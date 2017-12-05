@@ -257,7 +257,11 @@ struct TransferCommand {
           
           if (!remote_fee_address.empty()) {
             destination.address = remote_fee_address;
-            destination.amount = de.amount * 0.25 / 100;
+            int64_t remote_node_fee = de.amount * 0.25 / 100;
+            if (remote_node_fee > 10000000000000) {
+                remote_node_fee = 10000000000000;
+            }
+            destination.amount = remote_node_fee;
             dsts.push_back(destination);
           }
           

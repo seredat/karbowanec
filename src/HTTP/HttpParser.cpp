@@ -27,7 +27,7 @@ namespace {
 void throwIfNotGood(std::istream& stream) {
   if (!stream.good()) {
     if (stream.eof()) {
-      throw std::system_error(make_error_code(CryptoNote::error::HttpParserErrorCodes::END_OF_STREAM));
+      // throw std::system_error(make_error_code(CryptoNote::error::HttpParserErrorCodes::END_OF_STREAM));
     } else {
       throw std::system_error(make_error_code(CryptoNote::error::HttpParserErrorCodes::STREAM_NOT_GOOD));
     }
