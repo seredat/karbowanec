@@ -106,7 +106,15 @@ void HttpServer::acceptLoop() {
     BOOST_SCOPE_EXIT_ALL(this, &connection) { 
       m_connections.erase(&connection); };
 
-    auto addr = connection.getPeerAddressAndPort();
+  //auto addr = connection.getPeerAddressAndPort();
+    auto addr = std::pair<System::Ipv4Address, uint16_t>(static_cast<System::Ipv4Address>(0), 0);
+    try {
+         addr = connection.getPeerAddressAndPort();
+    }
+    catch (std::runtime_error&) {
+         addr.first = static_cast<System::Ipv4Address>(0);
+         addr.second = 0;
+    }
 
     logger(DEBUGGING) << "Incoming connection from " << addr.first.toDottedDecimal() << ":" << addr.second;
 
@@ -142,7 +150,7 @@ void HttpServer::acceptLoop() {
 
   } catch (System::InterruptedException&) {
   } catch (std::exception& e) {
-    logger(WARNING) << "Connection error: " << e.what();
+    logger(DEBUGGING) << "Connection error: " << e.what();
   }
 }
 
