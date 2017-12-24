@@ -22,29 +22,11 @@
 #include <CryptoTypes.h>
 #include "generic-ops.h"
 
-#if defined(_MSC_VER)
-#define POD_CLASS struct
-#else
-#define POD_CLASS class
-#endif
-
 namespace Crypto {
 
   extern "C" {
 #include "hash-ops.h"
   }
-
-#pragma pack(push, 1)
-  POD_CLASS hash{
-	  char data[HASH_SIZE];
-  };
-  POD_CLASS hash8{
-	  char data[8];
-  };
-#pragma pack(pop)
-
-  static_assert(sizeof(hash) == HASH_SIZE, "Invalid structure size");
-  static_assert(sizeof(hash8) == 8, "Invalid structure size");
 
   /*
     Cryptonight hash functions
@@ -77,8 +59,7 @@ namespace Crypto {
   };
 
   inline void cn_slow_hash(cn_context &context, const void *data, size_t length, Hash &hash) {
-    //(*cn_slow_hash_f)(context.data, data, length, reinterpret_cast<void *>(&hash));
-    cn_slow_hash(data, length, reinterpret_cast<char *>(&hash));
+	cn_slow_hash(data, length, reinterpret_cast<char *>(&hash));
   }
 
   inline void tree_hash(const Hash *hashes, size_t count, Hash &root_hash) {
@@ -96,4 +77,3 @@ namespace Crypto {
 }
 
 CRYPTO_MAKE_HASHABLE(Hash)
-CRYPTO_MAKE_COMPARABLE(hash8)

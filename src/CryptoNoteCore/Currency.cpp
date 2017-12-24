@@ -707,7 +707,7 @@ namespace CryptoNote {
 			throw std::invalid_argument("val at upgradeWindow()");
 		}
 
-		m_currency.m_upgradeWindow = val;
+		m_currency.m_upgradeWindow = static_cast<uint32_t>(val);
 		return *this;
 	}
 

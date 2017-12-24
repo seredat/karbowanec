@@ -26,6 +26,7 @@
 
 #include <boost/program_options/variables_map.hpp>
 
+#include "android.h"
 #include "IWalletLegacy.h"
 #include "PasswordContainer.h"
 

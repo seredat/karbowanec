@@ -33,10 +33,10 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "aesb.c" // comment on Android???
 #include "common/int-util.h"
 #include "hash-ops.h"
 #include "oaes_lib.h"
+#include "aesb.h"
 
 #define MEMORY         (1 << 21) // 2MB scratchpad
 #define ITER           (1 << 20)
@@ -45,16 +45,10 @@
 #define INIT_SIZE_BLK   8
 #define INIT_SIZE_BYTE (INIT_SIZE_BLK * AES_BLOCK_SIZE)
 
-// uncomment on Android???
 //extern int aesb_single_round(const uint8_t *in, uint8_t*out, const uint8_t *expandedKey);
 //extern int aesb_pseudo_round(const uint8_t *in, uint8_t *out, const uint8_t *expandedKey);
 
-// comment on Android???
-extern void aesb_single_round(const uint8_t *in, uint8_t*out, const uint8_t *expandedKey);
-extern void aesb_pseudo_round(const uint8_t *in, uint8_t *out, const uint8_t *expandedKey);
-
-
-#if defined(__x86_64__) || (defined(_MSC_VER) && defined(_WIN64))
+#if !defined NO_AES && (defined(__x86_64__) || (defined(_MSC_VER) && defined(_WIN64)))
 // Optimised code below, uses x86-specific intrinsics, SSE2, AES-NI
 // Fall back to more portable code is down at the bottom
 
@@ -523,6 +517,7 @@ void slow_hash_free_state(void)
  * @param hash a pointer to a buffer in which the final 256 bit hash will be stored
  */
 
+
 void cn_slow_hash(const void *data, size_t length, char *hash)
 {
     RDATA_ALIGN16 uint8_t expandedKey[240];  /* These buffers are aligned to use later with SSE functions */
@@ -652,7 +647,7 @@ void cn_slow_hash(const void *data, size_t length, char *hash)
     extra_hashes[state.hs.b[0] & 3](&state, 200, hash);
 }
 
-#elif defined(__arm__) || defined(__aarch64__)
+#elif !defined NO_AES && (defined(__arm__) || defined(__aarch64__))
 void slow_hash_allocate_state(void)
 {
   // Do nothing, this is just to maintain compatibility with the upgraded slow-hash.c
@@ -1065,12 +1060,7 @@ void cn_slow_hash(const void *data, size_t length, char *hash)
         hash_extra_blake, hash_extra_groestl, hash_extra_jh, hash_extra_skein
     };
 
-#ifndef FORCE_USE_HEAP
-    uint8_t long_state[MEMORY];
-#else
-    uint8_t *long_state = NULL;
-    long_state = (uint8_t *)malloc(MEMORY);
-#endif
+    uint8_t *long_state = (uint8_t*)malloc(MEMORY);
 
     hash_process(&state.hs, data, length);
     memcpy(text, state.init, INIT_SIZE_BYTE);
@@ -1131,9 +1121,8 @@ void cn_slow_hash(const void *data, size_t length, char *hash)
     memcpy(state.init, text, INIT_SIZE_BYTE);
     hash_permutation(&state.hs);
     extra_hashes[state.hs.b[0] & 3](&state, 200, hash);
-#ifdef FORCE_USE_HEAP
-    free(long_state);
-#endif
+
+	free(long_state);
 }
 #endif /* !aarch64 || !crypto */
 

@@ -20,6 +20,7 @@
 #include <string.h>
 #include <tuple>
 #include <boost/uuid/uuid.hpp>
+#include "android.h"
 #include "Common/StringTools.h"
 
 namespace CryptoNote

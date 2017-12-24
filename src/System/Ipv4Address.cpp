@@ -17,6 +17,7 @@
 
 #include "Ipv4Address.h"
 #include <stdexcept>
+#include "android.h"
 
 namespace System {
 

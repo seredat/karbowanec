@@ -20,6 +20,7 @@
 #include <iostream>
 #include <map>
 #include <string>
+#include "android.h"
 
 namespace CryptoNote {
   class HttpRequest {
