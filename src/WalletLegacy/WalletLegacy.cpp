@@ -25,6 +25,13 @@
 #include "WalletLegacy/WalletLegacySerialization.h"
 #include "WalletLegacy/WalletLegacySerializer.h"
 #include "WalletLegacy/WalletUtils.h"
+#include "mnemonics/electrum-words.h"
+
+extern "C"
+{
+#include "crypto/keccak.h"
+#include "crypto/crypto-ops.h"
+}
 
 using namespace Crypto;
 
@@ -156,6 +163,7 @@ void WalletLegacy::initAndGenerate(const std::string& password) {
     }
 
     m_account.generate();
+	//m_account.generateDeterministic();
     m_password = password;
 
     initSync();
@@ -165,21 +173,38 @@ void WalletLegacy::initAndGenerate(const std::string& password) {
 }
 
 void WalletLegacy::initAndGenerateDeterministic(const std::string& password) {
-	{
-		std::unique_lock<std::mutex> stateLock(m_cacheMutex);
+  {
+    std::unique_lock<std::mutex> stateLock(m_cacheMutex);
 
-		if (m_state != NOT_INITIALIZED) {
-			throw std::system_error(make_error_code(error::ALREADY_INITIALIZED));
-		}
+    if (m_state != NOT_INITIALIZED) {
+      throw std::system_error(make_error_code(error::ALREADY_INITIALIZED));
+    }
 
-		m_account.generateDeterministic();
-		m_password = password;
+    m_account.generateDeterministic();
+    m_password = password;
 
-		initSync();
-	}
+    initSync();
+  }
 
-	m_observerManager.notify(&IWalletLegacyObserver::initCompleted, std::error_code());
+  m_observerManager.notify(&IWalletLegacyObserver::initCompleted, std::error_code());
 }
+
+Crypto::SecretKey WalletLegacy::generateKey(const std::string& password, const Crypto::SecretKey& recovery_param, bool recover, bool two_random) {
+  std::unique_lock<std::mutex> stateLock(m_cacheMutex);
+
+  if (m_state != NOT_INITIALIZED) {
+    throw std::system_error(make_error_code(error::ALREADY_INITIALIZED));
+  }
+
+  Crypto::SecretKey retval = m_account.generate_key(recovery_param, recover, two_random);
+  m_password = password;
+
+  initSync();
+
+  m_observerManager.notify(&IWalletLegacyObserver::initCompleted, std::error_code());
+  return retval;
+}
+
 
 void WalletLegacy::initWithKeys(const AccountKeys& accountKeys, const std::string& password) {
   {
@@ -391,6 +416,19 @@ std::error_code WalletLegacy::changePassword(const std::string& oldPassword, con
   m_password = newPassword;
 
   return std::error_code();
+}
+
+bool WalletLegacy::getSeed(std::string& electrum_words)
+{
+	std::string lang = "English";
+	Crypto::ElectrumWords::bytes_to_words(m_account.getAccountKeys().spendSecretKey, electrum_words, lang);
+
+	Crypto::SecretKey second;
+	keccak((uint8_t *)&m_account.getAccountKeys().spendSecretKey, sizeof(Crypto::SecretKey), (uint8_t *)&second, sizeof(Crypto::SecretKey));
+
+	sc_reduce32((uint8_t *)&second);
+
+	return memcmp(second.data, m_account.getAccountKeys().viewSecretKey.data, sizeof(Crypto::SecretKey)) == 0;
 }
 
 std::string WalletLegacy::getAddress() {

@@ -26,6 +26,7 @@
 #include "CryptoNoteCore/Account.h"
 #include "crypto/hash.h"
 #include "WalletLegacy/WalletHelper.h"
+#include "WalletLegacy/WalletLegacy.h"
 // #include "wallet_errors.h"
 
 #include "Rpc/JsonRpc.h"
@@ -115,6 +116,8 @@ void wallet_rpc_server::processRequest(const CryptoNote::HttpRequest& request, C
       { "get_payments", makeMemberMethod(&wallet_rpc_server::on_get_payments) },
       { "get_transfers", makeMemberMethod(&wallet_rpc_server::on_get_transfers) },
       { "get_height", makeMemberMethod(&wallet_rpc_server::on_get_height) },
+      { "get_address", makeMemberMethod(&wallet_rpc_server::on_get_address) },
+      { "query_key", makeMemberMethod(&wallet_rpc_server::on_query_key) },
       { "reset", makeMemberMethod(&wallet_rpc_server::on_reset) }
     };
 
@@ -291,6 +294,28 @@ bool wallet_rpc_server::on_get_transfers(const wallet_rpc::COMMAND_RPC_GET_TRANS
 
 bool wallet_rpc_server::on_get_height(const wallet_rpc::COMMAND_RPC_GET_HEIGHT::request& req, wallet_rpc::COMMAND_RPC_GET_HEIGHT::response& res) {
   res.height = m_node.getLastLocalBlockHeight();
+  return true;
+}
+
+bool wallet_rpc_server::on_get_address(const wallet_rpc::COMMAND_RPC_GET_ADDRESS::request& req, wallet_rpc::COMMAND_RPC_GET_ADDRESS::response& res) {
+  res.address = m_wallet.getAddress();
+  return true;
+}
+
+bool wallet_rpc_server::on_query_key(const wallet_rpc::COMMAND_RPC_QUERY_KEY::request& req, wallet_rpc::COMMAND_RPC_QUERY_KEY::response& res) {
+  if (req.key_type.compare("mnemonic") == 0) {
+    if (!m_wallet.getSeed(res.key))
+    {
+      throw JsonRpc::JsonRpcError(WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR, std::string("The wallet is non-deterministic. Cannot display seed."));
+      return false;
+    }
+  }
+  else
+  {
+    throw JsonRpc::JsonRpcError(WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR, std::string("key_type ") + req.key_type + std::string(" not found"));
+    return false;
+  }
+
   return true;
 }
 

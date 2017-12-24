@@ -71,6 +71,27 @@ namespace Crypto {
     ge_p3_tobytes(reinterpret_cast<unsigned char*>(&pub), &point);
   }
 
+  SecretKey crypto_ops::generate_m_keys(PublicKey &pub, SecretKey &sec, const SecretKey& recovery_key, bool recover) {
+    lock_guard<mutex> lock(random_lock);
+    ge_p3 point;
+    SecretKey rng;
+    if (recover)
+    {
+      rng = recovery_key;
+    }
+    else
+    {
+      random_scalar(reinterpret_cast<EllipticCurveScalar&>(rng));
+    }
+    sec = rng;
+    sc_reduce32(reinterpret_cast<unsigned char*>(&sec)); // reduce in case second round of keys (sendkeys)
+    ge_scalarmult_base(&point, reinterpret_cast<unsigned char*>(&sec));
+    ge_p3_tobytes(reinterpret_cast<unsigned char*>(&pub), &point);
+
+    return rng;
+  }
+
+
   bool crypto_ops::check_key(const PublicKey &key) {
     ge_p3 point;
     return ge_frombytes_vartime(&point, reinterpret_cast<const unsigned char*>(&key)) == 0;

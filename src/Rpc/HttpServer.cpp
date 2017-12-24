@@ -109,11 +109,11 @@ void HttpServer::acceptLoop() {
   //auto addr = connection.getPeerAddressAndPort();
     auto addr = std::pair<System::Ipv4Address, uint16_t>(static_cast<System::Ipv4Address>(0), 0);
     try {
-         addr = connection.getPeerAddressAndPort();
+      addr = connection.getPeerAddressAndPort();
     }
     catch (std::runtime_error&) {
-         addr.first = static_cast<System::Ipv4Address>(0);
-         addr.second = 0;
+      workingContextGroup.spawn(std::bind(&HttpServer::acceptLoop, this));
+	  return;
     }
 
     logger(DEBUGGING) << "Incoming connection from " << addr.first.toDottedDecimal() << ":" << addr.second;
@@ -124,7 +124,7 @@ void HttpServer::acceptLoop() {
     std::iostream stream(&streambuf);
     HttpParser parser;
 
-    for (;;) {
+	for (;;) {
       HttpRequest req;
       HttpResponse resp;
 	  resp.addHeader("Access-Control-Allow-Origin", "*");
