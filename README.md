@@ -1,4 +1,4 @@
-The karbowanec is Ukrainian national cryptocurrency, just like Bitcoin but more anonymous and privacy centric with opaque and more analysis resistant blockchain. It is people's electronic cash, not connected to government or officials.
+The Karbo (Karbovanets) is cryptocurrency of Ukrainian origin, just like Bitcoin but more anonymous and privacy centric with opaque and more analysis resistant blockchain. It is people's electronic cash, not connected to government or officials.
 
 ## Building Karbo 
 
@@ -54,6 +54,7 @@ tar xjf boost_1_65_1.tar.bz2
 cd boost_1_65_1
 ./bootstrap.sh
 ```
+apply patch from external/boost1_65_1/libs/filesystem/src
 
 Build Boost with the 32 bit toolchain
 ```
