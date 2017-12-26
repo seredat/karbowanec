@@ -20,7 +20,7 @@ string to_string(T value)
     return os.str();
 }
 
-
+/*
 inline unsigned long stoul (std::string const& str, size_t *idx = 0, int base = 10)
 {
     char *endp;
@@ -36,6 +36,6 @@ inline unsigned long stoul (std::string const& str, size_t *idx = 0, int base = 
 
     return value;
 }
-
+*/
 }// namespace std
 #endif
