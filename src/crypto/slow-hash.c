@@ -33,7 +33,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "common/int-util.h"
+#include "Common/int-util.h"
 #include "hash-ops.h"
 #include "oaes_lib.h"
 #include "aesb.h"
