@@ -38,3 +38,33 @@ cmake -G "Visual Studio 12 Win64" ..
 
 And then do Build.
 Good luck!
+
+### Building for Android on Linux
+
+Set up the 32 bit toolchain
+Download and extract the Android SDK and NDK
+```
+android-ndk-r15c/build/tools/make_standalone_toolchain.py --api 21 --stl=libc++ --arch arm --install-dir /opt/android/tool32
+```
+
+Download and setup the Boost 1.65.1 source
+```
+wget https://sourceforge.net/projects/boost/files/boost/1.65.1/boost_1_65_1.tar.bz2/download -O boost_1_65_1.tar.bz2
+tar xjf boost_1_65_1.tar.bz2
+cd boost_1_65_1
+./bootstrap.sh
+```
+
+Build Boost with the 32 bit toolchain
+```
+export PATH=/opt/android/tool32/arm-linux-androideabi/bin:/opt/android/tool32/bin:$PATH
+./b2 abi=aapcs architecture=arm binary-format=elf address-model=32 link=static runtime-link=static --with-chrono --with-date_time --with-filesystem --with-program_options --with-regex --with-serialization --with-system --with-thread --with-context --with-coroutine --with-atomic --build-dir=android32 --stagedir=android32 toolset=clang threading=multi threadapi=pthread target-os=android --reconfigure stage
+```
+
+Build Karbo for 32 bit Android
+```
+mkdir -p build/release.android32
+cd build/release.android32
+CC=clang CXX=clang++ cmake -D BUILD_TESTS=OFF -D ARCH="armv7-a" -ldl -D STATIC=ON -D BUILD_64=OFF -D CMAKE_BUILD_TYPE=release -D ANDROID=true -D BUILD_TAG="android" -D BOOST_ROOT=/opt/android/boost_1_65_1 -D BOOST_LIBRARYDIR=/opt/android/boost_1_65_1/android32/lib -D CMAKE_POSITION_INDEPENDENT_CODE:BOOL=true -D BOOST_IGNORE_SYSTEM_PATHS_DEFAULT=ON ../..
+make SimpleWallet
+```
