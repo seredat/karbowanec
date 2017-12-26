@@ -36,7 +36,7 @@ LoggerMessage::~LoggerMessage() {
   }
 }
 
-#ifndef __linux__
+#if defined(__ANDROID__) || defined(__APPLE__) || defined(WIN32)
 LoggerMessage::LoggerMessage(LoggerMessage&& other)
   : std::ostream(std::move(other))
   , std::streambuf(std::move(other))
