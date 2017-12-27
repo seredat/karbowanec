@@ -1,21 +1,23 @@
+// Copyright (c) 2012-2013, The Cryptonote developers
 // Copyright (c) 2014-2017, The Monero Project
-//
+// Copyright (c) 2017-2018, Karbo developers
+// 
 // All rights reserved.
-//
+// 
 // Redistribution and use in source and binary forms, with or without modification, are
 // permitted provided that the following conditions are met:
-//
+// 
 // 1. Redistributions of source code must retain the above copyright notice, this list of
 //    conditions and the following disclaimer.
-//
+// 
 // 2. Redistributions in binary form must reproduce the above copyright notice, this list
 //    of conditions and the following disclaimer in the documentation and/or other
 //    materials provided with the distribution.
-//
+// 
 // 3. Neither the name of the copyright holder nor the names of its contributors may be
 //    used to endorse or promote products derived from this software without specific
 //    prior written permission.
-//
+// 
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
 // EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
 // MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
@@ -25,8 +27,6 @@
 // INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-//
-// Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
 #include <assert.h>
 #include <stddef.h>
@@ -540,8 +540,10 @@ void cn_slow_hash(const void *data, size_t length, char *hash)
         hash_extra_blake, hash_extra_groestl, hash_extra_jh, hash_extra_skein
     };
 
-    // this isn't supposed to happen, but guard against it for now.
-    if(hp_state == NULL)
+	// hp_state is supposed to be managed externally with respect to the 2MB scratchpad reusage logic.
+	// However, if it is not managed, it needs to be locally allocated/freed.
+    int bLocalStateAllocation = (hp_state == NULL);
+	if (bLocalStateAllocation)
         slow_hash_allocate_state();
 
     /* CryptoNight Step 1:  Use Keccak1600 to initialize the 'state' (and 'text') buffers from the data. */
@@ -645,6 +647,9 @@ void cn_slow_hash(const void *data, size_t length, char *hash)
     memcpy(state.init, text, INIT_SIZE_BYTE);
     hash_permutation(&state.hs);
     extra_hashes[state.hs.b[0] & 3](&state, 200, hash);
+
+	if (bLocalStateAllocation)
+		slow_hash_free_state();
 }
 
 #elif !defined NO_AES && (defined(__arm__) || defined(__aarch64__))
