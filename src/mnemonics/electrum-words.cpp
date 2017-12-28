@@ -121,7 +121,7 @@ bool find_seed_language(const std::vector<std::string> &seed, bool has_checksum,
 	Language::Base *fallback = NULL;
 
 	// Iterate through all the languages and find a match
-	for (auto& it1 = Language::c_languageMap.cbegin(); it1 != Language::c_languageMap.cend(); ++it1)
+	for (auto it1 = Language::c_languageMap.cbegin(); it1 != Language::c_languageMap.cend(); ++it1)
 	{
 		std::shared_ptr<Language::Base>& lang = it1->second;
 
@@ -362,10 +362,10 @@ bool bytes_to_words(const Crypto::SecretKey& src, std::string& words, const std:
 void get_language_list(std::vector<std::string> &languages)
 {
     languages.clear();
-	auto& itBegin = Language::c_languageMap.cbegin();
-	auto& itEnd   = Language::c_languageMap.cend();
+	auto itBegin = Language::c_languageMap.cbegin();
+	auto itEnd   = Language::c_languageMap.cend();
 	std::transform(itBegin, itEnd, std::back_inserter(languages), 
-		[](auto& pair){ return pair.first; });
+		[](const Language::LanguageMap::value_type& pair){ return pair.first; });
 }
 
 /*!
