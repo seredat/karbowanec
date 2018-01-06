@@ -95,7 +95,15 @@ using CryptoNote::ISerializer;
 	struct COMMAND_RPC_STORE
 	{
 		typedef CryptoNote::EMPTY_STRUCT request;
-		typedef CryptoNote::EMPTY_STRUCT response;
+		struct response
+		{
+			bool stored;
+
+			void serialize(ISerializer& s)
+			{
+				KV_MEMBER(stored)
+			}
+		};
 	};
 
 	/* Command: get_payments */

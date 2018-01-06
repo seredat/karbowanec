@@ -233,11 +233,12 @@ bool wallet_rpc_server::on_store(const wallet_rpc::COMMAND_RPC_STORE::request& r
 {
 	try
 	{
-		WalletHelper::storeWallet(m_wallet, m_walletFilename);
+		res.stored = WalletHelper::storeWallet(m_wallet, m_walletFilename);
 	}
 	catch (std::exception& e)
 	{
 		throw JsonRpc::JsonRpcError(WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR, std::string("Couldn't save wallet: ") + e.what());
+		return false;
 	}
 	return true;
 }

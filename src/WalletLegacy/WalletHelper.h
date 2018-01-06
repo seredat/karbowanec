@@ -65,7 +65,7 @@ private:
 };
 
 void prepareFileNames(const std::string& file_path, std::string& keys_file, std::string& wallet_file);
-void storeWallet(CryptoNote::IWalletLegacy& wallet, const std::string& walletFilename);
+bool storeWallet(CryptoNote::IWalletLegacy& wallet, const std::string& walletFilename);
 
 }
 }
