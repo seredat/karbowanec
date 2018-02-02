@@ -116,6 +116,7 @@ namespace CryptoNote {
     void get_difference(const std::vector<Crypto::Hash>& known_tx_ids, std::vector<Crypto::Hash>& new_tx_ids, std::vector<Crypto::Hash>& deleted_tx_ids) const;
     size_t get_transactions_count() const;
     std::string print_pool(bool short_format) const;
+	
     void on_idle();
 
     bool getTransactionIdsByPaymentId(const Crypto::Hash& paymentId, std::vector<Crypto::Hash>& transactionIds);
@@ -150,6 +151,9 @@ namespace CryptoNote {
       bool keptByBlock;
       time_t receiveTime;
     };
+
+	void getMemoryPool(std::list<CryptoNote::tx_memory_pool::TransactionDetails> txs) const;
+	std::list<CryptoNote::tx_memory_pool::TransactionDetails> getMemoryPool() const;
 
   private:
 

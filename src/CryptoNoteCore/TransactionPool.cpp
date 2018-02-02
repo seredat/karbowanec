@@ -22,6 +22,7 @@
 #include <ctime>
 #include <vector>
 #include <unordered_set>
+#include <unordered_map>
 
 #include <boost/filesystem.hpp>
 
@@ -263,6 +264,24 @@ namespace CryptoNote {
       txs.push_back(tx_vt.tx);
     }
   }
+
+  //---------------------------------------------------------------------------------
+  void tx_memory_pool::getMemoryPool(std::list<tx_memory_pool::TransactionDetails> txs) const {
+	  std::lock_guard<std::recursive_mutex> lock(m_transactions_lock);
+	  for (const auto& txd : m_fee_index) {
+		  txs.push_back(txd);
+	  }
+  }
+
+  std::list<CryptoNote::tx_memory_pool::TransactionDetails> tx_memory_pool::getMemoryPool() const {
+	  std::lock_guard<std::recursive_mutex> lock(m_transactions_lock);
+	  std::list<tx_memory_pool::TransactionDetails> txs;
+	  for (const auto& txd : m_fee_index) {
+		  txs.push_back(txd);
+	  }
+	  return txs;
+  }
+
   //---------------------------------------------------------------------------------
   void tx_memory_pool::get_difference(const std::vector<Crypto::Hash>& known_tx_ids, std::vector<Crypto::Hash>& new_tx_ids, std::vector<Crypto::Hash>& deleted_tx_ids) const {
     std::lock_guard<std::recursive_mutex> lock(m_transactions_lock);

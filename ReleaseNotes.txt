@@ -1,3 +1,52 @@
+Release notes Karbowanec 1.4.6
+
+- Android platform support
+- Added logging to blockchain synchronizer
+- Refactored mnemonics
+- Fixed memory leaks in mnemonics
+- Fixed memory leak in simplewallet
+- Fixed memory leak in cn_slow_hash
+- Minor optimization of JSON KV-serializer
+- LoggerMessage implementation is now platform-independent
+
+Release notes Karbowanec 1.4.5
+
+- Deterministic wallets and Mnemonic seed, courtesy of Monero Developers
+- Various build fixes
+- Transactions confirmations in RPC response for walletd
+- Log file location for simplewallet
+- New RPC methods
+- Support for solo GPU mining
+
+Release notes Karbowanec 1.4.4
+
+- Transaction size limit
+- Additional validation and attribution
+
+Release notes Karbowanec 1.4.3
+
+- Change of the Network ID
+- Security update to address Disclosure of a Major Bug in CryptoNote Based Currencies by Monero developers
+
+Release notes Karbowanec 1.4.2
+
+- OpenAlias support in simplewallet
+- More friendly simplewallet prompt
+
+Release notes Karbowanec 1.4.1
+
+- Additional transaction validation
+
+Release notes Karbowanec 1.4.0
+
+- GUI wallet mining support
+- Simplewallet export/import keys
+- Simplewallet import paperwallet/backup keys
+- Simplewallet export/import tracking keys
+- Change password in simplewallet
+
+
+
 Release notes Karbowanec 1.3.0
 
 - Bytecoin core 1.0.11 transition

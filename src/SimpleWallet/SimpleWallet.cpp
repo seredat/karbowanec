@@ -102,6 +102,7 @@ namespace po = boost::program_options;
 
 namespace {
 
+const command_line::arg_descriptor<std::string> arg_config_file = { "config-file", "Specify configuration file", "" };
 const command_line::arg_descriptor<std::string> arg_wallet_file = { "wallet-file", "Use wallet <arg>", "" };
 const command_line::arg_descriptor<std::string> arg_generate_new_wallet = { "generate-new-wallet", "Generate new wallet and save it to <arg>", "" };
 const command_line::arg_descriptor<std::string> arg_daemon_address = { "daemon-address", "Use daemon instance at <host>:<port>", "" };
@@ -1838,10 +1839,10 @@ bool simple_wallet::fetch_dns_txt(const std::string domain, std::string &record)
 		ns_type type = ns_t_txt;
 
 		const char * c_domain = (domain).c_str();
-		response = res_query(c_domain, C_IN, type, query_buffer, sizeof(query_buffer));
+		response = res_query(c_domain, 1, type, query_buffer, sizeof(query_buffer));
 
 		if (response < 0)
-			return false;
+			return 1;
 	}
 
 	ns_initparse(query_buffer, response, &nsMsg);
@@ -2027,6 +2028,7 @@ int main(int argc, char* argv[]) {
   po::options_description desc_general("General options");
   command_line::add_arg(desc_general, command_line::arg_help);
   command_line::add_arg(desc_general, command_line::arg_version);
+  command_line::add_arg(desc_general, arg_config_file);
 
   po::options_description desc_params("Wallet options");
   command_line::add_arg(desc_params, arg_wallet_file);
@@ -2072,8 +2074,23 @@ int main(int argc, char* argv[]) {
       return false;
     }
 
-    auto parser = po::command_line_parser(argc, argv).options(desc_params).positional(positional_options);
+    auto parser = po::command_line_parser(argc, argv).options(desc_all).positional(positional_options);
     po::store(parser.run(), vm);
+
+    const std::string config = vm["config-file"].as<std::string>();
+	if (!config.empty()) {
+      boost::filesystem::path full_path(boost::filesystem::current_path());
+      boost::filesystem::path config_path(config);
+      if (!config_path.has_parent_path()) {
+        config_path = full_path / config_path;
+      }
+
+      boost::system::error_code ec;
+      if (boost::filesystem::exists(config_path, ec)) {
+         po::store(po::parse_config_file<char>(config_path.string<std::string>().c_str(), desc_params, true), vm);
+      }
+    }
+	
     po::notify(vm);
     return true;
   });
@@ -2083,7 +2100,6 @@ int main(int argc, char* argv[]) {
   
   auto modulePath = Common::NativePathToGeneric(argv[0]);
   auto cfgLogFile = Common::NativePathToGeneric(command_line::get_arg(vm, arg_log_file));
-
   if (cfgLogFile.empty()) {
     cfgLogFile = Common::ReplaceExtenstion(modulePath, ".log");
     } else {

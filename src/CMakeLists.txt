@@ -71,10 +71,8 @@ target_link_libraries(SimpleWallet Wallet NodeRpcProxy Transfers Rpc Http Crypto
 target_link_libraries(PaymentGateService PaymentGate JsonRpcServer Wallet NodeRpcProxy Transfers CryptoNoteCore Crypto P2P Rpc Http System Logging Common InProcessNode upnpc-static BlockchainExplorer ${Boost_LIBRARIES} Serialization ${EXTRA_LIBRARIES})
 target_link_libraries(Miner CryptoNoteCore Rpc System Http Logging Common Crypto ${Boost_LIBRARIES} Serialization ${EXTRA_LIBRARIES})
 
-if (LINUX)
-
+if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux" OR APPLE)
   target_link_libraries(SimpleWallet -lresolv)
-
 endif ()
 
 add_dependencies(Rpc version)
