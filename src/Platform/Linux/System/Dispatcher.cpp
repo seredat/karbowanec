@@ -58,7 +58,7 @@ private:
 
 static_assert(Dispatcher::SIZEOF_PTHREAD_MUTEX_T == sizeof(pthread_mutex_t), "invalid pthread mutex size");
 
-const size_t STACK_SIZE = 64 * 1024;
+const size_t STACK_SIZE = 512 * 1024;
 
 };
 
