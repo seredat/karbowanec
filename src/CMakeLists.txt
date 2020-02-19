@@ -86,12 +86,12 @@ if (MINGW)
   target_link_libraries(System ws2_32)
 endif()
 
-target_link_libraries(Daemon Rpc Http P2P CryptoNoteCore Logging Serialization Crypto System Checkpoints CryptoNoteProtocol BlockchainExplorer Common upnpc-static ${Boost_LIBRARIES})
+target_link_libraries(Daemon Rpc Http P2P CryptoNoteCore Logging Serialization Crypto System Checkpoints CryptoNoteProtocol BlockchainExplorer Common upnpc-static ${Boost_LIBRARIES} ${LMDB_LIBRARY})
 target_link_libraries(SimpleWallet Wallet Transfers NodeRpcProxy Rpc Http CryptoNoteCore Logging Serialization Crypto System Checkpoints Mnemonics Common ${Boost_LIBRARIES})
 target_link_libraries(GreenWallet Wallet Transfers NodeRpcProxy Rpc Http CryptoNoteCore Logging Serialization Crypto System Checkpoints Mnemonics Common ${Boost_LIBRARIES})
 target_link_libraries(Optimizer PaymentGate Rpc Http CryptoNoteCore Logging Serialization Crypto System Common ${Boost_LIBRARIES})
 target_link_libraries(PaymentGateService PaymentGate JsonRpcServer InProcessNode Wallet Transfers NodeRpcProxy Rpc Http P2P CryptoNoteCore Logging Serialization Crypto System Checkpoints
-                      CryptoNoteProtocol BlockchainExplorer Common upnpc-static ${Boost_LIBRARIES})
+                      CryptoNoteProtocol BlockchainExplorer Common upnpc-static ${Boost_LIBRARIES} ${LMDB_LIBRARY})
 target_link_libraries(AddressGenerator CryptoNoteCore Logging Serialization Crypto Mnemonics Common System ${Boost_LIBRARIES})
 
 if (OPENSSL_FOUND)
