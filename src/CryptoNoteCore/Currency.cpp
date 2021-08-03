@@ -397,6 +397,37 @@ namespace CryptoNote {
 		return Common::Format::parseAmount(str, amount);
 	}
 
+  // The idea is based on Zawy's post
+  // http://zawy1.blogspot.com/2017/12/using-difficulty-to-get-constant-value.html
+  // Moore's law application by Sergey Kozlov
+  uint64_t Currency::getMinimalFee(uint64_t avgCurrentDifficulty, uint64_t currentReward, uint64_t avgReferenceDifficulty, uint64_t avgReferenceReward, uint32_t height) const {
+    uint64_t minimumFee(0);
+    double minFee(0.0);
+    const double baseFee = static_cast<double>(250000000000);
+    const uint64_t blocksInTwoYears = expectedNumberOfBlocksPerDay() * 365 * 2;
+    double currentDifficultyMoore = static_cast<double>(avgCurrentDifficulty) / 
+                                    pow(2, static_cast<double>(height) / static_cast<double>(blocksInTwoYears));
+    minFee = baseFee * static_cast<double>(avgReferenceDifficulty) / currentDifficultyMoore *
+             static_cast<double>(currentReward) / static_cast<double>(avgReferenceReward);
+
+    // zero test 
+    if (minFee == 0 || !std::isfinite(minFee))
+      return CryptoNote::parameters::MAXIMUM_FEE;
+
+    minimumFee = static_cast<uint64_t>(minFee);
+
+    if (height > CryptoNote::parameters::UPGRADE_HEIGHT_V4_2) {
+      // Make all insignificant digits zero
+      uint64_t i = 1000000000;
+      while (i > 1) {
+        if (minimumFee > i * 100) { minimumFee = ((minimumFee + i / 2) / i) * i; break; }
+        else { i /= 10; }
+      }
+    }
+
+    return std::min<uint64_t>(CryptoNote::parameters::MAXIMUM_FEE, minimumFee);
+  }
+
   // All that exceeds 100 bytes is charged per byte,
   // the cost of one byte is 1/100 of minimal fee
   uint64_t Currency::getFeePerByte(const uint64_t txExtraSize, const uint64_t minFee) const {

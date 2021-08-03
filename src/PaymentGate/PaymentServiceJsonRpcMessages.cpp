@@ -72,6 +72,7 @@ void GetStatus::Response::serialize(CryptoNote::ISerializer& serializer) {
   serializer(localDaemonBlockCount, "localDaemonBlockCount");
   serializer(lastBlockHash, "lastBlockHash");
   serializer(peerCount, "peerCount");
+  serializer(minimalFee, "minimalFee");
   serializer(version, "version");
 }
 

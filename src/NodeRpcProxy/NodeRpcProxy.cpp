@@ -81,6 +81,7 @@ NodeRpcProxy::NodeRpcProxy(const std::string& nodeHost, unsigned short nodePort,
     m_nodeHeight(0),
     m_nextDifficulty(0),
     m_nextReward(0),
+    m_minimalFee(CryptoNote::parameters::MAXIMUM_FEE),
     m_alreadyGeneratedCoins(0),
     m_transactionsCount(0),
     m_transactionsPoolSize(0),
@@ -301,6 +302,7 @@ void NodeRpcProxy::updateBlockchainStatus() {
 
     updatePeerCount(getInfoResp.incoming_connections_count + getInfoResp.outgoing_connections_count);
 
+    m_minimalFee.store(getInfoResp.min_fee, std::memory_order_relaxed);
     m_nodeHeight.store(getInfoResp.height, std::memory_order_relaxed);
     m_nextDifficulty.store(getInfoResp.difficulty, std::memory_order_relaxed);
     m_nextReward.store(getInfoResp.next_reward, std::memory_order_relaxed);
@@ -411,6 +413,10 @@ uint32_t NodeRpcProxy::getKnownBlockCount() const {
 uint64_t NodeRpcProxy::getLastLocalBlockTimestamp() const {
   std::lock_guard<std::mutex> lock(m_mutex);
   return lastLocalBlockHeaderInfo.timestamp;
+}
+
+uint64_t NodeRpcProxy::getMinimalFee() const {
+  return m_minimalFee.load(std::memory_order_relaxed);
 }
 
 uint64_t NodeRpcProxy::getNextDifficulty() const {

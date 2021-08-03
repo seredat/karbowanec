@@ -429,6 +429,11 @@ uint64_t InProcessNode::getLastLocalBlockTimestamp() const {
   return lastLocalBlockHeaderInfo.timestamp;
 }
 
+uint64_t InProcessNode::getMinimalFee() const {
+  std::unique_lock<std::mutex> lock(mutex);
+  return core.getMinimalFee();
+}
+
 uint64_t InProcessNode::getNextDifficulty() const {
   std::unique_lock<std::mutex> lock(mutex);
   if (state != INITIALIZED) {
