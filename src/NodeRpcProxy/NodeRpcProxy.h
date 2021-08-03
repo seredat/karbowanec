@@ -66,7 +66,6 @@ public:
   virtual uint32_t getLocalBlockCount() const override;
   virtual uint32_t getKnownBlockCount() const override;
   virtual uint64_t getLastLocalBlockTimestamp() const override;
-  virtual uint64_t getMinimalFee() const override;
   virtual uint64_t getNextDifficulty() const override;
   virtual uint64_t getNextReward() const override;
   virtual uint64_t getAlreadyGeneratedCoins() const override;
@@ -184,7 +183,6 @@ private:
   std::atomic<size_t> m_peerCount;
   std::atomic<uint32_t> m_networkHeight;
   std::atomic<uint32_t> m_nodeHeight;
-  std::atomic<uint64_t> m_minimalFee;
   std::atomic<uint64_t> m_nextDifficulty;
   std::atomic<uint64_t> m_nextReward;
   std::atomic<uint64_t> m_alreadyGeneratedCoins;

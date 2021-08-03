@@ -1432,15 +1432,14 @@ std::error_code WalletService::getUnconfirmedTransactionHashes(const std::vector
   return std::error_code();
 }
 
-std::error_code WalletService::getStatus(uint32_t& blockCount, uint32_t& knownBlockCount, uint32_t& localDaemonBlockCount, std::string& lastBlockHash, uint32_t& peerCount, uint64_t& minimalFee) {
+std::error_code WalletService::getStatus(uint32_t& blockCount, uint32_t& knownBlockCount, uint32_t& localDaemonBlockCount, std::string& lastBlockHash, uint32_t& peerCount) {
   try {
     System::EventLock lk(readyEvent);
 
     knownBlockCount = node.getKnownBlockCount();
     peerCount = static_cast<uint32_t>(node.getPeerCount());
     blockCount = wallet.getBlockCount();
-	localDaemonBlockCount = node.getLocalBlockCount();
-	minimalFee = node.getMinimalFee();
+    localDaemonBlockCount = node.getLocalBlockCount();
 
     auto lastHashes = wallet.getBlockHashes(blockCount - 1, 1);
     lastBlockHash = Common::podToHex(lastHashes.back());

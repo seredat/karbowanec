@@ -62,7 +62,8 @@ const size_t   CRYPTONOTE_DISPLAY_DECIMAL_POINT              = 12;
 
 const uint64_t MINIMUM_FEE_V1                                = UINT64_C(100000000);
 const uint64_t MINIMUM_FEE_V2                                = UINT64_C(100000000000);
-const uint64_t MINIMUM_FEE                                   = MINIMUM_FEE_V2;
+const uint64_t MINIMUM_FEE_V3                                = UINT64_C(10000000000);
+const uint64_t MINIMUM_FEE                                   = MINIMUM_FEE_V3;
 const uint64_t MAXIMUM_FEE                                   = UINT64_C(100000000000);
 
 const uint64_t DEFAULT_DUST_THRESHOLD                        = UINT64_C(100000000);
@@ -110,6 +111,7 @@ const uint32_t UPGRADE_HEIGHT_V3_1                           = 216394; // Min fe
 const uint32_t UPGRADE_HEIGHT_V4                             = 266000; // Block v4, LWMA2, adaptive min fee, min mixin, disable slave merge mining
 const uint32_t UPGRADE_HEIGHT_V4_1                           = 300000; // LWMA3
 const uint32_t UPGRADE_HEIGHT_V4_2                           = 500000; // Fee per-byte for extra, ban unmixable denominations
+const uint32_t UPGRADE_HEIGHT_V4_3                           = 650000; // Fixed fee + fee per-byte for extra
 const uint32_t UPGRADE_HEIGHT_V5                             = 4294967294; // Block v5, back to LWMA1+
 
 const unsigned UPGRADE_VOTING_THRESHOLD                      = 90; // percent

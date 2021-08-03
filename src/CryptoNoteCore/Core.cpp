@@ -333,8 +333,8 @@ bool Core::check_tx_fee(const Transaction& tx, const Crypto::Hash& txHash, size_
     {
       enough = false;
     }
-    else if (height > CryptoNote::parameters::UPGRADE_HEIGHT_V4) {
-      uint64_t min = getMinimalFeeForHeight(height);
+    else if (height > CryptoNote::parameters::UPGRADE_HEIGHT_V4 && height < CryptoNote::parameters::UPGRADE_HEIGHT_V4_3) {
+      uint64_t min = CryptoNote::parameters::MINIMUM_FEE_V2;
 
       if (fee < (min - (min * 20 / 100))) {      
         enough = false;
@@ -348,6 +348,22 @@ bool Core::check_tx_fee(const Transaction& tx, const Crypto::Hash& txHash, size_
           logger(DEBUGGING) << "Transaction fee is insufficient due to additional data in extra";
           enough = false;
         }
+      }
+    }
+    else if (height > CryptoNote::parameters::UPGRADE_HEIGHT_V4_3) {
+      uint64_t min = CryptoNote::parameters::MINIMUM_FEE_V3;
+
+      if (fee < min) {
+        enough = false;
+      }
+
+      uint64_t extraSize = (uint64_t)tx.extra.size();
+      uint64_t feePerByte = m_currency.getFeePerByte(extraSize, min);
+      min += feePerByte;
+
+      if (fee < min) {
+        logger(DEBUGGING) << "Transaction fee is insufficient due to additional data in extra";
+        enough = false;
       }
     }
 
@@ -1209,14 +1225,6 @@ difficulty_type Core::getAvgDifficulty(uint32_t height, size_t window) {
 
 difficulty_type Core::getAvgDifficulty(uint32_t height) {
   return m_blockchain.getAvgDifficulty(height);
-}
-
-uint64_t Core::getMinimalFee() {
-  return getMinimalFeeForHeight(getCurrentBlockchainHeight() - 1);
-}
-
-uint64_t Core::getMinimalFeeForHeight(uint32_t height) {
-	return m_blockchain.getMinimalFee(height);
 }
 
 std::error_code Core::executeLocked(const std::function<std::error_code()>& func) {

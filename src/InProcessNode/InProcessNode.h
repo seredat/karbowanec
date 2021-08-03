@@ -59,7 +59,6 @@ public:
   virtual uint32_t getKnownBlockCount() const override;
   virtual uint32_t getNodeHeight() const override;
   virtual uint64_t getLastLocalBlockTimestamp() const override;
-  virtual uint64_t getMinimalFee() const override;
   virtual uint64_t getNextDifficulty() const override;
   virtual uint64_t getNextReward() const override;
   virtual uint64_t getAlreadyGeneratedCoins() const override;

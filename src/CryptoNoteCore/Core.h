@@ -95,8 +95,6 @@ namespace CryptoNote {
      virtual std::unique_ptr<IBlock> getBlock(const Crypto::Hash& blocksId) override;
      virtual bool handleIncomingTransaction(const Transaction& tx, const Crypto::Hash& txHash, size_t blobSize, tx_verification_context& tvc, bool keptByBlock, uint32_t height) override;
      virtual std::error_code executeLocked(const std::function<std::error_code()>& func) override;
-     virtual uint64_t getMinimalFeeForHeight(uint32_t height) override;
-     virtual uint64_t getMinimalFee() override;
 
      virtual bool addMessageQueue(MessageQueue<BlockchainMessage>& messageQueue) override;
      virtual bool removeMessageQueue(MessageQueue<BlockchainMessage>& messageQueue) override;

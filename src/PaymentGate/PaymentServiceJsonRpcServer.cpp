@@ -262,7 +262,7 @@ std::error_code PaymentServiceJsonRpcServer::handleGetMnemonicSeed(const GetMnem
 
 std::error_code PaymentServiceJsonRpcServer::handleGetStatus(const GetStatus::Request& request, GetStatus::Response& response) {
   response.version = PROJECT_VERSION_LONG;
-  return service.getStatus(response.blockCount, response.knownBlockCount, response.localDaemonBlockCount, response.lastBlockHash, response.peerCount, response.minimalFee);
+  return service.getStatus(response.blockCount, response.knownBlockCount, response.localDaemonBlockCount, response.lastBlockHash, response.peerCount);
 }
 
 std::error_code PaymentServiceJsonRpcServer::handleValidateAddress(const ValidateAddress::Request& request, ValidateAddress::Response& response) {
