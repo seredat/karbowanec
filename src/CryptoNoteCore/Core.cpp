@@ -1216,14 +1216,7 @@ std::vector<Crypto::Hash> Core::getTransactionHashesByPaymentId(const Crypto::Ha
 }
 
 uint64_t Core::getMinimalFee(const uint32_t height) {
-  if (height <= CryptoNote::parameters::UPGRADE_HEIGHT_V3_1)
-    return CryptoNote::parameters::MINIMUM_FEE_V1;
-  else if (height > CryptoNote::parameters::UPGRADE_HEIGHT_V3_1 && height <= CryptoNote::parameters::UPGRADE_HEIGHT_V4)
-    return CryptoNote::parameters::MINIMUM_FEE_V2;
-  else if (height > CryptoNote::parameters::UPGRADE_HEIGHT_V4 && height < CryptoNote::parameters::UPGRADE_HEIGHT_V4_3)
-    return CryptoNote::parameters::MINIMUM_FEE_V3;
-  else
-    return CryptoNote::parameters::MINIMUM_FEE_V3;
+  return m_currency.getMinimalFee(height);
 }
 
 uint64_t Core::getMinimalFee() {
