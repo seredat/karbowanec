@@ -509,14 +509,15 @@ bool Core::get_block_template(Block& b, const AccountPublicAddress& adr, difficu
   {
     LockedBlockchainStorage blockchainLock(m_blockchain);
     height = m_blockchain.getCurrentBlockchainHeight();
-    diffic = m_blockchain.getDifficultyForNextBlock();
+    b = boost::value_initialized<Block>();
+    b.majorVersion = m_blockchain.getBlockMajorVersionForHeight(height);
+    b.previousBlockHash = get_tail_id();
+    b.timestamp = time(NULL);
+    diffic = m_blockchain.getDifficultyForNextBlock(b.previousBlockHash);
     if (!(diffic)) {
       logger(ERROR, BRIGHT_RED) << "difficulty overhead.";
       return false;
     }
-
-    b = boost::value_initialized<Block>();
-    b.majorVersion = m_blockchain.getBlockMajorVersionForHeight(height);
 
     if (b.majorVersion == BLOCK_MAJOR_VERSION_1) {
       b.minorVersion = m_currency.upgradeHeight(BLOCK_MAJOR_VERSION_2) == UpgradeDetectorBase::UNDEF_HEIGHT ? BLOCK_MINOR_VERSION_1 : BLOCK_MINOR_VERSION_0;
@@ -541,9 +542,6 @@ bool Core::get_block_template(Block& b, const AccountPublicAddress& adr, difficu
     } else if (b.majorVersion >= BLOCK_MAJOR_VERSION_5) {
       b.minorVersion = m_currency.upgradeHeight(BLOCK_MAJOR_VERSION_5) == UpgradeDetectorBase::UNDEF_HEIGHT ? BLOCK_MINOR_VERSION_1 : BLOCK_MINOR_VERSION_0;
     }
-
-    b.previousBlockHash = get_tail_id();
-    b.timestamp = time(NULL);
 
     // Don't generate a block template with invalid timestamp
     // Fix by Jagerman
@@ -1248,7 +1246,7 @@ std::error_code Core::executeLocked(const std::function<std::error_code()>& func
 }
 
 uint64_t Core::getNextBlockDifficulty() {
-  return m_blockchain.getDifficultyForNextBlock();
+  return m_blockchain.getDifficultyForNextBlock(get_tail_id());
 }
 
 uint64_t Core::getTotalGeneratedAmount() {
