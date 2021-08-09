@@ -1228,7 +1228,7 @@ uint64_t Core::getMinimalFeeForHeight(const uint32_t height) {
     return CryptoNote::parameters::MINIMUM_FEE_V1;
   else if (height > CryptoNote::parameters::UPGRADE_HEIGHT_V3_1 && height <= CryptoNote::parameters::UPGRADE_HEIGHT_V4)
     return CryptoNote::parameters::MINIMUM_FEE_V2;
-  else if (height > CryptoNote::parameters::UPGRADE_HEIGHT_V4 && height < CryptoNote::parameters::MINIMUM_FEE_V3)
+  else if (height > CryptoNote::parameters::UPGRADE_HEIGHT_V4 && height < CryptoNote::parameters::UPGRADE_HEIGHT_V4_3)
     return m_blockchain.getMinimalFee(height);
   else
     return CryptoNote::parameters::MINIMUM_FEE_V3;
