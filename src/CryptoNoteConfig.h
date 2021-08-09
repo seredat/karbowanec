@@ -112,7 +112,7 @@ const uint32_t UPGRADE_HEIGHT_V4                             = 266000; // Block 
 const uint32_t UPGRADE_HEIGHT_V4_1                           = 300000; // LWMA3
 const uint32_t UPGRADE_HEIGHT_V4_2                           = 500000; // Fee per-byte for extra, ban unmixable denominations
 const uint32_t UPGRADE_HEIGHT_V4_3                           = 667000; // Fixed min fee + fee per-byte for extra
-const uint32_t UPGRADE_HEIGHT_V5                             = 4294967294; // Block v5, back to LWMA1+
+const uint32_t UPGRADE_HEIGHT_V5                             = 696969; // Block v5, back to LWMA1+, Alt. Signed Proof-of-Work
 
 const unsigned UPGRADE_VOTING_THRESHOLD                      = 90; // percent
 const uint32_t UPGRADE_VOTING_WINDOW                         = EXPECTED_NUMBER_OF_BLOCKS_PER_DAY;  // blocks
