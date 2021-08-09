@@ -51,7 +51,7 @@ jobs:
           echo "::set-output name=krb_ver::${krb_ver}"
 
       - name: Create Release
-        uses: softprops/action-gh-release@v0.1.11
+        uses: softprops/action-gh-release@v0.1.8
         with:
           files: ${{ steps.build.outputs.asset_path }}
           name: Karbo CLI Suite ${{ steps.build.outputs.krb_ver }}
@@ -95,7 +95,7 @@ jobs:
           echo "::set-output name=krb_ver::${krb_ver}"
 
       - name: Create Release
-        uses: softprops/action-gh-release@v0.1.11
+        uses: softprops/action-gh-release@v0.1.8
         with:
           files: ${{ steps.build.outputs.asset_path }}
           name: Karbo CLI Suite ${{ steps.build.outputs.krb_ver }}
@@ -140,7 +140,7 @@ jobs:
           echo "::set-output name=krb_ver::${krb_ver}"
 
       - name: Create Release
-        uses: softprops/action-gh-release@v0.1.11
+        uses: softprops/action-gh-release@v0.1.8
         with:
           files: ${{ steps.build.outputs.asset_path }}
           name: Karbo CLI Suite ${{ steps.build.outputs.krb_ver }}
@@ -186,7 +186,7 @@ jobs:
           echo "::set-output name=krb_ver::${krb_ver}"
 
       - name: Create Release
-        uses: softprops/action-gh-release@v0.1.11
+        uses: softprops/action-gh-release@v0.1.8
         with:
           files: ${{ steps.build.outputs.asset_path }}
           name: Karbo CLI Suite ${{ steps.build.outputs.krb_ver }}
