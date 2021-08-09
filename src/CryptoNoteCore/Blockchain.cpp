@@ -790,6 +790,7 @@ difficulty_type Blockchain::getAvgDifficulty(uint32_t height, size_t window) {
 
 difficulty_type Blockchain::getAvgDifficulty(uint32_t height) {
   std::lock_guard<decltype(m_blockchain_lock)> lk(m_blockchain_lock);
+  height = std::min<uint32_t>(height, (uint32_t)m_blocks.size() - 1);
   if (height <= 1)
     return 1;
   return m_blocks[std::min<difficulty_type>(height, m_blocks.size())].cumulative_difficulty / std::min<difficulty_type>(height, m_blocks.size());
