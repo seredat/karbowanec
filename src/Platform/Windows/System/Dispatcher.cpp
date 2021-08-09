@@ -80,11 +80,11 @@ Dispatcher::Dispatcher() {
         return;
       }
 
-      BOOL result2 = CloseHandle(completionPort);
-      assert(result2 == TRUE);
+      result = CloseHandle(completionPort);
+      assert(result == TRUE);
     }
 
-    BOOL result2 = ConvertFiberToThread();
+    result = ConvertFiberToThread();
     assert(result == TRUE);
   }
   

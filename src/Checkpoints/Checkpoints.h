@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2018, The TurtleCoin developers
-// Copyright (c) 2016-2020, The Karbo developers
+// Copyright (c) 2016-2021, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -37,7 +37,7 @@ namespace CryptoNote
     bool is_alternative_block_allowed(uint32_t blockchain_height, uint32_t block_height) const;
     std::vector<uint32_t> getCheckpointHeights() const;
 #ifndef __ANDROID__
-	bool load_checkpoints_from_dns();
+    bool load_checkpoints_from_dns();
 #endif
 
   private:

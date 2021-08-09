@@ -328,23 +328,37 @@ bool Core::check_tx_fee(const Transaction& tx, const Crypto::Hash& txHash, size_
   if (!isFusionTransaction && !m_checkpoints.is_in_checkpoint_zone(height)) {
     bool enough = true;
 
-    if ((height <= CryptoNote::parameters::UPGRADE_HEIGHT_V3_1 && fee < CryptoNote::parameters::MINIMUM_FEE_V1) ||
-        (height > CryptoNote::parameters::UPGRADE_HEIGHT_V3_1 && height <= CryptoNote::parameters::UPGRADE_HEIGHT_V4 && fee < CryptoNote::parameters::MINIMUM_FEE_V2))
-    {
+    uint64_t min = getMinimalFeeForHeight(height);
+
+    if (height <= CryptoNote::parameters::UPGRADE_HEIGHT_V4 && fee < min) {
       enough = false;
     }
-    else if (height > CryptoNote::parameters::UPGRADE_HEIGHT_V4) {
-      uint64_t min = getMinimalFeeForHeight(height);
-
+    else if (height > CryptoNote::parameters::UPGRADE_HEIGHT_V4 && height < CryptoNote::parameters::UPGRADE_HEIGHT_V4_3) {
       if (fee < (min - (min * 20 / 100))) {      
         enough = false;
       }
-
-      if (height > CryptoNote::parameters::UPGRADE_HEIGHT_V4_2) {
+      else {
+        if (height > CryptoNote::parameters::UPGRADE_HEIGHT_V4_2 && height < CryptoNote::parameters::UPGRADE_HEIGHT_V4_3) {
+          uint64_t extraSize = (uint64_t)tx.extra.size();
+          uint64_t feePerByte = m_currency.getFeePerByte(extraSize, min);
+          min += feePerByte;
+          if (fee < (min - min * 20 / 100)) {
+            logger(DEBUGGING) << "Transaction fee is insufficient due to additional data in extra";
+            enough = false;
+          }
+        }
+      }
+    }
+    else if (height >= CryptoNote::parameters::UPGRADE_HEIGHT_V4_3) {
+      if (fee < min) {
+        enough = false;
+      }
+      else {
         uint64_t extraSize = (uint64_t)tx.extra.size();
         uint64_t feePerByte = m_currency.getFeePerByte(extraSize, min);
         min += feePerByte;
-        if (fee < (min - min * 20 / 100)) {
+
+        if (fee < min) {
           logger(DEBUGGING) << "Transaction fee is insufficient due to additional data in extra";
           enough = false;
         }
@@ -495,14 +509,15 @@ bool Core::get_block_template(Block& b, const AccountKeys& acc, difficulty_type&
   {
     LockedBlockchainStorage blockchainLock(m_blockchain);
     height = m_blockchain.getCurrentBlockchainHeight();
-    diffic = m_blockchain.getDifficultyForNextBlock();
+    b = boost::value_initialized<Block>();
+    b.majorVersion = m_blockchain.getBlockMajorVersionForHeight(height);
+    b.previousBlockHash = get_tail_id();
+    b.timestamp = time(NULL);
+    diffic = m_blockchain.getDifficultyForNextBlock(b.previousBlockHash);
     if (!(diffic)) {
       logger(ERROR, BRIGHT_RED) << "difficulty overhead.";
       return false;
     }
-
-    b = boost::value_initialized<Block>();
-    b.majorVersion = m_blockchain.getBlockMajorVersionForHeight(height);
 
     if (b.majorVersion == BLOCK_MAJOR_VERSION_1) {
       b.minorVersion = m_currency.upgradeHeight(BLOCK_MAJOR_VERSION_2) == UpgradeDetectorBase::UNDEF_HEIGHT ? BLOCK_MINOR_VERSION_1 : BLOCK_MINOR_VERSION_0;
@@ -527,9 +542,6 @@ bool Core::get_block_template(Block& b, const AccountKeys& acc, difficulty_type&
     } else if (b.majorVersion >= BLOCK_MAJOR_VERSION_5) {
       b.minorVersion = m_currency.upgradeHeight(BLOCK_MAJOR_VERSION_5) == UpgradeDetectorBase::UNDEF_HEIGHT ? BLOCK_MINOR_VERSION_1 : BLOCK_MINOR_VERSION_0;
     }
-
-    b.previousBlockHash = get_tail_id();
-    b.timestamp = time(NULL);
 
     // Don't generate a block template with invalid timestamp
     // Fix by Jagerman
@@ -1217,12 +1229,19 @@ difficulty_type Core::getAvgDifficulty(uint32_t height) {
   return m_blockchain.getAvgDifficulty(height);
 }
 
-uint64_t Core::getMinimalFee() {
-  return getMinimalFeeForHeight(getCurrentBlockchainHeight() - 1);
+uint64_t Core::getMinimalFeeForHeight(const uint32_t height) {
+  if (height <= CryptoNote::parameters::UPGRADE_HEIGHT_V3_1)
+    return CryptoNote::parameters::MINIMUM_FEE_V1;
+  else if (height > CryptoNote::parameters::UPGRADE_HEIGHT_V3_1 && height <= CryptoNote::parameters::UPGRADE_HEIGHT_V4)
+    return CryptoNote::parameters::MINIMUM_FEE_V2;
+  else if (height > CryptoNote::parameters::UPGRADE_HEIGHT_V4 && height < CryptoNote::parameters::UPGRADE_HEIGHT_V4_3)
+    return m_blockchain.getMinimalFee(height);
+  else
+    return CryptoNote::parameters::MINIMUM_FEE_V3;
 }
 
-uint64_t Core::getMinimalFeeForHeight(uint32_t height) {
-	return m_blockchain.getMinimalFee(height);
+uint64_t Core::getMinimalFee() {
+  return getMinimalFeeForHeight(getCurrentBlockchainHeight() - 1);
 }
 
 std::error_code Core::executeLocked(const std::function<std::error_code()>& func) {
@@ -1233,7 +1252,7 @@ std::error_code Core::executeLocked(const std::function<std::error_code()>& func
 }
 
 uint64_t Core::getNextBlockDifficulty() {
-  return m_blockchain.getDifficultyForNextBlock();
+  return m_blockchain.getDifficultyForNextBlock(get_tail_id());
 }
 
 uint64_t Core::getTotalGeneratedAmount() {
