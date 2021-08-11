@@ -1301,4 +1301,34 @@ struct COMMAND_RPC_RESOLVE_OPEN_ALIAS {
   };
 };
 
+struct COMMAND_RPC_CHECK_PAYMENT_BY_PAYMENT_ID {
+  struct request {
+    std::string payment_id;
+    std::string view_key;
+    std::string address;
+    uint64_t amount;
+
+    void serialize(ISerializer &s) {
+      KV_MEMBER(payment_id)
+      KV_MEMBER(view_key)
+      KV_MEMBER(address)
+      KV_MEMBER(amount)
+    }
+  };
+
+  struct response {
+    std::vector<Crypto::Hash> transaction_hashes;
+    uint64_t received_amount = 0;
+    uint32_t confirmations = 0;
+    std::string status;
+
+    void serialize(ISerializer &s) {
+      KV_MEMBER(status)
+      KV_MEMBER(transaction_hashes);
+      KV_MEMBER(received_amount);
+      KV_MEMBER(confirmations);
+    }
+  };
+};
+
 }
