@@ -1106,6 +1106,7 @@ bool RpcServer::on_get_transaction_hashes_by_paymentid(const COMMAND_RPC_GET_TRA
 
 bool RpcServer::on_check_payment(const COMMAND_RPC_CHECK_PAYMENT_BY_PAYMENT_ID::request& req, COMMAND_RPC_CHECK_PAYMENT_BY_PAYMENT_ID::response& rsp) {
   // get txs with requested payment id
+  std::vector<Crypto::Hash> transaction_hashes;
   Crypto::Hash pid_hash;
   if (!parse_hash256(req.payment_id, pid_hash)) {
     throw JsonRpc::JsonRpcError{
@@ -1113,7 +1114,7 @@ bool RpcServer::on_check_payment(const COMMAND_RPC_CHECK_PAYMENT_BY_PAYMENT_ID::
       "Failed to parse hex representation of payment id. Hex = " + req.payment_id + '.' };
   }
   try {
-    rsp.transaction_hashes = m_core.getTransactionHashesByPaymentId(pid_hash);
+    transaction_hashes = m_core.getTransactionHashesByPaymentId(pid_hash);
   }
   catch (std::system_error& e) {
     throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_INTERNAL_ERROR, e.what() };
@@ -1124,7 +1125,7 @@ bool RpcServer::on_check_payment(const COMMAND_RPC_CHECK_PAYMENT_BY_PAYMENT_ID::
     return false;
   }
 
-  if (rsp.transaction_hashes.size() == 0) {
+  if (transaction_hashes.size() == 0) {
     rsp.status = "not_found";
     return true;
   }
@@ -1147,7 +1148,7 @@ bool RpcServer::on_check_payment(const COMMAND_RPC_CHECK_PAYMENT_BY_PAYMENT_ID::
   // fetch tx(s)
   std::list<Crypto::Hash> missed_txs;
   std::list<Transaction> txs;
-  m_core.getTransactions(rsp.transaction_hashes, txs, missed_txs, true);
+  m_core.getTransactions(transaction_hashes, txs, missed_txs, true);
 
   if (missed_txs.size() != 0) {
     throw JsonRpc::JsonRpcError{
@@ -1177,6 +1178,21 @@ bool RpcServer::on_check_payment(const COMMAND_RPC_CHECK_PAYMENT_BY_PAYMENT_ID::
           derive_public_key(derivation, keyIndex, address.spendPublicKey, pubkey);
           if (pubkey == out_key.key) {
             received += o.amount;
+
+            // count confirmations only for actually paying tx
+            // and include only their hashes in responce
+            Crypto::Hash blockHash;
+            uint32_t blockHeight;
+            Crypto::Hash txHash = getObjectHash(tx);
+            if (std::find(rsp.transaction_hashes.begin(), rsp.transaction_hashes.end(), txHash) == rsp.transaction_hashes.end()) {
+              rsp.transaction_hashes.push_back(txHash);
+            }
+            if (m_core.getBlockContainingTx(txHash, blockHash, blockHeight)) {
+              uint32_t confirmations = m_protocolQuery.getObservedHeight() - blockHeight;
+              if  (rsp.confirmations < confirmations) {
+                   rsp.confirmations = confirmations;
+              }
+            }
           }
         }
         ++keyIndex;
@@ -1189,17 +1205,6 @@ bool RpcServer::on_check_payment(const COMMAND_RPC_CHECK_PAYMENT_BY_PAYMENT_ID::
   }
 
   rsp.received_amount = received;
-
-  for (const auto& h : rsp.transaction_hashes) {
-    Crypto::Hash blockHash;
-    uint32_t blockHeight;
-    if (m_core.getBlockContainingTx(h, blockHash, blockHeight)) {
-      uint32_t confirmations = m_protocolQuery.getObservedHeight() - blockHeight;
-      if (rsp.confirmations < confirmations) {
-        rsp.confirmations = confirmations;
-      }
-    }
-  }
 
   if (received >= req.amount && rsp.confirmations > 0) {
     rsp.status = "paid";
