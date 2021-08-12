@@ -409,6 +409,7 @@ bool RpcServer::processJsonRpcRequest(const HttpRequest& request, HttpResponse& 
       { "checktransactionbyviewkey", { makeMemberMethod(&RpcServer::on_check_transaction_with_view_key), true } },
       { "checktransactionproof", { makeMemberMethod(&RpcServer::on_check_transaction_proof), true } },
       { "checkreserveproof", { makeMemberMethod(&RpcServer::on_check_reserve_proof), true } },
+      { "checkpayment", { makeMemberMethod(&RpcServer::on_check_payment), true } },
       { "validateaddress", { makeMemberMethod(&RpcServer::on_validate_address), true } },
       { "verifymessage", { makeMemberMethod(&RpcServer::on_verify_message), true } },
       { "submitblock", { makeMemberMethod(&RpcServer::on_submitblock), false } },
@@ -1100,6 +1101,124 @@ bool RpcServer::on_get_transaction_hashes_by_paymentid(const COMMAND_RPC_GET_TRA
     return false;
   }
   rsp.status = CORE_RPC_STATUS_OK;
+  return true;
+}
+
+bool RpcServer::on_check_payment(const COMMAND_RPC_CHECK_PAYMENT_BY_PAYMENT_ID::request& req, COMMAND_RPC_CHECK_PAYMENT_BY_PAYMENT_ID::response& rsp) {
+  // get txs with requested payment id
+  std::vector<Crypto::Hash> transaction_hashes;
+  Crypto::Hash pid_hash;
+  if (!parse_hash256(req.payment_id, pid_hash)) {
+    throw JsonRpc::JsonRpcError{
+      CORE_RPC_ERROR_CODE_WRONG_PARAM,
+      "Failed to parse hex representation of payment id. Hex = " + req.payment_id + '.' };
+  }
+  try {
+    transaction_hashes = m_core.getTransactionHashesByPaymentId(pid_hash);
+  }
+  catch (std::system_error& e) {
+    throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_INTERNAL_ERROR, e.what() };
+    return false;
+  }
+  catch (std::exception& e) {
+    throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_INTERNAL_ERROR, "Error: " + std::string(e.what()) };
+    return false;
+  }
+
+  if (transaction_hashes.size() == 0) {
+    rsp.status = "not_found";
+    return true;
+  }
+
+  uint64_t received = 0;
+
+  // parse address
+  CryptoNote::AccountPublicAddress address;
+  if (!m_core.currency().parseAccountAddressString(req.address, address)) {
+    throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_WRONG_PARAM, "Failed to parse address " + req.address + '.' };
+  }
+  // parse view key
+  Crypto::Hash view_key_hash;
+  size_t size;
+  if (!Common::fromHex(req.view_key, &view_key_hash, sizeof(view_key_hash), size) || size != sizeof(view_key_hash)) {
+    throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_WRONG_PARAM, "Failed to parse private view key" };
+  }
+  Crypto::SecretKey viewKey = *(struct Crypto::SecretKey *) &view_key_hash;
+
+  // fetch tx(s)
+  std::list<Crypto::Hash> missed_txs;
+  std::list<Transaction> txs;
+  m_core.getTransactions(transaction_hashes, txs, missed_txs, true);
+
+  if (missed_txs.size() != 0) {
+    throw JsonRpc::JsonRpcError{
+      CORE_RPC_ERROR_CODE_INTERNAL_ERROR,
+      "Couldn't get transaction with hash: " + Common::podToHex(missed_txs.front()) + '.' };
+  }
+
+  for (const auto& tx : txs) {
+    // get tx pub key
+    Crypto::PublicKey txPubKey = getTransactionPublicKeyFromExtra(tx.extra);
+
+    // obtain key derivation
+    Crypto::KeyDerivation derivation;
+    if (!Crypto::generate_key_derivation(txPubKey, viewKey, derivation))
+    {
+      throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_WRONG_PARAM, "Failed to generate key derivation from supplied parameters" };
+    }
+
+    // look for outputs
+    size_t keyIndex(0);
+    std::vector<TransactionOutput> outputs;
+    try {
+      for (const TransactionOutput& o : tx.outputs) {
+        if (o.target.type() == typeid(KeyOutput)) {
+          const KeyOutput out_key = boost::get<KeyOutput>(o.target);
+          Crypto::PublicKey pubkey;
+          derive_public_key(derivation, keyIndex, address.spendPublicKey, pubkey);
+          if (pubkey == out_key.key) {
+            received += o.amount;
+
+            // count confirmations only for actually paying tx
+            // and include only their hashes in responce
+            Crypto::Hash blockHash;
+            uint32_t blockHeight;
+            Crypto::Hash txHash = getObjectHash(tx);
+            if (std::find(rsp.transaction_hashes.begin(), rsp.transaction_hashes.end(), txHash) == rsp.transaction_hashes.end()) {
+              rsp.transaction_hashes.push_back(txHash);
+            }
+            if (m_core.getBlockContainingTx(txHash, blockHash, blockHeight)) {
+              uint32_t confirmations = m_protocolQuery.getObservedHeight() - blockHeight;
+              if  (rsp.confirmations < confirmations) {
+                   rsp.confirmations = confirmations;
+              }
+            }
+          }
+        }
+        ++keyIndex;
+      }
+    }
+    catch (...)
+    {
+      throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_INTERNAL_ERROR, "Unknown error" };
+    }  
+  }
+
+  rsp.received_amount = received;
+
+  if (received >= req.amount && rsp.confirmations > 0) {
+    rsp.status = "paid";
+  }
+  else if (received > 0 && received < req.amount) {
+    rsp.status = "underpaid";
+  }
+  else if (rsp.confirmations == 0 && received >= req.amount) {
+    rsp.status = "pending";
+  }
+  else {
+    rsp.status = "unpaid";
+  }
+
   return true;
 }
 
