@@ -196,27 +196,28 @@ void wallet_rpc_server::processRequest(const CryptoNote::HttpRequest& request, C
 
 		static const std::unordered_map<std::string, JsonMemberMethod> s_methods =
 		{
-            { "getbalance"       , makeMemberMethod(&wallet_rpc_server::on_getbalance)        },
-            { "transfer"         , makeMemberMethod(&wallet_rpc_server::on_transfer)          },
-            { "store"            , makeMemberMethod(&wallet_rpc_server::on_store)             },
-            { "stop_wallet"      , makeMemberMethod(&wallet_rpc_server::on_stop_wallet)       },
-            { "reset"            , makeMemberMethod(&wallet_rpc_server::on_reset)             },
-            { "get_payments"     , makeMemberMethod(&wallet_rpc_server::on_get_payments)      },
-            { "get_transfers"    , makeMemberMethod(&wallet_rpc_server::on_get_transfers)     },
-            { "get_transaction"  , makeMemberMethod(&wallet_rpc_server::on_get_transaction)   },
-            { "get_height"       , makeMemberMethod(&wallet_rpc_server::on_get_height)        },
-            { "get_address"      , makeMemberMethod(&wallet_rpc_server::on_get_address)       },
-            { "validate_address" , makeMemberMethod(&wallet_rpc_server::on_validate_address)  },
-            { "query_key"        , makeMemberMethod(&wallet_rpc_server::on_query_key)         },
-            { "get_paymentid"    , makeMemberMethod(&wallet_rpc_server::on_gen_paymentid)     },
-            { "get_tx_key"       , makeMemberMethod(&wallet_rpc_server::on_get_tx_key)        },
-            { "get_tx_proof"     , makeMemberMethod(&wallet_rpc_server::on_get_tx_proof)      },
-            { "get_reserve_proof", makeMemberMethod(&wallet_rpc_server::on_get_reserve_proof) },
-            { "sign_message"     , makeMemberMethod(&wallet_rpc_server::on_sign_message)      },
-            { "verify_message"   , makeMemberMethod(&wallet_rpc_server::on_verify_message)    },
-            { "change_password"  , makeMemberMethod(&wallet_rpc_server::on_change_password)   },
-            { "estimate_fusion"  , makeMemberMethod(&wallet_rpc_server::on_estimate_fusion)   },
-            { "send_fusion"      , makeMemberMethod(&wallet_rpc_server::on_send_fusion)       },
+            { "get_balance"       , makeMemberMethod(&wallet_rpc_server::on_get_balance)       },
+            { "transfer"          , makeMemberMethod(&wallet_rpc_server::on_transfer)          },
+            { "store"             , makeMemberMethod(&wallet_rpc_server::on_store)             },
+            { "stop_wallet"       , makeMemberMethod(&wallet_rpc_server::on_stop_wallet)       },
+            { "reset"             , makeMemberMethod(&wallet_rpc_server::on_reset)             },
+            { "get_payments"      , makeMemberMethod(&wallet_rpc_server::on_get_payments)      },
+            { "get_transfers"     , makeMemberMethod(&wallet_rpc_server::on_get_transfers)     },
+            { "get_last_transfers", makeMemberMethod(&wallet_rpc_server::on_get_last_transfers)},
+            { "get_transaction"   , makeMemberMethod(&wallet_rpc_server::on_get_transaction)   },
+            { "get_height"        , makeMemberMethod(&wallet_rpc_server::on_get_height)        },
+            { "get_address"       , makeMemberMethod(&wallet_rpc_server::on_get_address)       },
+            { "validate_address"  , makeMemberMethod(&wallet_rpc_server::on_validate_address)  },
+            { "query_key"         , makeMemberMethod(&wallet_rpc_server::on_query_key)         },
+            { "get_paymentid"     , makeMemberMethod(&wallet_rpc_server::on_gen_paymentid)     },
+            { "get_tx_key"        , makeMemberMethod(&wallet_rpc_server::on_get_tx_key)        },
+            { "get_tx_proof"      , makeMemberMethod(&wallet_rpc_server::on_get_tx_proof)      },
+            { "get_reserve_proof" , makeMemberMethod(&wallet_rpc_server::on_get_reserve_proof) },
+            { "sign_message"      , makeMemberMethod(&wallet_rpc_server::on_sign_message)      },
+            { "verify_message"    , makeMemberMethod(&wallet_rpc_server::on_verify_message)    },
+            { "change_password"   , makeMemberMethod(&wallet_rpc_server::on_change_password)   },
+            { "estimate_fusion"   , makeMemberMethod(&wallet_rpc_server::on_estimate_fusion)   },
+            { "send_fusion"       , makeMemberMethod(&wallet_rpc_server::on_send_fusion)       },
 		};
 
 		auto it = s_methods.find(jsonRequest.getMethod());
@@ -239,7 +240,7 @@ void wallet_rpc_server::processRequest(const CryptoNote::HttpRequest& request, C
 
 //------------------------------------------------------------------------------------------------------------------------------
 
-bool wallet_rpc_server::on_getbalance(const wallet_rpc::COMMAND_RPC_GET_BALANCE::request& req, 
+bool wallet_rpc_server::on_get_balance(const wallet_rpc::COMMAND_RPC_GET_BALANCE::request& req, 
 	wallet_rpc::COMMAND_RPC_GET_BALANCE::response& res)
 {
 	res.locked_amount	  = m_wallet.pendingBalance();
@@ -411,16 +412,16 @@ bool wallet_rpc_server::on_get_transfers(const wallet_rpc::COMMAND_RPC_GET_TRANS
 		}
 
 		wallet_rpc::Transfer transfer;
-		transfer.time			 = txInfo.timestamp;
-		transfer.output			 = txInfo.totalAmount < 0;
+		transfer.time = txInfo.timestamp;
+		transfer.output = txInfo.totalAmount < 0;
 		transfer.transactionHash = Common::podToHex(txInfo.hash);
-		transfer.amount			 = std::abs(txInfo.totalAmount);
-		transfer.fee			 = txInfo.fee;
-		transfer.address		 = address;
-		transfer.blockIndex		 = txInfo.blockHeight;
-		transfer.unlockTime		 = txInfo.unlockTime;
-		transfer.paymentId		 = "";
-		transfer.confirmations	 = (txInfo.blockHeight != UNCONFIRMED_TRANSACTION_GLOBAL_OUTPUT_INDEX ? bc_height - txInfo.blockHeight : 0);
+		transfer.amount = std::abs(txInfo.totalAmount);
+		transfer.fee = txInfo.fee;
+		transfer.address = address;
+		transfer.blockIndex = txInfo.blockHeight;
+		transfer.unlockTime = txInfo.unlockTime;
+		transfer.paymentId = "";
+		transfer.confirmations = (txInfo.blockHeight != UNCONFIRMED_TRANSACTION_GLOBAL_OUTPUT_INDEX ? bc_height - txInfo.blockHeight : 0);
 
 		std::vector<uint8_t> extraVec;
 		extraVec.reserve(txInfo.extra.size());
@@ -433,6 +434,61 @@ bool wallet_rpc_server::on_get_transfers(const wallet_rpc::COMMAND_RPC_GET_TRANS
 		res.transfers.push_back(transfer);
 	}
 	return true;
+}
+
+bool wallet_rpc_server::on_get_last_transfers(const wallet_rpc::COMMAND_RPC_GET_LAST_TRANSFERS::request& req,
+  wallet_rpc::COMMAND_RPC_GET_LAST_TRANSFERS::response& res)
+{
+  res.transfers.clear();
+  size_t transactionsCount = m_wallet.getTransactionCount();
+  size_t offset = transactionsCount > req.count ? transactionsCount - req.count : 0;
+  uint64_t bc_height;
+  try {
+    bc_height = m_node.getKnownBlockCount();
+  }
+  catch (std::exception &e) {
+    throw JsonRpc::JsonRpcError(WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR, std::string("Failed to get blockchain height: ") + e.what());
+  }
+
+  for (size_t transactionNumber = offset; transactionNumber < transactionsCount; ++transactionNumber)
+  {
+    WalletLegacyTransaction txInfo;
+    m_wallet.getTransaction(transactionNumber, txInfo);
+    if (txInfo.state == WalletLegacyTransactionState::Cancelled || txInfo.state == WalletLegacyTransactionState::Deleted
+      || txInfo.state == WalletLegacyTransactionState::Failed)
+      continue;
+
+    std::string address = "";
+    if (txInfo.totalAmount < 0 && txInfo.transferCount > 0)
+    {
+      WalletLegacyTransfer tr;
+      m_wallet.getTransfer(txInfo.firstTransferId, tr);
+      address = tr.address;
+    }
+
+    wallet_rpc::Transfer transfer;
+    transfer.time = txInfo.timestamp;
+    transfer.output = txInfo.totalAmount < 0;
+    transfer.transactionHash = Common::podToHex(txInfo.hash);
+    transfer.amount = std::abs(txInfo.totalAmount);
+    transfer.fee = txInfo.fee;
+    transfer.address = address;
+    transfer.blockIndex = txInfo.blockHeight;
+    transfer.unlockTime = txInfo.unlockTime;
+    transfer.paymentId = "";
+    transfer.confirmations = (txInfo.blockHeight != UNCONFIRMED_TRANSACTION_GLOBAL_OUTPUT_INDEX ? bc_height - txInfo.blockHeight : 0);
+
+    std::vector<uint8_t> extraVec;
+    extraVec.reserve(txInfo.extra.size());
+    std::for_each(txInfo.extra.begin(), txInfo.extra.end(), [&extraVec](const char el) { extraVec.push_back(el); });
+
+    Crypto::Hash paymentId;
+    transfer.paymentId = (getPaymentIdFromTxExtra(extraVec, paymentId) && paymentId != NULL_HASH ? Common::podToHex(paymentId) : "");
+    transfer.txKey = (txInfo.secretKey != NULL_SECRET_KEY ? Common::podToHex(txInfo.secretKey) : "");
+
+    res.transfers.push_back(transfer);
+  }
+  return true;
 }
 
 bool wallet_rpc_server::on_get_transaction(const wallet_rpc::COMMAND_RPC_GET_TRANSACTION::request& req,

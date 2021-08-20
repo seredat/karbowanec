@@ -201,6 +201,28 @@ using CryptoNote::ISerializer;
 		};
 	};
 
+  struct COMMAND_RPC_GET_LAST_TRANSFERS
+  {
+    struct request
+    {
+      size_t count = 1000;
+
+      void serialize(ISerializer& s)
+      {
+        KV_MEMBER(count)
+      }
+    };
+    struct response
+    {
+      std::list<Transfer> transfers;
+
+      void serialize(ISerializer& s)
+      {
+        KV_MEMBER(transfers)
+      }
+    };
+  };
+
 	/* Command: get_transaction */
 	struct COMMAND_RPC_GET_TRANSACTION
 	{
