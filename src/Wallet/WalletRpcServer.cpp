@@ -412,24 +412,23 @@ bool wallet_rpc_server::on_get_transfers(const wallet_rpc::COMMAND_RPC_GET_TRANS
     }
 
     wallet_rpc::Transfer transfer;
-    transfer.time = txInfo.timestamp;
-    transfer.output = txInfo.totalAmount < 0;
+    transfer.time            = txInfo.timestamp;
+    transfer.output          = txInfo.totalAmount < 0;
     transfer.transactionHash = Common::podToHex(txInfo.hash);
-    transfer.amount = std::abs(txInfo.totalAmount);
-    transfer.fee = txInfo.fee;
-    transfer.address = address;
-    transfer.blockIndex = txInfo.blockHeight;
-    transfer.unlockTime = txInfo.unlockTime;
-    transfer.paymentId = "";
-    transfer.confirmations = (txInfo.blockHeight != UNCONFIRMED_TRANSACTION_GLOBAL_OUTPUT_INDEX ? bc_height - txInfo.blockHeight : 0);
+    transfer.amount          = std::abs(txInfo.totalAmount);
+    transfer.fee             = txInfo.fee;
+    transfer.address         = address;
+    transfer.blockIndex      = txInfo.blockHeight;
+    transfer.unlockTime      = txInfo.unlockTime;
+    transfer.confirmations   = (txInfo.blockHeight != UNCONFIRMED_TRANSACTION_GLOBAL_OUTPUT_INDEX ? bc_height - txInfo.blockHeight : 0);
 
     std::vector<uint8_t> extraVec;
     extraVec.reserve(txInfo.extra.size());
     std::for_each(txInfo.extra.begin(), txInfo.extra.end(), [&extraVec](const char el) { extraVec.push_back(el); });
 
     Crypto::Hash paymentId;
-    transfer.paymentId = (getPaymentIdFromTxExtra(extraVec, paymentId) && paymentId != NULL_HASH ? Common::podToHex(paymentId) : "");
-    transfer.txKey = (txInfo.secretKey != NULL_SECRET_KEY ? Common::podToHex(txInfo.secretKey) : "");
+    transfer.paymentId       = (getPaymentIdFromTxExtra(extraVec, paymentId) && paymentId != NULL_HASH ? Common::podToHex(paymentId) : "");
+    transfer.txKey           = (txInfo.secretKey != NULL_SECRET_KEY ? Common::podToHex(txInfo.secretKey) : "");
 
     res.transfers.push_back(transfer);
   }
@@ -467,24 +466,23 @@ bool wallet_rpc_server::on_get_last_transfers(const wallet_rpc::COMMAND_RPC_GET_
     }
 
     wallet_rpc::Transfer transfer;
-    transfer.time = txInfo.timestamp;
-    transfer.output = txInfo.totalAmount < 0;
+    transfer.time            = txInfo.timestamp;
+    transfer.output          = txInfo.totalAmount < 0;
     transfer.transactionHash = Common::podToHex(txInfo.hash);
-    transfer.amount = std::abs(txInfo.totalAmount);
-    transfer.fee = txInfo.fee;
-    transfer.address = address;
-    transfer.blockIndex = txInfo.blockHeight;
-    transfer.unlockTime = txInfo.unlockTime;
-    transfer.paymentId = "";
-    transfer.confirmations = (txInfo.blockHeight != UNCONFIRMED_TRANSACTION_GLOBAL_OUTPUT_INDEX ? bc_height - txInfo.blockHeight : 0);
+    transfer.amount          = std::abs(txInfo.totalAmount);
+    transfer.fee             = txInfo.fee;
+    transfer.address         = address;
+    transfer.blockIndex      = txInfo.blockHeight;
+    transfer.unlockTime      = txInfo.unlockTime;
+    transfer.confirmations   = (txInfo.blockHeight != UNCONFIRMED_TRANSACTION_GLOBAL_OUTPUT_INDEX ? bc_height - txInfo.blockHeight : 0);
 
     std::vector<uint8_t> extraVec;
     extraVec.reserve(txInfo.extra.size());
     std::for_each(txInfo.extra.begin(), txInfo.extra.end(), [&extraVec](const char el) { extraVec.push_back(el); });
 
     Crypto::Hash paymentId;
-    transfer.paymentId = (getPaymentIdFromTxExtra(extraVec, paymentId) && paymentId != NULL_HASH ? Common::podToHex(paymentId) : "");
-    transfer.txKey = (txInfo.secretKey != NULL_SECRET_KEY ? Common::podToHex(txInfo.secretKey) : "");
+    transfer.paymentId       = (getPaymentIdFromTxExtra(extraVec, paymentId) && paymentId != NULL_HASH ? Common::podToHex(paymentId) : "");
+    transfer.txKey           = (txInfo.secretKey != NULL_SECRET_KEY ? Common::podToHex(txInfo.secretKey) : "");
 
     res.transfers.push_back(transfer);
   }
@@ -523,25 +521,24 @@ bool wallet_rpc_server::on_get_transaction(const wallet_rpc::COMMAND_RPC_GET_TRA
       }
 
       wallet_rpc::Transfer transfer;
-      transfer.time = txInfo.timestamp;
-      transfer.output = txInfo.totalAmount < 0;
+      transfer.time            = txInfo.timestamp;
+      transfer.output          = txInfo.totalAmount < 0;
       transfer.transactionHash = Common::podToHex(txInfo.hash);
-      transfer.amount = std::abs(txInfo.totalAmount);
-      transfer.fee = txInfo.fee;
-      transfer.address = address;
-      transfer.blockIndex = txInfo.blockHeight;
-      transfer.unlockTime = txInfo.unlockTime;
-      transfer.paymentId = "";
-      transfer.confirmations = (txInfo.blockHeight != UNCONFIRMED_TRANSACTION_GLOBAL_OUTPUT_INDEX ? bc_height - txInfo.blockHeight : 0);
+      transfer.amount          = std::abs(txInfo.totalAmount);
+      transfer.fee             = txInfo.fee;
+      transfer.address         = address;
+      transfer.blockIndex      = txInfo.blockHeight;
+      transfer.unlockTime      = txInfo.unlockTime;
+      transfer.confirmations   = (txInfo.blockHeight != UNCONFIRMED_TRANSACTION_GLOBAL_OUTPUT_INDEX ? bc_height - txInfo.blockHeight : 0);
       
       std::vector<uint8_t> extraVec;
       extraVec.reserve(txInfo.extra.size());
       std::for_each(txInfo.extra.begin(), txInfo.extra.end(), [&extraVec](const char el) { extraVec.push_back(el); });
 
       Crypto::Hash paymentId;
-      transfer.paymentId = (getPaymentIdFromTxExtra(extraVec, paymentId) && paymentId != NULL_HASH ? Common::podToHex(paymentId) : "");
+      transfer.paymentId       = (getPaymentIdFromTxExtra(extraVec, paymentId) && paymentId != NULL_HASH ? Common::podToHex(paymentId) : "");
 
-      transfer.txKey = (txInfo.secretKey != NULL_SECRET_KEY ? Common::podToHex(txInfo.secretKey) : "");
+      transfer.txKey           = (txInfo.secretKey != NULL_SECRET_KEY ? Common::podToHex(txInfo.secretKey) : "");
 
       res.transaction_details = transfer;
 
@@ -607,9 +604,9 @@ bool wallet_rpc_server::on_validate_address(const wallet_rpc::COMMAND_RPC_VALIDA
   bool r = m_currency.parseAccountAddressString(req.address, acc);
   res.is_valid = r;
   if (r) {
-    res.address = m_currency.accountAddressAsString(acc);
+    res.address          = m_currency.accountAddressAsString(acc);
     res.spend_public_key = Common::podToHex(acc.spendPublicKey);
-    res.view_public_key = Common::podToHex(acc.viewPublicKey);
+    res.view_public_key  = Common::podToHex(acc.viewPublicKey);
   }
   res.status = CORE_RPC_STATUS_OK;
   return true;
