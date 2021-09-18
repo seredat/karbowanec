@@ -4,17 +4,6 @@
 
 Karbo is people's electronic cash, a cryptocurrency, just like Bitcoin but Ukrainian and anonymous thanks to Cryptonote technology. The key principle of CryptoNote is adaptive parameters. Karbo already has adaptive block size limit and adaptive difficulty, which we improved, and which ensures it's stable emission rate and thus makes Karbo sound money.
 
-Pools operating **'cryptonote-forknote-pool'** or compatible software should update Node-Cryptonote-Util to this version: https://github.com/aivve/node-cryptonote-util. The reference pool software is here: https://github.com/Karbovanets/karbo-pool.
-
-Pools operating **'cryptonote-nodejs-pool'** should _change config on hardfork height_. The changes in config are:
-```
-"daemonType": "default",
-"cnAlgorithm": "cryptonight",
-"cnVariant": 0,
-"cnBlobType": 0,
-```
-The example of Karbo config is here: https://github.com/Karbovanets/cryptonote-nodejs-pool/blob/master/config_examples/karbo.json
-
 
 
 ## Building Karbo 
@@ -130,4 +119,6 @@ make SimpleWallet
 ### Portable and optimized binaries
 
 By default it will compile portable binary, to build optimized for your CPU, run Cmake with flag `-DARCH=native`.
+
+
 
