@@ -799,72 +799,9 @@ difficulty_type Blockchain::getDifficultyForNextBlock(const Crypto::Hash &prevHa
   return m_currency.nextDifficulty(static_cast<uint32_t>(m_blocks.size()), BlockMajorVersion, timestamps, cumulative_difficulties);
 }
 
-difficulty_type Blockchain::getAvgDifficulty(uint32_t height, size_t window) {
-  std::lock_guard<decltype(m_blockchain_lock)> lk(m_blockchain_lock);
-  height = std::min<uint32_t>(height, (uint32_t)m_blocks.size() - 1);
-  if (height <= 1)
-    return 1;
-
-  if (window == height) {
-    return m_blocks[height].cumulative_difficulty / height;
-  }
-
-  size_t offset;
-  offset = height - std::min<uint32_t>(height, std::min<uint32_t>(static_cast<uint32_t>(m_blocks.size() - 1), static_cast<uint32_t>(window)));
-  if (offset == 0) {
-    ++offset;
-  }
-  difficulty_type cumulDiffForPeriod = m_blocks[height].cumulative_difficulty - m_blocks[offset].cumulative_difficulty;
-  return cumulDiffForPeriod / std::min<uint32_t>(static_cast<uint32_t>(m_blocks.size() - 1), static_cast<uint32_t>(window));
-}
-
-difficulty_type Blockchain::getAvgDifficulty(uint32_t height) {
-  std::lock_guard<decltype(m_blockchain_lock)> lk(m_blockchain_lock);
-  height = std::min<uint32_t>(height, (uint32_t)m_blocks.size() - 1);
-  if (height <= 1)
-    return 1;
-  return m_blocks[std::min<difficulty_type>(height, m_blocks.size())].cumulative_difficulty / std::min<difficulty_type>(height, m_blocks.size());
-}
-
 uint64_t Blockchain::getBlockTimestamp(uint32_t height) {
   assert(height < m_blocks.size());
   return m_blocks[height].bl.timestamp;
-}
-
-uint64_t Blockchain::getMinimalFee(uint32_t height) {
-  std::lock_guard<decltype(m_blockchain_lock)> lk(m_blockchain_lock);
-  if (height == 0 || m_blocks.size() <= 1) {
-    return 0;
-  }
-  if (height > static_cast<uint32_t>(m_blocks.size()) - 1) {
-    height = static_cast<uint32_t>(m_blocks.size()) - 1;
-  }
-  if (height < 3) {
-    height = 3;
-  }
-  uint32_t window = std::min(height, std::min<uint32_t>(static_cast<uint32_t>(m_blocks.size()), static_cast<uint32_t>(m_currency.expectedNumberOfBlocksPerDay())));
-  if (window == 0) {
-    ++window;
-  }
-  size_t offset = height - window;
-  if (offset == 0) {
-    ++offset;
-  }
-
-  /* Perhaps, in case of POW change, difficulties for calculations here
-   * should be reset and used starting from the fork height.
-   */
-
-  // calculate average difficulty for ~last month
-  uint64_t avgCurrentDifficulty = getAvgDifficulty(height, window * 7 * 4);
-  // reference trailing average difficulty
-  uint64_t avgReferenceDifficulty = m_blocks[height].cumulative_difficulty / height;
-  // calculate current base reward
-  uint64_t currentReward = m_currency.calculateReward(m_blocks[height].already_generated_coins);
-  // reference trailing average reward
-  uint64_t avgReferenceReward = m_blocks[height].already_generated_coins / height;
-
-  return m_currency.getMinimalFee(avgCurrentDifficulty, currentReward, avgReferenceDifficulty, avgReferenceReward, height);
 }
 
 uint64_t Blockchain::getCoinsInCirculation() {

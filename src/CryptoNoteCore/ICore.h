@@ -111,8 +111,6 @@ public:
   virtual bool getBlockDifficulty(uint32_t height, difficulty_type& difficulty) = 0;
   virtual bool getBlockCumulativeDifficulty(uint32_t height, difficulty_type& difficulty) = 0;
   virtual bool getBlockTimestamp(uint32_t height, uint64_t& timestamp) = 0;
-  virtual difficulty_type getAvgDifficulty(uint32_t height, size_t window) = 0;
-  virtual difficulty_type getAvgDifficulty(uint32_t height) = 0;
   virtual bool getBlockContainingTx(const Crypto::Hash& txId, Crypto::Hash& blockId, uint32_t& blockHeight) = 0;
   virtual bool getMultisigOutputReference(const MultisignatureInput& txInMultisig, std::pair<Crypto::Hash, size_t>& outputReference) = 0;
 
@@ -122,7 +120,7 @@ public:
   virtual bool getPoolTransactionsByTimestamp(uint64_t timestampBegin, uint64_t timestampEnd, uint32_t transactionsNumberLimit, std::vector<Transaction>& transactions, uint64_t& transactionsNumberWithinTimestamps) = 0;
   virtual bool getTransactionsByPaymentId(const Crypto::Hash& paymentId, std::vector<Transaction>& transactions) = 0;
   virtual std::vector<Crypto::Hash> getTransactionHashesByPaymentId(const Crypto::Hash& paymentId) = 0;
-  virtual uint64_t getMinimalFeeForHeight(uint32_t height) = 0;
+  virtual uint64_t getMinimalFee(uint32_t height) = 0;
   virtual uint64_t getMinimalFee() = 0;
   virtual uint64_t getNextBlockDifficulty() = 0;
   virtual uint64_t getTotalGeneratedAmount() = 0;
