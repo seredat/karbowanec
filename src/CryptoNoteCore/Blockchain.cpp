@@ -938,6 +938,17 @@ bool Blockchain::switch_to_alternative_blockchain(std::list<blocks_ext_by_hash::
     return false;
   }
 
+  // Check that block major version matches
+  for (auto alt_ch_iter = alt_chain.begin(); alt_ch_iter != alt_chain.end(); alt_ch_iter++)
+  {
+    auto ch_ent = *alt_ch_iter;
+    Block b = ch_ent->second.bl;
+    if (!checkBlockVersion(b))
+    {
+      return false;
+    }
+  }
+
   // Poisson check, courtesy of ryo-project
   // https://github.com/ryo-currency/ryo-writeups/blob/master/poisson-writeup.md
   // For longer reorgs, check if the timestamps are probable - if they aren't the diff algo has failed
@@ -1242,7 +1253,7 @@ bool Blockchain::handle_alternative_block(const Block& b, const Crypto::Hash& id
     return false;
   }
 
-  if (!checkBlockVersion(b, id)) {
+  if (!checkBlockVersion(b)) {
     bvc.m_verification_failed = true;
     return false;
   }
@@ -1972,11 +1983,11 @@ bool Blockchain::check_block_timestamp(std::vector<uint64_t> timestamps, const B
   return true;
 }
 
-bool Blockchain::checkBlockVersion(const Block& b, const Crypto::Hash& blockHash) {
+bool Blockchain::checkBlockVersion(const Block& b) {
   uint32_t height = get_block_height(b);
   const uint8_t expectedBlockVersion = getBlockMajorVersionForHeight(height);
   if (b.majorVersion != expectedBlockVersion) {
-    logger(TRACE) << "Block " << blockHash << " has wrong major version: " << static_cast<int>(b.majorVersion) <<
+    logger(TRACE) << "Block " << get_block_hash(b) << " has wrong major version: " << static_cast<int>(b.majorVersion) <<
       ", at height " << height << " expected version is " << static_cast<int>(expectedBlockVersion);
     return false;
   }
@@ -2124,7 +2135,7 @@ bool Blockchain::pushBlock(const Block& blockData, const std::vector<Transaction
     return false;
   }
 
-  if (!checkBlockVersion(blockData, blockHash)) {
+  if (!checkBlockVersion(blockData)) {
     bvc.m_verification_failed = true;
     return false;
   }
