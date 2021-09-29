@@ -939,9 +939,9 @@ bool Blockchain::switch_to_alternative_blockchain(std::list<blocks_ext_by_hash::
   }
 
   // Check that block major version matches
-  for (auto alt_ch_iter2 = alt_chain.begin(); alt_ch_iter2 != alt_chain.end(); alt_ch_iter2++)
+  for (auto alt_ch_iter = alt_chain.begin(); alt_ch_iter != alt_chain.end(); alt_ch_iter++)
   {
-    auto ch_ent = *alt_ch_iter2;
+    auto ch_ent = *alt_ch_iter;
     Block b = ch_ent->second.bl;
     if (!checkBlockVersion(b))
     {
