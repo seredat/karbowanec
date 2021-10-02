@@ -18,6 +18,7 @@
 
 #include "HttpClient.h"
 
+#include <openssl/ssl.h>
 #include <HTTP/HttpParser.h>
 #include <System/Ipv4Resolver.h>
 #include <System/Ipv4Address.h>
@@ -244,6 +245,7 @@ void HttpClient::connect() {
       this->m_ssl_sock->lowest_layer().set_option(boost::asio::socket_base::keep_alive(true));
       if (!this->m_ssl_no_verify) {
         this->m_ssl_sock->set_verify_mode(boost::asio::ssl::verify_peer);
+        SSL_set_tlsext_host_name(this->m_ssl_sock->native_handle(), hostname.c_str());
       } else {
         this->m_ssl_sock->set_verify_mode(boost::asio::ssl::verify_none);
       }
