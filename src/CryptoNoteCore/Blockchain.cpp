@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers, The Monero developers
 // Copyright (c) 2018, Ryo Currency Project
-// Copyright (c) 2016-2020, The Karbo developers
+// Copyright (c) 2016-2021, The Karbo developers
 //
 // This file is part of Karbo.
 //

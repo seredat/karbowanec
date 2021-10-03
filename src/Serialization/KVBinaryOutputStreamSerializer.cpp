@@ -1,4 +1,5 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2016-2021, The Karbo Developers
 //
 // This file is part of Karbo.
 //
@@ -15,12 +16,13 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with Karbo.  If not, see <http://www.gnu.org/licenses/>.
 
-#include "KVBinaryOutputStreamSerializer.h"
-#include "KVBinaryCommon.h"
-
 #include <cassert>
 #include <stdexcept>
+#include <limits>
+
 #include <Common/StreamTools.h>
+#include "KVBinaryCommon.h"
+#include "KVBinaryOutputStreamSerializer.h"
 
 using namespace Common;
 using namespace CryptoNote;
