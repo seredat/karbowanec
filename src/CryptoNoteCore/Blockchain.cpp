@@ -1195,10 +1195,10 @@ bool Blockchain::handle_alternative_block(const Block& b, const Crypto::Hash& id
     return false;
   }
 
-  //if (!checkParentBlockSize(b, id)) {
-  //  bvc.m_verification_failed = true;
-  //  return false;
-  //}
+  if (!checkParentBlockSize(b, id)) {
+    bvc.m_verification_failed = true;
+    return false;
+  }
 
   size_t cumulativeSize;
   if (!getBlockCumulativeSize(b, cumulativeSize)) {
