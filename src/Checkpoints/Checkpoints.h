@@ -19,7 +19,6 @@
 
 #pragma once
 
-#include <condition_variable>
 #include <map>
 #include <mutex>
 
@@ -63,6 +62,5 @@ namespace CryptoNote
     std::map<uint32_t, Crypto::Hash> m_points;
     Logging::LoggerRef logger;
     mutable std::mutex m_mutex;
-    std::condition_variable m_signaler;
   };
 }
