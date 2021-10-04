@@ -28,10 +28,8 @@
 #include <sstream>
 #include <vector>
 #include <iterator>
-#include <mutex>
 #include <chrono>
 #include <thread>
-#include <condition_variable>
 
 #include "Checkpoints.h"
 #include "../CryptoNoteConfig.h"
@@ -152,8 +150,6 @@ std::vector<uint32_t> Checkpoints::getCheckpointHeights() const {
 //---------------------------------------------------------------------------
 bool Checkpoints::load_checkpoints_from_dns()
 {
-  std::mutex m;
-  std::condition_variable cv;
   std::string domain(CryptoNote::DNS_CHECKPOINTS_HOST);
   std::vector<std::string>records;
   bool res = true;
@@ -161,17 +157,17 @@ bool Checkpoints::load_checkpoints_from_dns()
   logger(Logging::DEBUGGING) << "Fetching DNS checkpoint records from " << domain;
 
   try {
-    std::thread t([&cv, &domain, &res, &records]()
+    std::thread t([this, &domain, &res, &records]()
     {
       res = Common::fetch_dns_txt(domain, records);
-      cv.notify_one();
+      m_signaler.notify_one();
     });
 
     t.detach();
 
     {
-      std::unique_lock<std::mutex> l(m);
-      if (cv.wait_for(l, std::chrono::milliseconds(400)) == std::cv_status::timeout) {
+      std::unique_lock<std::mutex> l(m_mutex);
+      if (m_signaler.wait_for(l, std::chrono::milliseconds(400)) == std::cv_status::timeout) {
         logger(Logging::DEBUGGING) << "Timeout lookup DNS checkpoint records from " << domain;
         return false;
       }
@@ -209,7 +205,7 @@ bool Checkpoints::load_checkpoints_from_dns()
       logger(DEBUGGING) << "Checkpoint already exists for height: " << height << ". Ignoring DNS checkpoint.";
     } else {
       add_checkpoint(height, hash_str);
-	  logger(DEBUGGING) << "Added DNS checkpoint: " << height_str << ":" << hash_str;
+      logger(DEBUGGING) << "Added DNS checkpoint: " << height_str << ":" << hash_str;
     }
   }
 

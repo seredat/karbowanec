@@ -18,7 +18,11 @@
 // along with Karbo.  If not, see <http://www.gnu.org/licenses/>.
 
 #pragma once
+
+#include <condition_variable>
 #include <map>
+#include <mutex>
+
 #include <CryptoNoteCore/CryptoNoteBasicImpl.h>
 #include <Logging/LoggerRef.h>
 
@@ -28,6 +32,21 @@ namespace CryptoNote
   {
   public:
     Checkpoints(Logging::ILogger& log);
+
+    Checkpoints& operator=(Checkpoints const& other)
+    {
+      if (&other != this)
+      {
+        // lock both objects
+        std::unique_lock<std::mutex> lock_this(m_mutex, std::defer_lock);
+        std::unique_lock<std::mutex> lock_other(other.m_mutex, std::defer_lock);
+        std::lock(lock_this, lock_other); // ensure no deadlock
+        m_points = other.m_points;
+        logger = other.logger;
+      }
+
+      return *this;
+    }
 
     bool add_checkpoint(uint32_t height, const std::string& hash_str);
     bool load_checkpoints_from_file(const std::string& fileName);
@@ -43,5 +62,7 @@ namespace CryptoNote
   private:
     std::map<uint32_t, Crypto::Hash> m_points;
     Logging::LoggerRef logger;
+    mutable std::mutex m_mutex;
+    std::condition_variable m_signaler;
   };
 }
