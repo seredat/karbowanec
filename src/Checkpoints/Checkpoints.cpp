@@ -28,10 +28,9 @@
 #include <sstream>
 #include <vector>
 #include <iterator>
-#include <mutex>
 #include <chrono>
 #include <thread>
-#include <condition_variable>
+#include <future>
 
 #include "Checkpoints.h"
 #include "../CryptoNoteConfig.h"
@@ -152,8 +151,6 @@ std::vector<uint32_t> Checkpoints::getCheckpointHeights() const {
 //---------------------------------------------------------------------------
 bool Checkpoints::load_checkpoints_from_dns()
 {
-  std::mutex m;
-  std::condition_variable cv;
   std::string domain(CryptoNote::DNS_CHECKPOINTS_HOST);
   std::vector<std::string>records;
   bool res = true;
@@ -161,25 +158,20 @@ bool Checkpoints::load_checkpoints_from_dns()
   logger(Logging::DEBUGGING) << "Fetching DNS checkpoint records from " << domain;
 
   try {
-    std::thread t([&cv, &domain, &res, &records]()
-    {
+    auto future = std::async(std::launch::async, [this, &res, &domain, &records]() {
       res = Common::fetch_dns_txt(domain, records);
-      cv.notify_one();
     });
 
-    t.detach();
+    std::future_status status;
 
-    {
-      std::unique_lock<std::mutex> l(m);
-      if (cv.wait_for(l, std::chrono::milliseconds(400)) == std::cv_status::timeout) {
-        logger(Logging::DEBUGGING) << "Timeout lookup DNS checkpoint records from " << domain;
-        return false;
-      }
-    }
+    status = future.wait_for(std::chrono::milliseconds(200));
 
-    if (!res) {
-      logger(Logging::DEBUGGING) << "Failed to lookup DNS checkpoint records from " + domain;
+    if (status == std::future_status::timeout) {
+      logger(Logging::DEBUGGING) << "Timeout lookup DNS checkpoint records from " << domain;
       return false;
+    }
+    else if (status == std::future_status::ready) {
+      future.get();
     }
   }
   catch (std::runtime_error& e) {
@@ -209,7 +201,7 @@ bool Checkpoints::load_checkpoints_from_dns()
       logger(DEBUGGING) << "Checkpoint already exists for height: " << height << ". Ignoring DNS checkpoint.";
     } else {
       add_checkpoint(height, hash_str);
-	  logger(DEBUGGING) << "Added DNS checkpoint: " << height_str << ":" << hash_str;
+      logger(DEBUGGING) << "Added DNS checkpoint: " << height_str << ":" << hash_str;
     }
   }
 
