@@ -116,6 +116,7 @@ namespace CryptoNote
     bool prepare_tx(const std::vector<std::string>& args);
     bool print_address(const std::vector<std::string> &args = std::vector<std::string>());
     bool save_address(const std::vector<std::string> &args = std::vector<std::string>());
+    bool save_keys(const std::vector<std::string> &args = std::vector<std::string>());
     bool save(const std::vector<std::string> &args);
     bool reset(const std::vector<std::string> &args);
     bool set_log(const std::vector<std::string> &args);
