@@ -54,7 +54,7 @@ Dependencies: MSVC 2013 or later, CMake 2.8.6 or later, Boost 1.55 or later, Ope
 * https://www.microsoft.com/
 * https://www.cmake.org/
 * https://www.boost.org/
-* https://www.openssl.org/
+* https://slproweb.com/products/Win32OpenSSL.html
 
 To build, change to a directory where this file is located, and run these commands: 
 ```
