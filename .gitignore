@@ -6,3 +6,6 @@
 .ycm_extra_conf.pyc
 Release
 Debug
+.vs/
+CMakeSettings.json
+out/
