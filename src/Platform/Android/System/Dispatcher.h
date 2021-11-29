@@ -1,4 +1,5 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2016-2017, Karbo developers
 //
 // This file is part of Bytecoin.
 //
@@ -89,8 +90,10 @@ public:
 # else
   static const int SIZEOF_PTHREAD_MUTEX_T = 32;
 # endif
+#elif defined(__aarch64__)
+  static const int SIZEOF_PTHREAD_MUTEX_T = 48;
 #else
-  static const int SIZEOF_PTHREAD_MUTEX_T = 32;
+  static const int SIZEOF_PTHREAD_MUTEX_T = 24;
 #endif
 
 private:
