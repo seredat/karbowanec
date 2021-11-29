@@ -74,7 +74,7 @@ bool Checkpoints::load_checkpoints_from_file(const std::string& fileName) {
 	while (std::getline(file, indexString, ','), std::getline(file, hash)) {
 		try {
 			height = std::stoi(indexString);
-		} catch (const std::invalid_argument &)	{
+		} catch (const std::invalid_argument &) {
 			logger(Logging::ERROR, BRIGHT_RED) << "Invalid checkpoint file format - "
 				<< "could not parse height as a number";
 			return false;
