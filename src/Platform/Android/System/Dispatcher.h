@@ -84,7 +84,6 @@ public:
   int getTimer();
   void pushTimer(int timer);
 
-/*
 #ifdef __x86_64__
 # if __WORDSIZE == 64
   static const int SIZEOF_PTHREAD_MUTEX_T = 40;
@@ -96,8 +95,6 @@ public:
 #else
   static const int SIZEOF_PTHREAD_MUTEX_T = 24;
 #endif
-*/
-static const int SIZEOF_PTHREAD_MUTEX_T = sizeof(pthread_mutex_t);
 
 private:
   void spawn(std::function<void()>&& procedure);
