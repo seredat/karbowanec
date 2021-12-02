@@ -9,3 +9,4 @@ Debug
 .vs/
 CMakeSettings.json
 out/
+*.bak
