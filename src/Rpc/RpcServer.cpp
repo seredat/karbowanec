@@ -2453,6 +2453,8 @@ bool RpcServer::on_verify_message(const COMMAND_RPC_VERIFY_MESSAGE::request& req
 }
 
 bool RpcServer::on_resolve_open_alias(const COMMAND_RPC_RESOLVE_OPEN_ALIAS::request& req, COMMAND_RPC_RESOLVE_OPEN_ALIAS::response& res) {
+
+#ifndef __ANDROID__
   try {
     res.address = Common::resolveAlias(req.url);
 
@@ -2465,6 +2467,7 @@ bool RpcServer::on_resolve_open_alias(const COMMAND_RPC_RESOLVE_OPEN_ALIAS::requ
     throw JsonRpc::JsonRpcError(CORE_RPC_ERROR_CODE_WRONG_PARAM, "Couldn't resolve alias: " + std::string(e.what()));
     return true;
   }
+#endif
 
   res.status = CORE_RPC_STATUS_OK;
   return true;

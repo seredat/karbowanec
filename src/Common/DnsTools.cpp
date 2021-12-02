@@ -47,9 +47,10 @@
 
 namespace Common {
 
-#ifndef __ANDROID__
 
-	bool fetch_dns_txt(const std::string domain, std::vector<std::string>&records) {
+#if !defined(ANDROID) || !defined(__ANDROID__)
+
+bool fetch_dns_txt(const std::string domain, std::vector<std::string>&records) {
 
 #ifdef _WIN32
 		using namespace std;
@@ -133,8 +134,6 @@ namespace Common {
 		return true;
 	}
 
-#endif
-
 bool processServerAliasResponse(const std::string& s, std::string& address) {
   try {
     // Courtesy of Monero Project
@@ -209,5 +208,5 @@ std::vector<std::string> resolveAliases(const std::string& aliasUrl) {
 
   throw std::runtime_error("Failed to parse server response");
 }
-
+#endif
 }
