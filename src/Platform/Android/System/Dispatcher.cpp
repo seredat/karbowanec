@@ -56,7 +56,7 @@ const size_t STACK_SIZE = 64 * 1024;
 
 Dispatcher::Dispatcher() {
   std::string message;
-  epoll = ::epoll_create(0);
+  epoll = ::epoll_create1(0);
   if (epoll == -1) {
     message = "epoll_create1 failed, " + lastErrorMessage();
   } else {
