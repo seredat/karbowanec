@@ -76,3 +76,41 @@ jobs:
           path: ${{ steps.build-armv7-a.outputs.artifact_path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build armv8-a
+        id: build-armv8-a
+        run: |
+          build_folder="build/release"
+          krb_ver=${GITHUB_SHA::7}
+          release_name=Karbo-"$krb_ver"-cli-android-arm64-v8a
+          echo "${ANDROID_NDK_ROOT}/toolchains/llvm/prebuilt/linux-x86_64/aarch64-linux-android" >> $GITHUB_PATH
+          echo "${ANDROID_NDK_ROOT}/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_PATH
+          mkdir -p "$build_folder"
+          cd "$build_folder"
+          CC=clang CXX=clang++ CFLAGS='-stdlib=libc++' cmake -D BUILD_TESTS=OFF -D ARCH="armv8-a" \
+          -D STATIC=ON -D BUILD_64=ON -D CMAKE_BUILD_TYPE=Release -D ANDROID=true -D BUILD_TAG="android" \
+          -D CMAKE_TOOLCHAIN_FILE="${ANDROID_NDK_ROOT}/build/cmake/android.toolchain.cmake" \
+          -D ANDROID_NATIVE_API_LEVEL=21 -D ANDROID_ABI="arm64-v8a" -D ANDROID_TOOLCHAIN=clang \
+          -D OPENSSL_ROOT_DIR=${HOME}/opt/android/openssl/openssl-1.1.1k-clang \
+          -D OPENSSL_SSL_LIBRARY=${HOME}/opt/android/openssl/openssl-1.1.1k-clang/arm64-v8a/lib/libssl.so \
+          -D OPENSSL_CRYPTO_LIBRARY=${HOME}/opt/android/openssl/openssl-1.1.1k-clang/arm64-v8a/lib/libcrypto.so \
+          -D OPENSSL_INCLUDE_DIR=${HOME}/opt/android/openssl/openssl-1.1.1k-clang/include \
+          -D BOOST_IGNORE_SYSTEM_PATHS_DEFAULT=ON -DBoost_NO_SYSTEM_PATHS=ON -D Boost_USE_STATIC_RUNTIME=ON \
+          -D BOOST_ROOT=${HOME}/opt/android/boost/ndk_21_boost_1.72.0 \
+          -D Boost_INCLUDE_DIR=${HOME}/opt/android/boost/ndk_21_boost_1.72.0/include \
+          -D Boost_LIBRARY_DIR=${HOME}/opt/android/boost/ndk_21_boost_1.72.0/libs/arm64-v8a \
+          -D Boost_LIBRARY_DIRS=${HOME}/opt/android/boost/ndk_21_boost_1.72.0/libs/arm64-v8a \
+          -D CMAKE_POSITION_INDEPENDENT_CODE:BOOL=true ../..
+          make SimpleWallet
+          mkdir -p "$release_name"
+          cp src/simplewallet "$release_name/"
+          echo "::set-output name=release_name::${release_name}"
+          echo "::set-output name=artifact_path::$build_folder/$release_name"
+
+      - name: Upload armv8-a to GH Artifacts
+        uses: actions/upload-artifact@v1.0.0
+        with:
+          name: ${{ steps.build-armv8-a.outputs.release_name }}
+          path: ${{ steps.build-armv8-a.outputs.artifact_path }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
