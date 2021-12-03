@@ -504,7 +504,7 @@ void WalletLegacy::doSave(std::ostream& destination, bool saveDetailed, bool sav
 
     m_state = INITIALIZED;
     m_blockchainSync.start(); //XXX: start can throw. what to do in this case?
-    }
+  }
   catch (std::system_error& e) {
     runAtomic(m_cacheMutex, [this] () {this->m_state = WalletLegacy::INITIALIZED;} );
     m_observerManager.notify(&IWalletLegacyObserver::saveCompleted, e.code());
