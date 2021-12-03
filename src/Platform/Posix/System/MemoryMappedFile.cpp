@@ -127,7 +127,7 @@ void MemoryMappedFile::open(const std::string& path, std::error_code& ec) {
     close(ignore);
   });
 
-  m_file = ::open(path.c_str(), O_RDWR, S_IRUSR | S_IWUSR);
+  m_file = ::open(path.c_str(), O_RDWR);
   if (m_file == -1) {
     return;
   }
