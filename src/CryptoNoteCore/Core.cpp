@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
-// Copyright (c) 2016-2020, The Karbo developers
+// Copyright (c) 2016-2021, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -328,7 +328,7 @@ bool Core::check_tx_fee(const Transaction& tx, const Crypto::Hash& txHash, size_
   if (!isFusionTransaction && !m_checkpoints.is_in_checkpoint_zone(height)) {
     bool enough = true;
 
-    uint64_t min = getMinimalFeeForHeight(height);
+    uint64_t min = getMinimalFee(height);
 
     if (height <= CryptoNote::parameters::UPGRADE_HEIGHT_V4 && fee < min) {
       enough = false;
@@ -1221,27 +1221,12 @@ std::vector<Crypto::Hash> Core::getTransactionHashesByPaymentId(const Crypto::Ha
   return blockchainTransactionHashes;
 }
 
-difficulty_type Core::getAvgDifficulty(uint32_t height, size_t window) {
-  return m_blockchain.getAvgDifficulty(height, window);
-}
-
-difficulty_type Core::getAvgDifficulty(uint32_t height) {
-  return m_blockchain.getAvgDifficulty(height);
-}
-
-uint64_t Core::getMinimalFeeForHeight(const uint32_t height) {
-  if (height <= CryptoNote::parameters::UPGRADE_HEIGHT_V3_1)
-    return CryptoNote::parameters::MINIMUM_FEE_V1;
-  else if (height > CryptoNote::parameters::UPGRADE_HEIGHT_V3_1 && height <= CryptoNote::parameters::UPGRADE_HEIGHT_V4)
-    return CryptoNote::parameters::MINIMUM_FEE_V2;
-  else if (height > CryptoNote::parameters::UPGRADE_HEIGHT_V4 && height < CryptoNote::parameters::UPGRADE_HEIGHT_V4_3)
-    return m_blockchain.getMinimalFee(height);
-  else
-    return CryptoNote::parameters::MINIMUM_FEE_V3;
+uint64_t Core::getMinimalFee(const uint32_t height) {
+  return m_currency.getMinimalFee(height);
 }
 
 uint64_t Core::getMinimalFee() {
-  return getMinimalFeeForHeight(getCurrentBlockchainHeight() - 1);
+  return getMinimalFee(getCurrentBlockchainHeight() - 1);
 }
 
 std::error_code Core::executeLocked(const std::function<std::error_code()>& func) {

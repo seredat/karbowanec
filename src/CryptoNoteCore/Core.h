@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
-// Copyright (c) 2016-2020, The Karbo developers
+// Copyright (c) 2016-2021, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -82,8 +82,6 @@ namespace CryptoNote {
      virtual bool getBlockDifficulty(uint32_t height, difficulty_type& difficulty) override;
      virtual bool getBlockCumulativeDifficulty(uint32_t height, difficulty_type& difficulty) override;
      virtual bool getBlockTimestamp(uint32_t height, uint64_t& timestamp) override;
-     virtual difficulty_type getAvgDifficulty(uint32_t height, size_t window) override;
-     virtual difficulty_type getAvgDifficulty(uint32_t height) override;
      virtual bool getBlockContainingTx(const Crypto::Hash& txId, Crypto::Hash& blockId, uint32_t& blockHeight) override;
      virtual bool getMultisigOutputReference(const MultisignatureInput& txInMultisig, std::pair<Crypto::Hash, size_t>& output_reference) override;
      virtual bool getGeneratedTransactionsNumber(uint32_t height, uint64_t& generatedTransactions) override;
@@ -96,7 +94,7 @@ namespace CryptoNote {
      virtual std::unique_ptr<IBlock> getBlock(const Crypto::Hash& blocksId) override;
      virtual bool handleIncomingTransaction(const Transaction& tx, const Crypto::Hash& txHash, size_t blobSize, tx_verification_context& tvc, bool keptByBlock, uint32_t height) override;
      virtual std::error_code executeLocked(const std::function<std::error_code()>& func) override;
-     virtual uint64_t getMinimalFeeForHeight(const uint32_t height) override;
+     virtual uint64_t getMinimalFee(const uint32_t height) override;
      virtual uint64_t getMinimalFee() override;
 
      virtual bool addMessageQueue(MessageQueue<BlockchainMessage>& messageQueue) override;

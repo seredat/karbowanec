@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2018-2019, The TurtleCoin Developers
-// Copyright (c) 2016-2019, The Karbo Developers
+// Copyright (c) 2016-2021, The Karbo Developers
 //
 // This file is part of Karbo.
 //
@@ -22,6 +22,7 @@
 #include <functional>
 #include <iostream>
 #include <sstream>
+#include <thread>
 #include <unordered_set>
 
 #include "Common/StreamTools.h"

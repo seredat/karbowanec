@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
-// Copyright (c) 2016, The Karbowanec developers
+// Copyright (c) 2016-2021, The Karbowanec developers
 //
 // This file is part of Karbo.
 //
@@ -80,7 +80,7 @@ public:
   uint64_t coin() const { return m_coin; }
 
   uint64_t minimumFee() const { return m_minimumFee; }
-  uint64_t getMinimalFee(uint64_t avgCurrentDifficulty, uint64_t currentReward, uint64_t avgReferenceDifficulty, uint64_t avgReferenceReward, uint32_t height) const;
+  uint64_t getMinimalFee(const uint32_t height) const;
   uint64_t getFeePerByte(const uint64_t txExtraSize, const uint64_t minFee) const;
 
   uint64_t defaultDustThreshold() const { return m_defaultDustThreshold; }

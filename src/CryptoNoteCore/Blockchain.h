@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
-// Copyright (c) 2016-2020, The Karbo developers
+// Copyright (c) 2016-2021, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -96,10 +96,7 @@ namespace CryptoNote {
     Crypto::Hash getTailId();
     Crypto::Hash getTailId(uint32_t& height);
     difficulty_type getDifficultyForNextBlock(const Crypto::Hash &prevHash);
-    difficulty_type getAvgDifficulty(uint32_t height);
-    difficulty_type getAvgDifficulty(uint32_t height, size_t window);
     uint64_t getBlockTimestamp(uint32_t height);
-    uint64_t getMinimalFee(uint32_t height);
     uint64_t getCoinsInCirculation();
     uint64_t getCoinsInCirculation(uint32_t height);
     uint8_t getBlockMajorVersionForHeight(uint32_t height) const;
@@ -318,7 +315,7 @@ namespace CryptoNote {
     bool check_block_timestamp(std::vector<uint64_t> timestamps, const Block& b);
     uint64_t get_adjusted_time();
     bool complete_timestamps_vector(uint8_t blockMajorVersion, uint64_t start_height, std::vector<uint64_t>& timestamps);
-    bool checkBlockVersion(const Block& b, const Crypto::Hash& blockHash);
+    bool checkBlockVersion(const Block& b);
     bool checkParentBlockSize(const Block& b, const Crypto::Hash& blockHash);
     bool checkCumulativeBlockSize(const Crypto::Hash& blockId, size_t cumulativeBlockSize, uint64_t height);
     std::vector<Crypto::Hash> doBuildSparseChain(const Crypto::Hash& startBlockId) const;

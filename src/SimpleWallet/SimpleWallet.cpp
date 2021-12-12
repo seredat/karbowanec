@@ -666,6 +666,7 @@ simple_wallet::simple_wallet(System::Dispatcher& dispatcher, const CryptoNote::C
     " - Transfer <amount_1>,... <amount_N> to <address_1>,... <address_N>, respectively. ");
   m_consoleHandler.setHandler("set_log", boost::bind(&simple_wallet::set_log, this, _1), "set_log <level> - Change current log level, <level> is a number 0-4");
   m_consoleHandler.setHandler("address", boost::bind(&simple_wallet::print_address, this, _1), "Show current wallet public address");
+  m_consoleHandler.setHandler("address_save", boost::bind(&simple_wallet::save_address, this, _1), "Save current wallet public address to disk");
   m_consoleHandler.setHandler("save", boost::bind(&simple_wallet::save, this, _1), "Save wallet synchronized data");
   m_consoleHandler.setHandler("reset", boost::bind(&simple_wallet::reset, this, _1), "Discard cache data and start synchronizing from the start");
   m_consoleHandler.setHandler("show_seed", boost::bind(&simple_wallet::seed, this, _1), "Get wallet recovery phrase (deterministic seed)");
@@ -2314,6 +2315,21 @@ void simple_wallet::stop() {
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::print_address(const std::vector<std::string> &args/* = std::vector<std::string>()*/) {
   success_msg_writer() << m_wallet->getAddress();
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::save_address(const std::vector<std::string> &args/* = std::vector<std::string>()*/) {
+  std::string walletAddressFile = prepareWalletAddressFilename(m_wallet_file_arg.empty() ? m_generate_new : m_wallet_file_arg);
+  boost::system::error_code ignore;
+  if (boost::filesystem::exists(walletAddressFile, ignore)) {
+    fail_msg_writer() << "Address file already exists: " + walletAddressFile;
+    return true;
+  }
+  if (writeAddressFile(walletAddressFile, m_wallet->getAddress())) {
+    success_msg_writer() << "Success write wallet address file: " + walletAddressFile;
+  } else {
+    fail_msg_writer() << "Couldn't write wallet address file: " + walletAddressFile;
+  }
   return true;
 }
 //----------------------------------------------------------------------------------------------------

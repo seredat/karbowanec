@@ -1,19 +1,8 @@
 ![Build check](https://github.com/seredat/karbowanec/workflows/Build%20check/badge.svg)
 
-Karbo is people's electronic cash, a cryptocurrency, just like Bitcoin but Ukrainian and anonymous thanks to Cryptonote technology. The key principle of CryptoNote is adaptive parameters. Karbo already has adaptive block size limit and adaptive difficulty, which we improved, and which ensures it's stable emission rate and thus makes Karbo sound money. In addition in Karbo was implemented adaptive fee to keep transaction costs stable regardless of karbo price.
+**HARDFORK AT HEIGHT 667000!!!** 
 
-**HARDFORK V4 IS SET AT HEIGHT 266000!!!** In this hardfork _we introduce adaptive minimal transaction fee_ as first step towards our goal. Information for exchanges and other services how to work with new fees: https://github.com/seredat/karbowanec/wiki/Dynamic-transaction-minimum-fee
-
-Pools operating **'cryptonote-forknote-pool'** or compatible software should update Node-Cryptonote-Util to this version: https://github.com/aivve/node-cryptonote-util. The reference pool software is here: https://github.com/Karbovanets/karbo-pool.
-
-Pools operating **'cryptonote-nodejs-pool'** should _change config on hardfork height_. The changes in config are:
-```
-"daemonType": "default",
-"cnAlgorithm": "cryptonight",
-"cnVariant": 0,
-"cnBlobType": 0,
-```
-The example of Karbo config is here: https://github.com/Karbovanets/cryptonote-nodejs-pool/blob/master/config_examples/karbo.json
+Karbo is people's electronic cash, a cryptocurrency, just like Bitcoin but Ukrainian and anonymous thanks to Cryptonote technology. The key principle of CryptoNote is adaptive parameters. Karbo already has adaptive block size limit and adaptive difficulty, which we improved, and which ensures it's stable emission rate and thus makes Karbo sound money.
 
 
 
@@ -65,7 +54,7 @@ Dependencies: MSVC 2013 or later, CMake 2.8.6 or later, Boost 1.55 or later, Ope
 * https://www.microsoft.com/
 * https://www.cmake.org/
 * https://www.boost.org/
-* https://www.openssl.org/
+* https://slproweb.com/products/Win32OpenSSL.html
 
 To build, change to a directory where this file is located, and run these commands: 
 ```
@@ -130,4 +119,6 @@ make SimpleWallet
 ### Portable and optimized binaries
 
 By default it will compile portable binary, to build optimized for your CPU, run Cmake with flag `-DARCH=native`.
+
+
 

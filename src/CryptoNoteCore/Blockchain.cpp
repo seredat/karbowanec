@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers, The Monero developers
 // Copyright (c) 2018, Ryo Currency Project
-// Copyright (c) 2016-2020, The Karbo developers
+// Copyright (c) 2016-2021, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -801,72 +801,9 @@ difficulty_type Blockchain::getDifficultyForNextBlock(const Crypto::Hash &prevHa
   return m_currency.nextDifficulty(static_cast<uint32_t>(m_blocks.size()), BlockMajorVersion, timestamps, cumulative_difficulties);
 }
 
-difficulty_type Blockchain::getAvgDifficulty(uint32_t height, size_t window) {
-  std::lock_guard<decltype(m_blockchain_lock)> lk(m_blockchain_lock);
-  height = std::min<uint32_t>(height, (uint32_t)m_blocks.size() - 1);
-  if (height <= 1)
-    return 1;
-
-  if (window == height) {
-    return m_blocks[height].cumulative_difficulty / height;
-  }
-
-  size_t offset;
-  offset = height - std::min<uint32_t>(height, std::min<uint32_t>(static_cast<uint32_t>(m_blocks.size() - 1), static_cast<uint32_t>(window)));
-  if (offset == 0) {
-    ++offset;
-  }
-  difficulty_type cumulDiffForPeriod = m_blocks[height].cumulative_difficulty - m_blocks[offset].cumulative_difficulty;
-  return cumulDiffForPeriod / std::min<uint32_t>(static_cast<uint32_t>(m_blocks.size() - 1), static_cast<uint32_t>(window));
-}
-
-difficulty_type Blockchain::getAvgDifficulty(uint32_t height) {
-  std::lock_guard<decltype(m_blockchain_lock)> lk(m_blockchain_lock);
-  height = std::min<uint32_t>(height, (uint32_t)m_blocks.size() - 1);
-  if (height <= 1)
-    return 1;
-  return m_blocks[std::min<difficulty_type>(height, m_blocks.size())].cumulative_difficulty / std::min<difficulty_type>(height, m_blocks.size());
-}
-
 uint64_t Blockchain::getBlockTimestamp(uint32_t height) {
   assert(height < m_blocks.size());
   return m_blocks[height].bl.timestamp;
-}
-
-uint64_t Blockchain::getMinimalFee(uint32_t height) {
-  std::lock_guard<decltype(m_blockchain_lock)> lk(m_blockchain_lock);
-  if (height == 0 || m_blocks.size() <= 1) {
-    return 0;
-  }
-  if (height > static_cast<uint32_t>(m_blocks.size()) - 1) {
-    height = static_cast<uint32_t>(m_blocks.size()) - 1;
-  }
-  if (height < 3) {
-    height = 3;
-  }
-  uint32_t window = std::min(height, std::min<uint32_t>(static_cast<uint32_t>(m_blocks.size()), static_cast<uint32_t>(m_currency.expectedNumberOfBlocksPerDay())));
-  if (window == 0) {
-    ++window;
-  }
-  size_t offset = height - window;
-  if (offset == 0) {
-    ++offset;
-  }
-
-  /* Perhaps, in case of POW change, difficulties for calculations here
-   * should be reset and used starting from the fork height.
-   */
-
-  // calculate average difficulty for ~last month
-  uint64_t avgCurrentDifficulty = getAvgDifficulty(height, window * 7 * 4);
-  // reference trailing average difficulty
-  uint64_t avgReferenceDifficulty = m_blocks[height].cumulative_difficulty / height;
-  // calculate current base reward
-  uint64_t currentReward = m_currency.calculateReward(m_blocks[height].already_generated_coins);
-  // reference trailing average reward
-  uint64_t avgReferenceReward = m_blocks[height].already_generated_coins / height;
-
-  return m_currency.getMinimalFee(avgCurrentDifficulty, currentReward, avgReferenceDifficulty, avgReferenceReward, height);
 }
 
 uint64_t Blockchain::getCoinsInCirculation() {
@@ -938,6 +875,17 @@ bool Blockchain::switch_to_alternative_blockchain(std::list<blocks_ext_by_hash::
   if (!(m_blocks.size() > split_height)) {
     logger(ERROR, BRIGHT_RED) << "switch_to_alternative_blockchain: blockchain size is lower than split height";
     return false;
+  }
+
+  // Check that block major version matches
+  for (auto alt_ch_iter = alt_chain.begin(); alt_ch_iter != alt_chain.end(); alt_ch_iter++)
+  {
+    auto ch_ent = *alt_ch_iter;
+    Block b = ch_ent->second.bl;
+    if (!checkBlockVersion(b))
+    {
+      return false;
+    }
   }
 
   // Poisson check, courtesy of ryo-project
@@ -1324,15 +1272,15 @@ bool Blockchain::handle_alternative_block(const Block& b, const Crypto::Hash& id
     return false;
   }
 
-  if (!checkBlockVersion(b, id)) {
+  if (!checkBlockVersion(b)) {
     bvc.m_verification_failed = true;
     return false;
   }
 
-  //if (!checkParentBlockSize(b, id)) {
-  //  bvc.m_verification_failed = true;
-  //  return false;
-  //}
+  if (!checkParentBlockSize(b, id)) {
+    bvc.m_verification_failed = true;
+    return false;
+  }
 
   size_t cumulativeSize;
   if (!getBlockCumulativeSize(b, cumulativeSize)) {
@@ -2054,11 +2002,11 @@ bool Blockchain::check_block_timestamp(std::vector<uint64_t> timestamps, const B
   return true;
 }
 
-bool Blockchain::checkBlockVersion(const Block& b, const Crypto::Hash& blockHash) {
+bool Blockchain::checkBlockVersion(const Block& b) {
   uint32_t height = get_block_height(b);
   const uint8_t expectedBlockVersion = getBlockMajorVersionForHeight(height);
   if (b.majorVersion != expectedBlockVersion) {
-    logger(TRACE) << "Block " << blockHash << " has wrong major version: " << static_cast<int>(b.majorVersion) <<
+    logger(TRACE) << "Block " << get_block_hash(b) << " has wrong major version: " << static_cast<int>(b.majorVersion) <<
       ", at height " << height << " expected version is " << static_cast<int>(expectedBlockVersion);
     return false;
   }
@@ -2206,7 +2154,7 @@ bool Blockchain::pushBlock(const Block& blockData, const std::vector<Transaction
     return false;
   }
 
-  if (!checkBlockVersion(blockData, blockHash)) {
+  if (!checkBlockVersion(blockData)) {
     bvc.m_verification_failed = true;
     return false;
   }
