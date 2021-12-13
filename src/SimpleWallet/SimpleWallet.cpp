@@ -2358,7 +2358,9 @@ bool simple_wallet::save_keys(const std::vector<std::string>& args/* = std::vect
 
   backup_file << priv_key;
 
-  logger(INFO, BRIGHT_GREEN) << "Wallet keys have been saved to the same folder where your wallet file is located.";
+  logger(INFO, BRIGHT_GREEN) << "Wallet keys have been saved to the \""
+                             << m_wallet_file + ".txt\""
+                             << " in same folder where your wallet file is located.";
 
   return true;
 }
