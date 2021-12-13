@@ -72,6 +72,7 @@ using CryptoNote::ISerializer;
       uint64_t mixin = 0;
       uint64_t unlock_time = 0;
       std::string payment_id;
+      std::string extra;
 
       void serialize(ISerializer& s)
       {
@@ -80,6 +81,7 @@ using CryptoNote::ISerializer;
         KV_MEMBER(mixin)
         KV_MEMBER(unlock_time)
         KV_MEMBER(payment_id)
+        KV_MEMBER(extra)
       }
     };
     struct response
