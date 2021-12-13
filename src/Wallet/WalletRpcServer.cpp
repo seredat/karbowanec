@@ -299,7 +299,7 @@ bool wallet_rpc_server::on_transfer(const wallet_rpc::COMMAND_RPC_TRANSFER::requ
     std::string extra_str = req.extra;
     if (!Common::fromHex(req.extra, extra)) {
       throw JsonRpc::JsonRpcError(WALLET_RPC_ERROR_CODE_WRONG_EXTRA,
-        "Wrong transaction extra format: " + extra_str + ", expected 64-character string");
+        "Wrong transaction extra format: " + extra_str + ", expected hex string");
     }
   }
 
