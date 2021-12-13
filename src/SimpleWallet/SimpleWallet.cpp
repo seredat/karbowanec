@@ -2347,7 +2347,7 @@ bool simple_wallet::save_keys(const std::vector<std::string>& args/* = std::vect
   AccountBase::generateViewFromSpend(keys.spendSecretKey, deterministic_private_view_key, unused_dummy_variable);
   bool deterministic_private_keys = deterministic_private_view_key == keys.viewSecretKey;
 
-  // dont show a mnemonic seed if it is a non-deterministic wallet
+  // don't show a mnemonic seed if it is a non-deterministic wallet
   std::string electrum_words;
   bool success = m_wallet->getSeed(electrum_words);
   if (success)
