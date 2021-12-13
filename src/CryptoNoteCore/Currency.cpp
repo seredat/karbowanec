@@ -38,6 +38,8 @@
 using namespace Logging;
 using namespace Common;
 
+#define RESET_WORK_FACTOR_V5 1000
+
 namespace CryptoNote {
 
 	const std::vector<uint64_t> Currency::PRETTY_AMOUNTS = {
@@ -671,7 +673,7 @@ namespace CryptoNote {
     height--; // there's difference between karbo1 and karbo2 here (height vs top block index)
 
     if (height == upgradeHeight(CryptoNote::BLOCK_MAJOR_VERSION_5)) {
-      return 1000; //return (cumulativeDifficulties[0] - cumulativeDifficulties[1]) / RESET_WORK_FACTOR;
+		return cumulativeDifficulties[0] / height / RESET_WORK_FACTOR_V5;
     }
     uint32_t count = (uint32_t)difficultyBlocksCountByBlockVersion(blockMajorVersion) - 1;
     if (height > upgradeHeight(CryptoNote::BLOCK_MAJOR_VERSION_5) && height < CryptoNote::parameters::UPGRADE_HEIGHT_V5 + count) {
