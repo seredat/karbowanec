@@ -38,7 +38,7 @@
 using namespace Logging;
 using namespace Common;
 
-#define RESET_WORK_FACTOR_V5 1000
+constexpr auto RESET_WORK_FACTOR_V5 = 1000;
 
 namespace CryptoNote {
 
