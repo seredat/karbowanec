@@ -32,7 +32,8 @@ public:
   void init(const boost::program_options::variables_map& options);
 
   std::string extraMessages;
-  std::string startMining;
+  std::string miningSpendKey;
+  std::string miningViewKey;
   uint32_t miningThreads;
 };
 

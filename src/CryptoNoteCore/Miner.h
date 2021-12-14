@@ -1,4 +1,5 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2016-2021, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -42,13 +43,15 @@ namespace CryptoNote {
     bool init(const MinerConfig& config);
     bool set_block_template(const Block& bl, const difficulty_type& diffic);
     bool on_block_chain_update();
-    bool start(const AccountPublicAddress& adr, size_t threads_count);
+    bool start(const AccountKeys& acc, size_t threads_count);
     uint64_t get_speed();
     void send_stop_signal();
     bool stop();
     bool is_mining();
     bool on_idle();
     void on_synchronized();
+    //synchronous analog (for fast calls)
+    bool find_nonce_for_given_block(Crypto::cn_context &context, Block& bl, const difficulty_type& diffic);
     void pause();
     void resume();
     void do_print_hashrate(bool do_hr);
@@ -56,7 +59,7 @@ namespace CryptoNote {
   private:
     bool worker_thread(uint32_t th_local_index);
     bool request_block_template();
-    void  merge_hr();
+    void merge_hr();
 
     struct miner_config
     {
@@ -83,7 +86,7 @@ namespace CryptoNote {
     std::list<std::thread> m_threads;
     std::mutex m_threads_lock;
     IMinerHandler& m_handler;
-    AccountPublicAddress m_mine_address;
+    AccountKeys m_mine_account;
     OnceInInterval m_update_block_template_interval;
     OnceInInterval m_update_merge_hr_interval;
 

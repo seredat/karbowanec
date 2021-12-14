@@ -204,7 +204,6 @@ namespace CryptoNote {
 
     void rollbackBlockchainTo(uint32_t height);
     bool have_tx_keyimg_as_spent(const Crypto::KeyImage &key_im);
-
     bool checkIfSpent(const Crypto::KeyImage& keyImage, uint32_t blockIndex);
     bool checkIfSpent(const Crypto::KeyImage& keyImage);
     bool is_tx_spendtime_unlocked(uint64_t unlock_time);
@@ -212,6 +211,9 @@ namespace CryptoNote {
 
     void rebuildCache();
     bool storeCache();
+
+    bool checkProofOfWork(Crypto::cn_context& context, const Block& block, difficulty_type currentDiffic, Crypto::Hash& proofOfWork);
+    bool get_block_long_hash(Crypto::cn_context &context, const Block& b, Crypto::Hash& res);
 
   private:
 

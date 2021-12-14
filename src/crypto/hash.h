@@ -1,4 +1,4 @@
-// Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2012-2017, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2016-2020, The Karbo developers
 //
 // This file is part of Karbo.
@@ -22,6 +22,7 @@
 
 #include <CryptoTypes.h>
 #include "generic-ops.h"
+#include "yespower.h"
 
 namespace Crypto {
 
@@ -60,7 +61,22 @@ namespace Crypto {
   };
 
   inline void cn_slow_hash(cn_context &context, const void *data, size_t length, Hash &hash) {
-    cn_slow_hash(data, length, reinterpret_cast<char *>(&hash));
+	cn_slow_hash(data, length, reinterpret_cast<char *>(&hash));
+  }
+
+  inline bool y_slow_hash(const void* data, size_t length, const Hash& seed, Hash& hash) {
+    yespower_params_t yespower_params = {
+      2048,
+      32,
+      seed.data,
+      sizeof(seed)
+    };
+
+    if (yespower_tls((unsigned char *)data, length, &yespower_params, (yespower_binary_t *)hash.data)) {
+      return false;
+    }
+
+    return true;
   }
 
   inline void tree_hash(const Hash *hashes, size_t count, Hash &root_hash) {
