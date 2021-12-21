@@ -1047,10 +1047,18 @@ bool Blockchain::prevalidate_miner_transaction(const Block& b, uint32_t height) 
     return false;
   }
 
-  if (b.majorVersion >= CryptoNote::BLOCK_MAJOR_VERSION_5 && !(b.baseTransaction.outputs.size() == 1)) {
-    logger(ERROR, BRIGHT_RED)
-      << "Only 1 output in coinbase transaction allowed";
-    return false;
+  if (b.majorVersion >= CryptoNote::BLOCK_MAJOR_VERSION_5) {
+    if (!(b.baseTransaction.outputs.size() == 1)) {
+      logger(ERROR, BRIGHT_RED)
+        << "Only 1 output in coinbase transaction allowed";
+      return false;
+    }
+
+    if (!(b.baseTransaction.outputs[0].target.type() == typeid(KeyOutput))) {
+      logger(ERROR, BRIGHT_RED)
+        << "Coinbase transaction in the block has the wrong output type";
+      return false;
+    }
   }
 
   if (!(b.baseTransaction.signatures.empty())) {
@@ -1061,7 +1069,7 @@ bool Blockchain::prevalidate_miner_transaction(const Block& b, uint32_t height) 
 
   if (!(b.baseTransaction.inputs[0].type() == typeid(BaseInput))) {
     logger(ERROR, BRIGHT_RED)
-      << "Coinbase transaction in the block has the wrong type";
+      << "Coinbase transaction in the block has the wrong input type";
     return false;
   }
 
