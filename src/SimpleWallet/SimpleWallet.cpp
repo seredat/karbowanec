@@ -666,7 +666,8 @@ simple_wallet::simple_wallet(System::Dispatcher& dispatcher, const CryptoNote::C
     " - Transfer <amount_1>,... <amount_N> to <address_1>,... <address_N>, respectively. ");
   m_consoleHandler.setHandler("set_log", boost::bind(&simple_wallet::set_log, this, _1), "set_log <level> - Change current log level, <level> is a number 0-4");
   m_consoleHandler.setHandler("address", boost::bind(&simple_wallet::print_address, this, _1), "Show current wallet public address");
-  m_consoleHandler.setHandler("address_save", boost::bind(&simple_wallet::save_address, this, _1), "Save current wallet public address to disk");
+  m_consoleHandler.setHandler("save_address", boost::bind(&simple_wallet::save_address, this, _1), "Save current wallet public address to disk");
+  m_consoleHandler.setHandler("save_keys", boost::bind(&simple_wallet::save_keys, this, boost::arg<1>()), "Save current wallet private keys to file");
   m_consoleHandler.setHandler("save", boost::bind(&simple_wallet::save, this, _1), "Save wallet synchronized data");
   m_consoleHandler.setHandler("reset", boost::bind(&simple_wallet::reset, this, _1), "Discard cache data and start synchronizing from the start");
   m_consoleHandler.setHandler("show_seed", boost::bind(&simple_wallet::seed, this, _1), "Get wallet recovery phrase (deterministic seed)");
@@ -1724,7 +1725,11 @@ bool simple_wallet::change_password(const std::vector<std::string>& args) {
 
 bool simple_wallet::start_mining(const std::vector<std::string>& args) {
   COMMAND_RPC_START_MINING::request req;
-  req.miner_address = m_wallet->getAddress();
+
+  AccountKeys acc;
+  m_wallet->getAccountKeys(acc);
+  req.miner_spend_key = Common::podToHex(acc.spendSecretKey);
+  req.miner_view_key = Common::podToHex(acc.viewSecretKey);
 
   bool ok = true;
   size_t max_mining_threads_count = (std::max)(std::thread::hardware_concurrency(), static_cast<unsigned>(2));
@@ -1761,12 +1766,12 @@ bool simple_wallet::start_mining(const std::vector<std::string>& args) {
     if (err.empty())
       success_msg_writer() << "Mining started in daemon";
     else
-      fail_msg_writer() << "mining has NOT been started: " << err;
+      fail_msg_writer() << "Mining has not started due to an error: " << err;
 
   } catch (const ConnectException&) {
     printConnectionError();
   } catch (const std::exception& e) {
-    fail_msg_writer() << "Failed to invoke rpc method: " << e.what();
+    fail_msg_writer() << "Failed to invoke RPC method: " << e.what();
   }
 
   return true;
@@ -1791,11 +1796,11 @@ bool simple_wallet::stop_mining(const std::vector<std::string>& args)
     if (err.empty())
       success_msg_writer() << "Mining stopped in daemon";
     else
-      fail_msg_writer() << "mining has NOT been stopped: " << err;
+      fail_msg_writer() << "Mining has not stopped: " << err;
   } catch (const ConnectException&) {
     printConnectionError();
   } catch (const std::exception& e) {
-    fail_msg_writer() << "Failed to invoke rpc method: " << e.what();
+    fail_msg_writer() << "Failed to invoke RPC method: " << e.what();
   }
 
   return true;
@@ -2326,6 +2331,41 @@ bool simple_wallet::save_address(const std::vector<std::string> &args/* = std::v
   } else {
     fail_msg_writer() << "Couldn't write wallet address file: " + walletAddressFile;
   }
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::save_keys(const std::vector<std::string>& args/* = std::vector<std::string>()*/) {
+  std::ofstream backup_file(m_wallet_file + ".txt");
+  AccountKeys keys;
+  m_wallet->getAccountKeys(keys);
+
+  std::string priv_key = "\t\tWallet Keys Backup\n\n";
+  priv_key += "Wallet file name: " + m_wallet_file + "\n";
+  priv_key += "Public address: " + m_wallet->getAddress() + "\n";
+  priv_key += "Private spend key: " + Common::podToHex(keys.spendSecretKey) + "\n";
+  priv_key += "Private view key: " + Common::podToHex(keys.viewSecretKey) + "\n";
+
+  Crypto::PublicKey unused_dummy_variable;
+  Crypto::SecretKey deterministic_private_view_key;
+
+  AccountBase::generateViewFromSpend(keys.spendSecretKey, deterministic_private_view_key, unused_dummy_variable);
+  bool deterministic_private_keys = deterministic_private_view_key == keys.viewSecretKey;
+
+  // don't show a mnemonic seed if it is a non-deterministic wallet
+  std::string electrum_words;
+  bool success = m_wallet->getSeed(electrum_words);
+  if (success)
+  {
+    seedFormater(electrum_words);
+    priv_key += "Mnemonic seed:\n" + electrum_words + "\n";
+  }
+
+  backup_file << priv_key;
+
+  logger(INFO, BRIGHT_GREEN) << "Wallet keys have been saved to the \""
+                             << m_wallet_file + ".txt\""
+                             << " in same folder where your wallet file is located.";
+
   return true;
 }
 //----------------------------------------------------------------------------------------------------

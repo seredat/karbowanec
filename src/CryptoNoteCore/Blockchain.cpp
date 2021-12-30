@@ -35,6 +35,8 @@
 #include "TransactionExtra.h"
 #include "parallel_hashmap/phmap_dump.h"
 
+#include "../crypto/hash.h"
+
 using namespace Logging;
 using namespace Common;
 
@@ -1045,6 +1047,20 @@ bool Blockchain::prevalidate_miner_transaction(const Block& b, uint32_t height) 
     return false;
   }
 
+  if (b.majorVersion >= CryptoNote::BLOCK_MAJOR_VERSION_5) {
+    if (!(b.baseTransaction.outputs.size() == 1)) {
+      logger(ERROR, BRIGHT_RED)
+        << "Only 1 output in coinbase transaction allowed";
+      return false;
+    }
+
+    if (!(b.baseTransaction.outputs[0].target.type() == typeid(KeyOutput))) {
+      logger(ERROR, BRIGHT_RED)
+        << "Coinbase transaction in the block has the wrong output type";
+      return false;
+    }
+  }
+
   if (!(b.baseTransaction.signatures.empty())) {
     logger(ERROR, BRIGHT_RED)
       << "Coinbase transaction in the block shouldn't have signatures";
@@ -1053,7 +1069,7 @@ bool Blockchain::prevalidate_miner_transaction(const Block& b, uint32_t height) 
 
   if (!(b.baseTransaction.inputs[0].type() == typeid(BaseInput))) {
     logger(ERROR, BRIGHT_RED)
-      << "Coinbase transaction in the block has the wrong type";
+      << "Coinbase transaction in the block has the wrong input type";
     return false;
   }
 
@@ -1120,6 +1136,27 @@ bool Blockchain::validate_miner_transaction(const Block& b, uint32_t height, siz
   return true;
 }
 
+bool Blockchain::validate_block_signature(const Block& b, const Crypto::Hash& id, uint32_t height) {
+  if (b.majorVersion >= CryptoNote::BLOCK_MAJOR_VERSION_5) {
+    BinaryArray ba;
+    if (!get_block_hashing_blob(b, ba)) {
+      logger(ERROR, BRIGHT_RED) << 
+        "Failed to get_block_hashing_blob of block " <<
+        id << " at height " << height;
+      return false;
+    }
+    Crypto::Hash sigHash = Crypto::cn_fast_hash(ba.data(), ba.size());
+    Crypto::PublicKey ephPubKey = boost::get<KeyOutput>(b.baseTransaction.outputs[0].target).key;
+    if (!Crypto::check_signature(sigHash, ephPubKey, b.signature)) {
+      logger(Logging::ERROR, Logging::BRIGHT_RED) <<
+        "Signature mismatch in block " << id << " at height " << height;
+      return false;
+    }
+  }
+
+  return true;
+}
+
 bool Blockchain::getBackwardBlocksSize(size_t from_height, std::vector<size_t>& sz, size_t count) {
   std::lock_guard<decltype(m_blockchain_lock)> lk(m_blockchain_lock);
   if (!(from_height < m_blocks.size())) {
@@ -1147,6 +1184,79 @@ bool Blockchain::get_last_n_blocks_sizes(std::vector<size_t>& sz, size_t count) 
 
 uint64_t Blockchain::getCurrentCumulativeBlocksizeLimit() {
   return m_current_block_cumul_sz_limit;
+}
+
+bool Blockchain::checkProofOfWork(Crypto::cn_context& context, const Block& block, difficulty_type currentDiffic, Crypto::Hash& proofOfWork) {
+  if (block.majorVersion < CryptoNote::BLOCK_MAJOR_VERSION_5) {
+    return m_currency.checkProofOfWork(context, block, currentDiffic, proofOfWork);
+  }
+
+  if (!get_block_long_hash(context, block, proofOfWork)) {
+    return false;
+  }
+
+  if (!check_hash(proofOfWork, currentDiffic)) {
+	  return false;
+  }
+
+  return true;
+}
+
+bool Blockchain::get_block_long_hash(Crypto::cn_context &context, const Block& b, Crypto::Hash& res) {
+  if (b.majorVersion < CryptoNote::BLOCK_MAJOR_VERSION_5) {
+    return get_block_longhash(context, b, res);
+  }
+
+  BinaryArray pot;
+  if (!get_signed_block_hashing_blob(b, pot)) {
+    logger(ERROR, BRIGHT_RED) << "Failed to get_block_hashing_blob in get_block_long_hash";
+    return false;
+  }
+
+  Crypto::Hash hash_1, hash_2;
+  uint32_t currentHeight = boost::get<BaseInput>(b.baseTransaction.inputs[0]).blockIndex;
+  uint32_t maxHeight = std::min<uint32_t>(getCurrentBlockchainHeight() - 1, currentHeight - 1 - m_currency.minedMoneyUnlockWindow());
+
+#define ITER 128
+  for (uint32_t i = 0; i < ITER; i++) {
+    cn_fast_hash(pot.data(), pot.size(), hash_1);
+
+    for (uint8_t j = 1; j <= 8; j++) {
+      uint8_t chunk[4] = {
+        hash_1.data[j * 4 - 4], 
+        hash_1.data[j * 4 - 3], 
+        hash_1.data[j * 4 - 2], 
+        hash_1.data[j * 4 - 1]
+      };
+
+      uint32_t n = (chunk[0] << 24) |
+                   (chunk[1] << 16) |
+                   (chunk[2] << 8)  |
+                   (chunk[3]);
+
+      uint32_t height_j = n % maxHeight;
+      std::lock_guard<decltype(m_blockchain_lock)> lk(m_blockchain_lock);
+      const Block& bj = m_blocks[height_j].bl;
+
+      BinaryArray ba;
+      if (!get_block_hashing_blob(bj, ba)) {
+        logger(ERROR, BRIGHT_RED) << "Failed to get_block_hashing_blob of additional block " 
+                                  << j << " at height " << height_j;
+        return false;
+      }
+
+      pot.insert(std::end(pot), std::begin(ba), std::end(ba));
+    }
+  }
+
+  if (!Crypto::y_slow_hash(pot.data(), pot.size(), hash_1, hash_2)) {
+    logger(Logging::ERROR, Logging::BRIGHT_RED) << "Error getting Yespower hash";
+    return false;
+  }
+
+  res = hash_2;
+
+  return true;
 }
 
 bool Blockchain::complete_timestamps_vector(uint8_t blockMajorVersion, uint64_t start_top_height, std::vector<uint64_t>& timestamps) {
@@ -1179,7 +1289,8 @@ bool Blockchain::handle_alternative_block(const Block& b, const Crypto::Hash& id
 
   // get fresh checkpoints from DNS - the best we have right now
 #ifndef __ANDROID__
-  m_checkpoints.load_checkpoints_from_dns();
+//  if (!m_currency.isTestnet())
+//    m_checkpoints.load_checkpoints_from_dns();
 #endif
 
   if (!m_checkpoints.is_alternative_block_allowed(getCurrentBlockchainHeight(), block_height)) {
@@ -1282,10 +1393,10 @@ bool Blockchain::handle_alternative_block(const Block& b, const Crypto::Hash& id
     if (!(current_diff)) { logger(ERROR, BRIGHT_RED) << "!!!!!!! DIFFICULTY OVERHEAD !!!!!!!"; return false; }
     Crypto::Hash proof_of_work = NULL_HASH;
     // Always check PoW for alternative blocks
-    if (!m_currency.checkProofOfWork(m_cn_context, bei.bl, current_diff, proof_of_work)) {
+    if (!checkProofOfWork(m_cn_context, bei.bl, current_diff, proof_of_work)) {
       logger(INFO, BRIGHT_RED) <<
-        "Block with id: " << id
-        << ENDL << " for alternative chain, have not enough proof of work: " << proof_of_work
+        "Block with id: " << Common::podToHex(id)
+        << ENDL << " for alternative chain, has not enough proof of work: " << proof_of_work
         << ENDL << " expected difficulty: " << current_diff;
       bvc.m_verification_failed = true;
       return false;
@@ -1293,7 +1404,14 @@ bool Blockchain::handle_alternative_block(const Block& b, const Crypto::Hash& id
 
     if (!prevalidate_miner_transaction(b, bei.height)) {
       logger(INFO, BRIGHT_RED) <<
-        "Block with id: " << Common::podToHex(id) << " (as alternative) have wrong miner transaction.";
+        "Block with id: " << Common::podToHex(id) << " (as alternative) has wrong miner transaction.";
+      bvc.m_verification_failed = true;
+      return false;
+    }
+
+    if (!validate_block_signature(b, id, bei.height)) {
+      logger(INFO, BRIGHT_RED) <<
+        "Block with id: " << Common::podToHex(id) << " (as alternative) has wrong miner signature.";
       bvc.m_verification_failed = true;
       return false;
     }
@@ -2126,7 +2244,7 @@ bool Blockchain::pushBlock(const Block& blockData, const std::vector<Transaction
       return false;
     }
   } else {
-    if (!m_currency.checkProofOfWork(m_cn_context, blockData, currentDifficulty, proof_of_work)) {
+    if (!checkProofOfWork(m_cn_context, blockData, currentDifficulty, proof_of_work)) {
       logger(INFO, BRIGHT_WHITE) <<
         "Block " << blockHash << ", has too weak proof of work: " << proof_of_work << ", expected difficulty: " << currentDifficulty;
       bvc.m_verification_failed = true;
@@ -2139,6 +2257,13 @@ bool Blockchain::pushBlock(const Block& blockData, const std::vector<Transaction
   if (!prevalidate_miner_transaction(blockData, static_cast<uint32_t>(m_blocks.size()))) {
     logger(INFO, BRIGHT_WHITE) <<
       "Block " << blockHash << " failed to pass prevalidation";
+    bvc.m_verification_failed = true;
+    return false;
+  }
+
+  if (!validate_block_signature(blockData, blockHash, static_cast<uint32_t>(m_blocks.size()))) {
+    logger(INFO, BRIGHT_RED) <<
+      "Block with id: " << Common::podToHex(blockHash) << " has wrong miner signature.";
     bvc.m_verification_failed = true;
     return false;
   }

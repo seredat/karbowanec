@@ -78,6 +78,7 @@ bool generate_key_image_helper(const AccountKeys& ack, const Crypto::PublicKey& 
 std::string short_hash_str(const Crypto::Hash& h);
 
 bool get_block_hashing_blob(const Block& b, BinaryArray& blob);
+bool get_signed_block_hashing_blob(const Block& b, BinaryArray& blob);
 bool get_parent_block_hashing_blob(const Block& b, BinaryArray& blob);
 bool get_aux_block_header_hash(const Block& b, Crypto::Hash& res);
 bool get_block_hash(const Block& b, Crypto::Hash& res);

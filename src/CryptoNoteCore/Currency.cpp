@@ -38,6 +38,8 @@
 using namespace Logging;
 using namespace Common;
 
+constexpr auto RESET_WORK_FACTOR_V5 = 1000;
+
 namespace CryptoNote {
 
 	const std::vector<uint64_t> Currency::PRETTY_AMOUNTS = {
@@ -204,7 +206,7 @@ namespace CryptoNote {
 	}
 
 	bool Currency::constructMinerTx(uint8_t blockMajorVersion, uint32_t height, size_t medianSize, uint64_t alreadyGeneratedCoins, size_t currentBlockSize,
-		uint64_t fee, const AccountPublicAddress& minerAddress, Transaction& tx, const BinaryArray& extraNonce/* = BinaryArray()*/, size_t maxOuts/* = 1*/) const {
+		uint64_t fee, const AccountPublicAddress& minerAddress, Transaction& tx, Crypto::SecretKey& txKey, const BinaryArray& extraNonce/* = BinaryArray()*/, size_t maxOuts/* = 1*/) const {
 
 		tx.inputs.clear();
 		tx.outputs.clear();
@@ -666,16 +668,21 @@ namespace CryptoNote {
     // See commented link below for required config file changes. Fix FTL and MTP.
     // https://github.com/zawy12/difficulty-algorithms/issues/3
 
-    // reset difficulty for new epoch
-    if (height == upgradeHeight(CryptoNote::BLOCK_MAJOR_VERSION_5) + 1) {
-      return 1000000; //return (cumulativeDifficulties[0] - cumulativeDifficulties[1]) / RESET_WORK_FACTOR;
+    // begin reset difficulty for new epoch
+
+    height--; // there's difference between karbo1 and karbo2 here (height vs top block index)
+
+    if (height == upgradeHeight(CryptoNote::BLOCK_MAJOR_VERSION_5)) {
+		return cumulativeDifficulties[0] / height / RESET_WORK_FACTOR_V5;
     }
-    uint32_t count = (uint32_t)difficultyBlocksCountByBlockVersion(blockMajorVersion);
+    uint32_t count = (uint32_t)difficultyBlocksCountByBlockVersion(blockMajorVersion) - 1;
     if (height > upgradeHeight(CryptoNote::BLOCK_MAJOR_VERSION_5) && height < CryptoNote::parameters::UPGRADE_HEIGHT_V5 + count) {
       uint32_t offset = count - (height - upgradeHeight(CryptoNote::BLOCK_MAJOR_VERSION_5));
       timestamps.erase(timestamps.begin(), timestamps.begin() + offset);
       cumulativeDifficulties.erase(cumulativeDifficulties.begin(), cumulativeDifficulties.begin() + offset);
     }
+
+    // end reset difficulty for new epoch
 
     assert(timestamps.size() == cumulativeDifficulties.size());
 
@@ -708,8 +715,8 @@ namespace CryptoNote {
     }
 
     // minimum limit
-    if (!isTestnet() && next_D < 1000000) {
-      next_D = 1000000;
+    if (!isTestnet() && next_D < 100000) {
+      next_D = 100000;
     }
 
     return next_D;
@@ -878,8 +885,9 @@ namespace CryptoNote {
 
 	Transaction CurrencyBuilder::generateGenesisTransaction() {
 		CryptoNote::Transaction tx;
+    Crypto::SecretKey txKey;
 		CryptoNote::AccountPublicAddress ac = boost::value_initialized<CryptoNote::AccountPublicAddress>();
-		m_currency.constructMinerTx(1, 0, 0, 0, 0, 0, ac, tx); // zero fee in genesis
+		m_currency.constructMinerTx(1, 0, 0, 0, 0, 0, ac, tx, txKey); // zero fee in genesis
 		return tx;
 	}
 	CurrencyBuilder& CurrencyBuilder::emissionSpeedFactor(unsigned int val) {

@@ -72,6 +72,11 @@ struct Transaction : public TransactionPrefix {
   std::vector<std::vector<Crypto::Signature>> signatures;
 };
 
+struct AccountPublicAddress {
+  Crypto::PublicKey spendPublicKey;
+  Crypto::PublicKey viewPublicKey;
+};
+
 struct ParentBlock {
   uint8_t majorVersion;
   uint8_t minorVersion;
@@ -93,12 +98,8 @@ struct BlockHeader {
 struct Block : public BlockHeader {
   ParentBlock parentBlock;
   Transaction baseTransaction;
+  Crypto::Signature signature;
   std::vector<Crypto::Hash> transactionHashes;
-};
-
-struct AccountPublicAddress {
-  Crypto::PublicKey spendPublicKey;
-  Crypto::PublicKey viewPublicKey;
 };
 
 struct AccountKeys {

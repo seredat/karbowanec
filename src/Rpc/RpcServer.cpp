@@ -1500,13 +1500,24 @@ bool RpcServer::on_start_mining(const COMMAND_RPC_START_MINING::request& req, CO
     return false;
   }
   
-  AccountPublicAddress adr;
-  if (!m_core.currency().parseAccountAddressString(req.miner_address, adr)) {
-    res.status = "Failed, wrong address";
-    return true;
-  }
+  AccountKeys keys = boost::value_initialized<AccountKeys>();
 
-  if (!m_core.get_miner().start(adr, static_cast<size_t>(req.threads_count))) {
+  Crypto::Hash key_hash;
+  size_t size;
+  if (!Common::fromHex(req.miner_spend_key, &key_hash, sizeof(key_hash), size) || size != sizeof(key_hash)) {
+    throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_WRONG_PARAM, "Failed to parse miner spend key" };
+  }
+  keys.spendSecretKey = *(struct Crypto::SecretKey *) &key_hash;
+
+  if (!Common::fromHex(req.miner_view_key, &key_hash, sizeof(key_hash), size) || size != sizeof(key_hash)) {
+    throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_WRONG_PARAM, "Failed to parse miner view key" };
+  }
+  keys.viewSecretKey = *(struct Crypto::SecretKey *) &key_hash;
+
+  Crypto::secret_key_to_public_key(keys.spendSecretKey, keys.address.spendPublicKey);
+  Crypto::secret_key_to_public_key(keys.viewSecretKey, keys.address.viewPublicKey);
+
+  if (!m_core.get_miner().start(keys, static_cast<size_t>(req.threads_count))) {
     res.status = "Failed, mining not started";
     return true;
   }
@@ -1828,16 +1839,27 @@ bool RpcServer::on_getblocktemplate(const COMMAND_RPC_GETBLOCKTEMPLATE::request&
     throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_TOO_BIG_RESERVE_SIZE, "To big reserved size, maximum 255" };
   }
 
-  AccountPublicAddress acc = boost::value_initialized<AccountPublicAddress>();
+  AccountKeys keys = boost::value_initialized<AccountKeys>();
 
-  if (!req.wallet_address.size() || !m_core.currency().parseAccountAddressString(req.wallet_address, acc)) {
-    throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_WRONG_WALLET_ADDRESS, "Failed to parse wallet address" };
+  Crypto::Hash key_hash;
+  size_t size;
+  if (!Common::fromHex(req.miner_spend_key, &key_hash, sizeof(key_hash), size) || size != sizeof(key_hash)) {
+    throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_WRONG_PARAM, "Failed to parse miner spend key" };
   }
+  keys.spendSecretKey = *(struct Crypto::SecretKey *) &key_hash;
+
+  if (!Common::fromHex(req.miner_view_key, &key_hash, sizeof(key_hash), size) || size != sizeof(key_hash)) {
+    throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_WRONG_PARAM, "Failed to parse miner view key" };
+  }
+  keys.viewSecretKey = *(struct Crypto::SecretKey *) &key_hash;
+
+  Crypto::secret_key_to_public_key(keys.spendSecretKey, keys.address.spendPublicKey);
+  Crypto::secret_key_to_public_key(keys.viewSecretKey, keys.address.viewPublicKey);
 
   Block b = boost::value_initialized<Block>();
   CryptoNote::BinaryArray blob_reserve;
   blob_reserve.resize(req.reserve_size, 0);
-  if (!m_core.get_block_template(b, acc, res.difficulty, res.height, blob_reserve)) {
+  if (!m_core.get_block_template(b, keys, res.difficulty, res.height, blob_reserve)) {
     logger(Logging::ERROR) << "Failed to create block template";
     throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_INTERNAL_ERROR, "Internal error: failed to create block template" };
   }

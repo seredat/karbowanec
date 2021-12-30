@@ -1359,7 +1359,7 @@ namespace CryptoNote
 
     if (arg.node_data.network_id != m_network_id) {
       add_host_fail(context.m_remote_ip);
-      logger(Logging::INFO) << context << "WRONG NETWORK AGENT CONNECTED! id=" << arg.node_data.network_id;
+      logger(Logging::DEBUGGING) << context << "WRONG NETWORK AGENT CONNECTED! id=" << arg.node_data.network_id;
       context.m_state = CryptoNoteConnectionContext::state_shutdown;
       return 1;
     }

@@ -1,6 +1,6 @@
 ![Build check](https://github.com/seredat/karbowanec/workflows/Build%20check/badge.svg)
 
-**HARDFORK AT HEIGHT 667000!!!** 
+**HARDFORK AT HEIGHT 700000!!!** 
 
 Karbo is people's electronic cash, a cryptocurrency, just like Bitcoin but Ukrainian and anonymous thanks to Cryptonote technology. The key principle of CryptoNote is adaptive parameters. Karbo already has adaptive block size limit and adaptive difficulty, which we improved, and which ensures it's stable emission rate and thus makes Karbo sound money.
 
