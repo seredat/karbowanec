@@ -841,6 +841,13 @@ STATIC INLINE void aes_pseudo_round_xor(const uint8_t *in, uint8_t *out, const u
 	}
 }
 
+#if (defined(__aarch64__))
+STATIC INLINE void aligned_free(void* ptr)
+{
+    free(ptr);
+}
+#endif
+
 void cn_slow_hash(const void *data, size_t length, char *hash)
 {
     RDATA_ALIGN16 uint8_t expandedKey[240];
