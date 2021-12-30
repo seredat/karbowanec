@@ -44,7 +44,7 @@ jobs:
         run: |
           build_folder="build/release"
           krb_ver=${GITHUB_SHA::7}
-          release_name=Karbo-"$krb_ver"-cli-android-armv7-a
+          release_name=Karbo-"$krb_ver"-cli-android-x86_64
           echo "${ANDROID_NDK_ROOT}/toolchains/llvm/prebuilt/linux-x86_64/x86_64-linux-android" >> $GITHUB_PATH
           echo "${ANDROID_NDK_ROOT}/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_PATH
           mkdir -p "$build_folder"
