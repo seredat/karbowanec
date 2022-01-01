@@ -387,7 +387,7 @@ struct COMMAND_RPC_GET_INFO {
     uint32_t height;
     std::string top_block_hash;
     uint64_t difficulty;
-    CryptoNote::Difficulty cumulative_difficulty;
+    std::string cumulative_difficulty;
     uint64_t max_cumulative_block_size;
     uint64_t next_reward;
     uint64_t min_fee;
