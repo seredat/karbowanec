@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers, The Monero developers
 // Copyright (c) 2018, Ryo Currency Project
-// Copyright (c) 2016-2021, The Karbo developers
+// Copyright (c) 2016-2022, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -64,7 +64,7 @@ bool operator<(const Crypto::KeyImage& keyImage1, const Crypto::KeyImage& keyIma
 }
 }
 
-#define CURRENT_BLOCKCACHE_STORAGE_ARCHIVE_VER 3
+#define CURRENT_BLOCKCACHE_STORAGE_ARCHIVE_VER 4
 #define CURRENT_BLOCKCHAININDICES_STORAGE_ARCHIVE_VER 1
 
 namespace CryptoNote {
@@ -226,6 +226,9 @@ public:
 
     logger(INFO) << operation << "multi-signature outputs...";
     s(m_bs.m_multisignatureOutputs, "multisig_outputs");
+
+    logger(INFO) << operation << "hashing blobs...";
+    s(m_bs.m_blobs, "hashing_blobs");
 
     auto dur = std::chrono::steady_clock::now() - start;
 
@@ -579,6 +582,7 @@ void Blockchain::rebuildCache() {
   m_spent_key_images.clear();
   m_outputs.clear();
   m_multisignatureOutputs.clear();
+  m_blobs.clear();
   for (uint32_t b = 0; b < m_blocks.size(); ++b) {
     if (b % 1000 == 0) {
       logger(INFO, BRIGHT_WHITE) << "Height " << b << " of " << m_blocks.size();
@@ -613,6 +617,15 @@ void Blockchain::rebuildCache() {
         }
       }
     }
+
+    // process blobs for fast mining
+    BinaryArray ba;
+    const Block& blk = m_blocks[b].bl;
+    if (!get_block_hashing_blob(blk, ba)) {
+      logger(ERROR, BRIGHT_RED) << "Failed to get_block_hashing_blob of block at height " << b;
+    }
+    m_blobs.push_back(ba);
+
   }
 
   std::chrono::duration<double> duration = std::chrono::steady_clock::now() - timePoint;
@@ -1207,6 +1220,12 @@ bool Blockchain::checkProofOfWork(Crypto::cn_context& context, const Block& bloc
   if (!check_hash(proofOfWork, currentDiffic)) {
 	  return false;
   }
+
+  return true;
+}
+
+bool Blockchain::getHashingBlob(const uint32_t height, BinaryArray& blob) {
+  blob = m_blobs[height];
 
   return true;
 }
@@ -2380,6 +2399,13 @@ bool Blockchain::pushBlock(BlockEntry& block, const Crypto::Hash& blockHash) {
   m_timestampIndex.add(block.bl.timestamp, blockHash);
   m_generatedTransactionsIndex.add(block.bl);
 
+  BinaryArray ba;
+  const Block& blk = block.bl;
+  if (!get_block_hashing_blob(blk, ba)) {
+      logger(ERROR, BRIGHT_RED) << "Failed to get_block_hashing_blob of block " << blockHash;
+  }
+  m_blobs.push_back(ba);
+
   assert(m_blockIndex.size() == m_blocks.size());
 
   return true;
@@ -2671,6 +2697,7 @@ void Blockchain::removeLastBlock() {
 
   m_blocks.pop_back();
   m_blockIndex.pop();
+  m_blobs.pop_back();
 
   assert(m_blockIndex.size() == m_blocks.size());
 }

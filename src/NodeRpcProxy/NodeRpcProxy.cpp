@@ -198,6 +198,7 @@ void NodeRpcProxy::workerThread(const INode::Callback& initialized_callback) {
     contextGroup.spawn([this]() {
       Timer pullTimer(*m_dispatcher);
       while (!m_stop) {
+        getFeeAddress(); // Get public node's fee info
         updateNodeStatus();
         if (!m_stop) {
           pullTimer.sleep(std::chrono::milliseconds(m_pullInterval));
@@ -225,7 +226,6 @@ void NodeRpcProxy::updateNodeStatus() {
     updateBlockchainStatus();
     updateBlockchain = !updatePoolStatus();
   }
-  getFeeAddress(); // Get public node's fee info
 }
 
 bool NodeRpcProxy::updatePoolStatus() {
