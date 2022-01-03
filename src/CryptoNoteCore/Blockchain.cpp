@@ -1245,15 +1245,17 @@ bool Blockchain::get_block_long_hash(Crypto::cn_context &context, const Block& b
                      (chunk[3]);
 
         uint32_t height_j = n % maxHeight;
-        std::lock_guard<decltype(m_blockchain_lock)> lk(m_blockchain_lock);
-        const Block& bj = m_blocks[height_j].bl;
+        // use these after removing blobs cache
+        //std::lock_guard<decltype(m_blockchain_lock)> lk(m_blockchain_lock);
+        //const Block& bj = m_blocks[height_j].bl;
 
-        BinaryArray ba;
-        if (!get_block_hashing_blob(bj, ba)) {
-          logger(ERROR, BRIGHT_RED) << "Failed to get_block_hashing_blob of additional block " 
-                                    << j << " at height " << height_j;
-          return false;
-        }
+        //BinaryArray ba;
+        //if (!get_block_hashing_blob(bj, ba)) {
+        //  logger(ERROR, BRIGHT_RED) << "Failed to get_block_hashing_blob of additional block " 
+        //                            << j << " at height " << height_j;
+        //  return false;
+        //}
+        BinaryArray& ba = m_blobs[height_j];
 
         pot.insert(std::end(pot), std::begin(ba), std::end(ba));
       }
