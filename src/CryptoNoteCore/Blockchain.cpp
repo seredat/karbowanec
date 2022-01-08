@@ -203,22 +203,22 @@ public:
     //s(m_bs.m_transactionMap, "transactions");
     if (s.type() == ISerializer::INPUT) {
       phmap::BinaryInputArchive ar_in(appendPath(m_bs.m_config_folder, "transactionsmap.dat").c_str());
-      m_bs.m_transactionMap.load(ar_in);
+      m_bs.m_transactionMap.phmap_load(ar_in);
     }
     else {
       phmap::BinaryOutputArchive ar_out(appendPath(m_bs.m_config_folder, "transactionsmap.dat").c_str());
-      m_bs.m_transactionMap.dump(ar_out);
+      m_bs.m_transactionMap.phmap_dump(ar_out);
     }
 
     logger(INFO) << operation << "spent keys...";
     //s(m_bs.m_spent_key_images, "spent_keys");
     if (s.type() == ISerializer::INPUT) {
       phmap::BinaryInputArchive ar_in(appendPath(m_bs.m_config_folder, "spentkeys.dat").c_str());
-      m_bs.m_spent_key_images.load(ar_in);
+      m_bs.m_spent_key_images.phmap_load(ar_in);
     }
     else {
       phmap::BinaryOutputArchive ar_out(appendPath(m_bs.m_config_folder, "spentkeys.dat").c_str());
-      m_bs.m_spent_key_images.dump(ar_out);
+      m_bs.m_spent_key_images.phmap_dump(ar_out);
     }
 
     logger(INFO) << operation << "outputs...";
