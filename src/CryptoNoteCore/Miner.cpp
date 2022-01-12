@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
-// Copyright (c) 2016-2021, The Karbo developers
+// Copyright (c) 2016-2022, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -213,12 +213,15 @@ namespace CryptoNote
       Crypto::secret_key_to_public_key(m_mine_account.spendSecretKey, m_mine_account.address.spendPublicKey);
       Crypto::secret_key_to_public_key(m_mine_account.viewSecretKey, m_mine_account.address.viewPublicKey);
 
-      m_threads_total = 1;
       m_do_mining = true;
-      if (config.miningThreads > 0) {
-        m_threads_total = config.miningThreads;
-      }
     }
+
+    m_threads_total = 1;
+    if (config.miningThreads > 0) {
+      m_threads_total = config.miningThreads;
+    }
+
+    m_do_print_hashrate = config.printHashrate;
 
     return true;
   }

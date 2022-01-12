@@ -85,7 +85,7 @@ jobs:
           brew link openssl boost --force
           mkdir "$build_folder"
           cd "$build_folder"
-          cmake -DCMAKE_C_FLAGS="-mmacosx-version-min=10.12" -DCMAKE_CXX_FLAGS="-mmacosx-version-min=10.12" ..
+          cmake -DCMAKE_C_FLAGS="-mmacosx-version-min=10.12" -DCMAKE_CXX_FLAGS="-mmacosx-version-min=10.12" -DOPENSSL_USE_STATIC_LIBS=ON ..
           make
           mkdir "$release_name"
           exeFiles=()
