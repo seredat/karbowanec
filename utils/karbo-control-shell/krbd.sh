@@ -175,7 +175,7 @@ service_is_ready(){
   for i in $(seq 1 30); do
     if [ -f $RUN_DIR/KRBD.pid ]; then
       pid=$(sed 's/[^0-9]*//g' $RUN_DIR/KRBD.pid)
-      cpu_load=$(top -b -n 1 -d 1 -p $pid | grep $pid | sed 's/^\s//g' | sed 's/\s\+/\n/g' | sed -n 9p | sed 's/[^0-9,]*//g' | sed 's/,.*//g')
+      cpu_load=$(top -b -n 1 -d 1 -p $pid | grep $pid | sed 's/^\s//g' | sed 's/\s\+/\n/g' | sed -n 9p | sed 's/[^0-9,.]*//g' | sed 's/[,|.].*//g')
       logger "-> Node load CPU: "$cpu_load
       if [ "$cpu_load" -lt 5 ]; then
         break
