@@ -1,4 +1,4 @@
-name: Android_CI armv7-a
+name: Android_CI x86
 
 on:
   push:
