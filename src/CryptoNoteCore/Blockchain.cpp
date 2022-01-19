@@ -203,22 +203,22 @@ public:
     //s(m_bs.m_transactionMap, "transactions");
     if (s.type() == ISerializer::INPUT) {
       phmap::BinaryInputArchive ar_in(appendPath(m_bs.m_config_folder, "transactionsmap.dat").c_str());
-      m_bs.m_transactionMap.load(ar_in);
+      m_bs.m_transactionMap.phmap_load(ar_in);
     }
     else {
       phmap::BinaryOutputArchive ar_out(appendPath(m_bs.m_config_folder, "transactionsmap.dat").c_str());
-      m_bs.m_transactionMap.dump(ar_out);
+      m_bs.m_transactionMap.phmap_dump(ar_out);
     }
 
     logger(INFO) << operation << "spent keys...";
     //s(m_bs.m_spent_key_images, "spent_keys");
     if (s.type() == ISerializer::INPUT) {
       phmap::BinaryInputArchive ar_in(appendPath(m_bs.m_config_folder, "spentkeys.dat").c_str());
-      m_bs.m_spent_key_images.load(ar_in);
+      m_bs.m_spent_key_images.phmap_load(ar_in);
     }
     else {
       phmap::BinaryOutputArchive ar_out(appendPath(m_bs.m_config_folder, "spentkeys.dat").c_str());
-      m_bs.m_spent_key_images.dump(ar_out);
+      m_bs.m_spent_key_images.phmap_dump(ar_out);
     }
 
     logger(INFO) << operation << "outputs...";
@@ -1037,8 +1037,8 @@ bool Blockchain::switch_to_alternative_blockchain(std::list<blocks_ext_by_hash::
   blocksFromCommonRoot.reserve(alt_chain.size() + 1);
   blocksFromCommonRoot.push_back(alt_chain.front()->second.bl.previousBlockHash);
 
-  //removing all_chain entries from alternative chain
-  for (auto ch_ent : alt_chain) {
+  //removing alt_chain entries from alternative chain
+  for (auto &ch_ent : alt_chain) {
     blocksFromCommonRoot.push_back(get_block_hash(ch_ent->second.bl));
     m_orphanBlocksIndex.remove(ch_ent->second.bl);
     m_alternative_chains.erase(ch_ent);
