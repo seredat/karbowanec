@@ -1039,8 +1039,8 @@ bool Blockchain::switch_to_alternative_blockchain(std::list<blocks_ext_by_hash::
   blocksFromCommonRoot.reserve(alt_chain.size() + 1);
   blocksFromCommonRoot.push_back(alt_chain.front()->second.bl.previousBlockHash);
 
-  //removing all_chain entries from alternative chain
-  for (auto ch_ent : alt_chain) {
+  //removing alt_chain entries from alternative chain
+  for (auto &ch_ent : alt_chain) {
     blocksFromCommonRoot.push_back(get_block_hash(ch_ent->second.bl));
     m_orphanBlocksIndex.remove(ch_ent->second.bl);
     m_alternative_chains.erase(ch_ent);
