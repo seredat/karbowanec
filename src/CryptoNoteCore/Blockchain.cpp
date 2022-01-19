@@ -1543,9 +1543,10 @@ bool Blockchain::handleGetObjects(NOTIFY_REQUEST_GET_OBJECTS::request& arg, NOTI
     getTransactions(bl.transactionHashes, txs, missed_tx_id);
     if (!(!missed_tx_id.size())) {
       logger(ERROR, BRIGHT_RED) << "Internal error: have missed missed_tx_id.size()=" << missed_tx_id.size() << ENDL << "for block id = " << get_block_hash(bl);
+      logger(INFO) << "Probably some blockchain indexes or cache is corrupted. Perform rebuilding cache or just resync from scratch.";
       rsp.missed_ids.insert(rsp.missed_ids.end(), missed_tx_id.begin(), missed_tx_id.end());
       return false;
-    } //WTF???
+    }
     rsp.blocks.push_back(block_complete_entry());
     block_complete_entry& e = rsp.blocks.back();
     //pack block
