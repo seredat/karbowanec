@@ -512,7 +512,7 @@ bool Core::get_block_template(Block& b, const AccountKeys& acc, difficulty_type&
     b = boost::value_initialized<Block>();
     b.majorVersion = m_blockchain.getBlockMajorVersionForHeight(height);
     b.previousBlockHash = get_tail_id();
-    b.timestamp = time(NULL);
+    b.timestamp = static_cast<uint64_t>(time(nullptr));
     diffic = m_blockchain.getDifficultyForNextBlock(b.previousBlockHash);
     if (!(diffic)) {
       logger(ERROR, BRIGHT_RED) << "difficulty overhead.";
