@@ -38,8 +38,8 @@ namespace CryptoNote {
                                                                                                " If this option is given the options add-priority-node and seed-node are ignored" };
   const command_line::arg_descriptor<std::vector<std::string> > arg_p2p_seed_node          = { "seed-node", "Connect to a node to retrieve peer addresses, and disconnect" };
   const command_line::arg_descriptor<std::string> arg_ban_list                             = { "ban-list", "Specify ban list file, one IP address per line", "", true };
-  const command_line::arg_descriptor<bool> arg_p2p_hide_my_port                            = { "hide-my-port", "Do not announce yourself as peerlist candidate", false, true };
-  const command_line::arg_descriptor<int64_t>     arg_connections_count                    = { "connections", "Set number of connected peers", -1 };
+  const command_line::arg_descriptor<bool>        arg_p2p_hide_my_port                     = { "hide-my-port", "Do not announce yourself as peerlist candidate", false, true };
+  const command_line::arg_descriptor<uint32_t>    arg_connections_count                    = { "connections", "Set number of connected peers", CryptoNote::P2P_DEFAULT_CONNECTIONS_COUNT };
 
 class NetNodeConfig {
 public:
