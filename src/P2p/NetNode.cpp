@@ -321,7 +321,7 @@ namespace CryptoNote
 
       //at this moment we have hardcoded config
       m_config.m_net_config.handshake_interval = CryptoNote::P2P_DEFAULT_HANDSHAKE_INTERVAL;
-      m_config.m_net_config.connections_count = CryptoNote::P2P_DEFAULT_CONNECTIONS_COUNT;
+      //m_config.m_net_config.connections_count = CryptoNote::P2P_DEFAULT_CONNECTIONS_COUNT;
       m_config.m_net_config.packet_max_size = CryptoNote::P2P_DEFAULT_PACKET_MAX_SIZE; //20 MB limit
       m_config.m_net_config.config_id = 0; // initial config
       m_config.m_net_config.connection_timeout = CryptoNote::P2P_DEFAULT_CONNECTION_TIMEOUT;
@@ -495,6 +495,14 @@ namespace CryptoNote
     std::vector<uint32_t> ban_list = config.getBanList();
     for (const auto& a : ban_list) {
       block_host(a, std::numeric_limits<time_t>::max());
+    }
+
+    uint32_t connections = config.getConnectionsCount();
+    if (connections != CryptoNote::P2P_DEFAULT_CONNECTIONS_COUNT) {
+      m_config.m_net_config.connections_count = connections;
+    }
+    else {
+      m_config.m_net_config.connections_count = CryptoNote::P2P_DEFAULT_CONNECTIONS_COUNT;
     }
 
     return true;
