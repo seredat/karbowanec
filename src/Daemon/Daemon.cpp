@@ -69,7 +69,7 @@ namespace
     "network id is changed. Use it with --data-dir flag. The wallet must be launched with --testnet flag.", false };
   const command_line::arg_descriptor<std::string> arg_load_checkpoints          = { "load-checkpoints", "<filename> Load checkpoints from csv file", "" };
   const command_line::arg_descriptor<bool>        arg_disable_checkpoints       = { "without-checkpoints", "Synchronize without checkpoints" };
-  const command_line::arg_descriptor<bool>        arg_allow_deep_reorg          = { "allow-reorg", "Allow deep reorganization", true, false };
+  const command_line::arg_descriptor<bool>        arg_allow_deep_reorg          = { "allow-reorg", "Allow deep reorganization", false, false };
   const command_line::arg_descriptor<std::string> arg_rollback                  = { "rollback", "Rollback blockchain to <height>", "", true };
 
   bool command_line_preprocessor(const boost::program_options::variables_map &vm, LoggerRef &logger) {
@@ -273,11 +273,16 @@ int main(int argc, char* argv[])
     }
     CryptoNote::Currency currency = currencyBuilder.currency();
     System::Dispatcher dispatcher;
-    CryptoNote::Core m_core(currency, nullptr, logManager, dispatcher, vm["enable-blockchain-indexes"].as<bool>());
+
+    bool allow_reorg = command_line::get_arg(vm, arg_allow_deep_reorg);
+    if (allow_reorg) {
+      logger(WARNING) << "Deep reorg allowed!";
+    }
+
+    CryptoNote::Core m_core(currency, nullptr, logManager, dispatcher, vm["enable-blockchain-indexes"].as<bool>(), allow_reorg);
 
     bool disable_checkpoints = command_line::get_arg(vm, arg_disable_checkpoints);
     if (!disable_checkpoints) {
-      bool allow_reorg = command_line::get_arg(vm, arg_allow_deep_reorg);
       CryptoNote::Checkpoints checkpoints(logManager, allow_reorg);
       for (const auto& cp : CryptoNote::CHECKPOINTS) {
         checkpoints.add_checkpoint(cp.height, cp.blockId);

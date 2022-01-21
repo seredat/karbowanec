@@ -30,7 +30,7 @@ namespace CryptoNote
   class Checkpoints
   {
   public:
-    Checkpoints(Logging::ILogger& log, bool is_trailing_checkpoint_allowed = true);
+    Checkpoints(Logging::ILogger& log, bool is_deep_reorg_allowed = false);
 
     Checkpoints& operator=(Checkpoints const& other)
     {
