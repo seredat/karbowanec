@@ -42,7 +42,8 @@ using namespace Logging;
 
 namespace CryptoNote {
 //---------------------------------------------------------------------------
-Checkpoints::Checkpoints(Logging::ILogger &log) : logger(log, "checkpoints") {
+Checkpoints::Checkpoints(Logging::ILogger &log, bool is_deep_reorg_allowed) : logger(log, "checkpoints"), m_is_deep_reorg_allowed(is_deep_reorg_allowed) {
+  
 }
 //---------------------------------------------------------------------------
 bool Checkpoints::add_checkpoint(uint32_t height, const std::string &hash_str) {
@@ -121,7 +122,7 @@ bool Checkpoints::is_alternative_block_allowed(uint32_t  blockchain_height,
   if (0 == block_height)
     return false;
 
-  if (block_height < blockchain_height - CryptoNote::parameters::CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW
+  if (!m_is_deep_reorg_allowed && block_height < blockchain_height - CryptoNote::parameters::CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW
     && !is_in_checkpoint_zone(block_height)) {
     logger(Logging::WARNING, Logging::WHITE) << "An attempt of too deep reorganization: "
       << blockchain_height - block_height << ", BLOCK REJECTED";
