@@ -567,6 +567,7 @@ bool Blockchain::init(const std::string& config_folder, bool load_existing) {
     << "Blockchain initialized. last block: " << m_blocks.size() - 1 << ", "
     << Common::timeIntervalToString(timestamp_diff)
     << " time ago, current difficulty: " << getDifficultyForNextBlock(getTailId());
+
   return true;
 }
 
@@ -2010,8 +2011,10 @@ uint64_t Blockchain::get_adjusted_time() {
 
 bool Blockchain::check_block_timestamp_main(const Block& b) {
   if (b.timestamp > get_adjusted_time() + m_currency.blockFutureTimeLimit(b.majorVersion)) {
+    time_t t = static_cast<time_t>(b.timestamp);
+    auto tm = *std::localtime(&t);
     logger(INFO, BRIGHT_WHITE) <<
-      "Timestamp of block with id: " << get_block_hash(b) << ", " << b.timestamp << ", bigger than adjusted time + 28 min.";
+      "Timestamp of block with id: " << get_block_hash(b) << ", " << b.timestamp << " (" << std::put_time(&tm, "%Y-%m-%d %H:%M:%S") << ") is too far in the future";
     return false;
   }
 
@@ -2040,9 +2043,10 @@ bool Blockchain::check_block_timestamp(std::vector<uint64_t> timestamps, const B
   uint64_t median_ts = Common::medianValue(timestamps);
 
   if (b.timestamp < median_ts) {
-    logger(INFO, BRIGHT_WHITE) <<
-      "Timestamp of block with id: " << get_block_hash(b) << ", " << b.timestamp <<
-      ", less than median of last " << m_currency.timestampCheckWindow(b.majorVersion) << " blocks, " << median_ts;
+    logger(INFO, BRIGHT_WHITE)
+      << "Timestamp of block with id " << get_block_hash(b) << ", " << b.timestamp
+      << " is less than median of last " << m_currency.timestampCheckWindow(b.majorVersion) << " blocks, " 
+      << median_ts << ", i.e. it's too deep in the past";
     return false;
   }
 
