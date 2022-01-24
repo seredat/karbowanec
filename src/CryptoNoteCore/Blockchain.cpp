@@ -1200,12 +1200,12 @@ uint64_t Blockchain::getCurrentCumulativeBlocksizeLimit() {
   return m_current_block_cumul_sz_limit;
 }
 
-bool Blockchain::checkProofOfWork(Crypto::cn_context& context, const Block& block, difficulty_type currentDiffic, Crypto::Hash& proofOfWork) {
+bool Blockchain::checkProofOfWork(Crypto::cn_context& context, const Block& block, difficulty_type currentDiffic, Crypto::Hash& proofOfWork, bool is_alt) {
   if (block.majorVersion < CryptoNote::BLOCK_MAJOR_VERSION_5) {
     return m_currency.checkProofOfWork(context, block, currentDiffic, proofOfWork);
   }
 
-  if (!get_block_long_hash(context, block, proofOfWork)) {
+  if (!get_block_long_hash(context, block, proofOfWork, is_alt)) {
     return false;
   }
 
@@ -1222,7 +1222,7 @@ bool Blockchain::getHashingBlob(const uint32_t height, BinaryArray& blob) {
   return true;
 }
 
-bool Blockchain::get_block_long_hash(Crypto::cn_context &context, const Block& b, Crypto::Hash& res) {
+bool Blockchain::get_block_long_hash(Crypto::cn_context &context, const Block& b, Crypto::Hash& res, bool is_alt) {
   if (b.majorVersion < CryptoNote::BLOCK_MAJOR_VERSION_5) {
     return get_block_longhash(context, b, res);
   }
@@ -1255,8 +1255,31 @@ bool Blockchain::get_block_long_hash(Crypto::cn_context &context, const Block& b
                    (chunk[3]);
 
       uint32_t height_j = n % maxHeight;
-      BinaryArray &ba = m_blobs[height_j];
-      pot.insert(std::end(pot), std::begin(ba), std::end(ba));
+      if (!is_alt) {
+        BinaryArray& ba = m_blobs[height_j];
+        pot.insert(std::end(pot), std::begin(ba), std::end(ba));
+      }
+      else {
+        bool found_alt = false;
+        for (auto alt_ch_iter = m_alternative_chains.begin(); alt_ch_iter != m_alternative_chains.end() && !found_alt; alt_ch_iter++) {
+          auto ch_ent = *alt_ch_iter;
+          uint32_t ah = boost::get<BaseInput>(ch_ent.second.bl.baseTransaction.inputs[0]).blockIndex;
+          if (ah == height_j) {
+            BinaryArray ba;
+            if (!get_block_hashing_blob(ch_ent.second.bl, ba)) {
+              logger(ERROR, BRIGHT_RED) << "Failed to get_block_hashing_blob of alt block "
+                << j << " at height " << height_j;
+              return false;
+            }
+            pot.insert(std::end(pot), std::begin(ba), std::end(ba));
+            found_alt = true;
+          }
+        }
+        if (!found_alt) {
+          BinaryArray& ba = m_blobs[height_j];
+          pot.insert(std::end(pot), std::begin(ba), std::end(ba));
+        }
+      }    
     }
   }
 
@@ -1404,7 +1427,7 @@ bool Blockchain::handle_alternative_block(const Block& b, const Crypto::Hash& id
     if (!(current_diff)) { logger(ERROR, BRIGHT_RED) << "!!!!!!! DIFFICULTY OVERHEAD !!!!!!!"; return false; }
     Crypto::Hash proof_of_work = NULL_HASH;
     // Always check PoW for alternative blocks
-    if (!checkProofOfWork(m_cn_context, bei.bl, current_diff, proof_of_work)) {
+    if (!checkProofOfWork(m_cn_context, bei.bl, current_diff, proof_of_work, true)) {
       logger(INFO, BRIGHT_RED) <<
         "Block with id: " << Common::podToHex(id)
         << ENDL << " for alternative chain, has not enough proof of work: " << proof_of_work

@@ -214,8 +214,8 @@ namespace CryptoNote {
     void rebuildCache();
     bool storeCache();
 
-    bool checkProofOfWork(Crypto::cn_context& context, const Block& block, difficulty_type currentDiffic, Crypto::Hash& proofOfWork);
-    bool get_block_long_hash(Crypto::cn_context &context, const Block& b, Crypto::Hash& res);
+    bool checkProofOfWork(Crypto::cn_context& context, const Block& block, difficulty_type currentDiffic, Crypto::Hash& proofOfWork, bool is_alt = false);
+    bool get_block_long_hash(Crypto::cn_context &context, const Block& b, Crypto::Hash& res, bool is_alt = false);
 
   private:
 
