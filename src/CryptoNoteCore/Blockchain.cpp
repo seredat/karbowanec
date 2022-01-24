@@ -1200,12 +1200,12 @@ uint64_t Blockchain::getCurrentCumulativeBlocksizeLimit() {
   return m_current_block_cumul_sz_limit;
 }
 
-bool Blockchain::checkProofOfWork(Crypto::cn_context& context, const Block& block, difficulty_type currentDiffic, Crypto::Hash& proofOfWork, bool is_alt) {
+bool Blockchain::checkProofOfWork(Crypto::cn_context& context, const Block& block, difficulty_type currentDiffic, Crypto::Hash& proofOfWork) {
   if (block.majorVersion < CryptoNote::BLOCK_MAJOR_VERSION_5) {
     return m_currency.checkProofOfWork(context, block, currentDiffic, proofOfWork);
   }
 
-  if (!get_block_long_hash(context, block, proofOfWork, is_alt)) {
+  if (!get_block_long_hash(context, block, proofOfWork)) {
     return false;
   }
 
@@ -1222,7 +1222,7 @@ bool Blockchain::getHashingBlob(const uint32_t height, BinaryArray& blob) {
   return true;
 }
 
-bool Blockchain::get_block_long_hash(Crypto::cn_context &context, const Block& b, Crypto::Hash& res, bool is_alt) {
+bool Blockchain::get_block_long_hash(Crypto::cn_context &context, const Block& b, Crypto::Hash& res) {
   if (b.majorVersion < CryptoNote::BLOCK_MAJOR_VERSION_5) {
     return get_block_longhash(context, b, res);
   }
@@ -1255,31 +1255,8 @@ bool Blockchain::get_block_long_hash(Crypto::cn_context &context, const Block& b
                    (chunk[3]);
 
       uint32_t height_j = n % maxHeight;
-      if (!is_alt) {
-        BinaryArray& ba = m_blobs[height_j];
-        pot.insert(std::end(pot), std::begin(ba), std::end(ba));
-      }
-      else {
-        bool found_alt = false;
-        for (auto alt_ch_iter = m_alternative_chains.begin(); alt_ch_iter != m_alternative_chains.end() && !found_alt; alt_ch_iter++) {
-          auto &ch_ent = *alt_ch_iter;
-          uint32_t ah = boost::get<BaseInput>(ch_ent.second.bl.baseTransaction.inputs[0]).blockIndex;
-          if (ah == height_j) {
-            BinaryArray ba;
-            if (!get_block_hashing_blob(ch_ent.second.bl, ba)) {
-              logger(ERROR, BRIGHT_RED) << "Failed to get_block_hashing_blob of alt block "
-                << j << " at height " << height_j;
-              return false;
-            }
-            pot.insert(std::end(pot), std::begin(ba), std::end(ba));
-            found_alt = true;
-          }
-        }
-        if (!found_alt) {
-          BinaryArray& ba = m_blobs[height_j];
-          pot.insert(std::end(pot), std::begin(ba), std::end(ba));
-        }
-      }    
+      BinaryArray& ba = m_blobs[height_j];
+      pot.insert(std::end(pot), std::begin(ba), std::end(ba));
     }
   }
 
@@ -1294,85 +1271,85 @@ bool Blockchain::get_block_long_hash(Crypto::cn_context &context, const Block& b
 }
 
 bool Blockchain::check_proof_of_work(Crypto::cn_context& context, const Block& block, difficulty_type currentDiffic, Crypto::Hash& proofOfWork, std::list<blocks_ext_by_hash::iterator>& alt_chain) {
-    if (block.majorVersion < CryptoNote::BLOCK_MAJOR_VERSION_5) {
-        return m_currency.checkProofOfWork(context, block, currentDiffic, proofOfWork);
-    }
+  if (block.majorVersion < CryptoNote::BLOCK_MAJOR_VERSION_5) {
+    return m_currency.checkProofOfWork(context, block, currentDiffic, proofOfWork);
+  }
 
-    if (!get_block_long_hash(context, block, proofOfWork, alt_chain)) {
-        return false;
-    }
+  if (!get_block_long_hash(context, block, proofOfWork, alt_chain)) {
+    return false;
+  }
 
-    if (!check_hash(proofOfWork, currentDiffic)) {
-        return false;
-    }
+  if (!check_hash(proofOfWork, currentDiffic)) {
+    return false;
+  }
 
-    return true;
+  return true;
 }
 
 bool Blockchain::get_block_long_hash(Crypto::cn_context& context, const Block& b, Crypto::Hash& res, std::list<blocks_ext_by_hash::iterator>& alt_chain) {
-    if (b.majorVersion < CryptoNote::BLOCK_MAJOR_VERSION_5) {
-        return get_block_longhash(context, b, res);
-    }
+  if (b.majorVersion < CryptoNote::BLOCK_MAJOR_VERSION_5) {
+    return get_block_longhash(context, b, res);
+  }
 
-    BinaryArray pot;
-    if (!get_signed_block_hashing_blob(b, pot)) {
-        logger(ERROR, BRIGHT_RED) << "Failed to get_block_hashing_blob in get_block_long_hash";
-        return false;
-    }
+  BinaryArray pot;
+  if (!get_signed_block_hashing_blob(b, pot)) {
+    logger(ERROR, BRIGHT_RED) << "Failed to get_block_hashing_blob in get_block_long_hash";
+    return false;
+  }
 
-    Crypto::Hash hash_1, hash_2;
-    uint32_t currentHeight = boost::get<BaseInput>(b.baseTransaction.inputs[0]).blockIndex;
-    uint32_t maxHeight = std::min<uint32_t>(getCurrentBlockchainHeight() - 1, currentHeight - 1 - m_currency.minedMoneyUnlockWindow());
+  Crypto::Hash hash_1, hash_2;
+  uint32_t currentHeight = boost::get<BaseInput>(b.baseTransaction.inputs[0]).blockIndex;
+  uint32_t maxHeight = std::min<uint32_t>(getCurrentBlockchainHeight() - 1, currentHeight - 1 - m_currency.minedMoneyUnlockWindow());
 
 #define ITER 128
-    for (uint32_t i = 0; i < ITER; i++) {
-        cn_fast_hash(pot.data(), pot.size(), hash_1);
+  for (uint32_t i = 0; i < ITER; i++) {
+    cn_fast_hash(pot.data(), pot.size(), hash_1);
 
-        for (uint8_t j = 1; j <= 8; j++) {
-            uint8_t chunk[4] = {
-              hash_1.data[j * 4 - 4],
-              hash_1.data[j * 4 - 3],
-              hash_1.data[j * 4 - 2],
-              hash_1.data[j * 4 - 1]
-            };
+    for (uint8_t j = 1; j <= 8; j++) {
+      uint8_t chunk[4] = {
+        hash_1.data[j * 4 - 4],
+        hash_1.data[j * 4 - 3],
+        hash_1.data[j * 4 - 2],
+        hash_1.data[j * 4 - 1]
+      };
 
-            uint32_t n = (chunk[0] << 24) |
-                (chunk[1] << 16) |
-                (chunk[2] << 8) |
-                (chunk[3]);
+      uint32_t n = (chunk[0] << 24) |
+                   (chunk[1] << 16) |
+                   (chunk[2] << 8) |
+                   (chunk[3]);
 
-            uint32_t height_j = n % maxHeight;
-            bool found_alt = false;
-            for (auto alt_ch_iter = alt_chain.begin(); alt_ch_iter != alt_chain.end() && !found_alt; alt_ch_iter++) {
-                auto &ch_ent = *alt_ch_iter;
-                Block b = ch_ent->second.bl;
-                uint32_t ah = boost::get<BaseInput>(b.baseTransaction.inputs[0]).blockIndex;
-                if (ah == height_j) {
-                    BinaryArray ba;
-                    if (!get_block_hashing_blob(b, ba)) {
-                        logger(ERROR, BRIGHT_RED) << "Failed to get_block_hashing_blob of alt block "
-                            << j << " at height " << height_j;
-                        return false;
-                    }
-                    pot.insert(std::end(pot), std::begin(ba), std::end(ba));
-                    found_alt = true;
-                }
-            }
-            if (!found_alt) {
-                BinaryArray& ba = m_blobs[height_j];
-                pot.insert(std::end(pot), std::begin(ba), std::end(ba));
-            }            
+      uint32_t height_j = n % maxHeight;
+      bool found_alt = false;
+      for (auto alt_ch_iter = alt_chain.begin(); alt_ch_iter != alt_chain.end() && !found_alt; alt_ch_iter++) {
+        auto &ch_ent = *alt_ch_iter;
+        Block b = ch_ent->second.bl;
+        uint32_t ah = boost::get<BaseInput>(b.baseTransaction.inputs[0]).blockIndex;
+        if (ah == height_j) {
+          BinaryArray ba;
+          if (!get_block_hashing_blob(b, ba)) {
+            logger(ERROR, BRIGHT_RED) << "Failed to get_block_hashing_blob of alt block "
+              << j << " at height " << height_j;
+            return false;
+          }
+          pot.insert(std::end(pot), std::begin(ba), std::end(ba));
+          found_alt = true;
         }
+      }
+      if (!found_alt) {
+        BinaryArray& ba = m_blobs[height_j];
+        pot.insert(std::end(pot), std::begin(ba), std::end(ba));
+      }            
     }
+  }
 
-    if (!Crypto::y_slow_hash(pot.data(), pot.size(), hash_1, hash_2)) {
-        logger(Logging::ERROR, Logging::BRIGHT_RED) << "Error getting Yespower hash";
-        return false;
-    }
+  if (!Crypto::y_slow_hash(pot.data(), pot.size(), hash_1, hash_2)) {
+    logger(Logging::ERROR, Logging::BRIGHT_RED) << "Error getting Yespower hash";
+    return false;
+  }
 
-    res = hash_2;
+  res = hash_2;
 
-    return true;
+  return true;
 }
 
 bool Blockchain::complete_timestamps_vector(uint8_t blockMajorVersion, uint64_t start_top_height, std::vector<uint64_t>& timestamps) {
