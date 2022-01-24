@@ -894,7 +894,7 @@ bool Blockchain::switch_to_alternative_blockchain(std::list<blocks_ext_by_hash::
   // Check that block major version matches
   for (auto alt_ch_iter = alt_chain.begin(); alt_ch_iter != alt_chain.end(); alt_ch_iter++)
   {
-    auto ch_ent = *alt_ch_iter;
+    auto &ch_ent = *alt_ch_iter;
     Block b = ch_ent->second.bl;
     if (!checkBlockVersion(b))
     {
@@ -975,7 +975,7 @@ bool Blockchain::switch_to_alternative_blockchain(std::list<blocks_ext_by_hash::
     std::copy(b.transactionHashes.begin(), b.transactionHashes.end(), std::inserter(mainChainTxHashes, mainChainTxHashes.end()));
   }
   for (auto alt_ch_iter = alt_chain.begin(); alt_ch_iter != alt_chain.end(); alt_ch_iter++) {
-    auto ch_ent = *alt_ch_iter;
+    auto &ch_ent = *alt_ch_iter;
     Block b = ch_ent->second.bl;
     std::copy(b.transactionHashes.begin(), b.transactionHashes.end(), std::inserter(altChainTxHashes, altChainTxHashes.end()));
   }
@@ -1002,7 +1002,7 @@ bool Blockchain::switch_to_alternative_blockchain(std::list<blocks_ext_by_hash::
 
   //connecting new alternative chain
   for (auto alt_ch_iter = alt_chain.begin(); alt_ch_iter != alt_chain.end(); alt_ch_iter++) {
-    auto ch_ent = *alt_ch_iter;
+    auto &ch_ent = *alt_ch_iter;
     block_verification_context bvc = boost::value_initialized<block_verification_context>();
     bool r = pushBlock(ch_ent->second.bl, get_block_hash(ch_ent->second.bl), bvc);
     if (!r || !bvc.m_added_to_main_chain) {
@@ -1262,7 +1262,7 @@ bool Blockchain::get_block_long_hash(Crypto::cn_context &context, const Block& b
       else {
         bool found_alt = false;
         for (auto alt_ch_iter = m_alternative_chains.begin(); alt_ch_iter != m_alternative_chains.end() && !found_alt; alt_ch_iter++) {
-          auto ch_ent = *alt_ch_iter;
+          auto &ch_ent = *alt_ch_iter;
           uint32_t ah = boost::get<BaseInput>(ch_ent.second.bl.baseTransaction.inputs[0]).blockIndex;
           if (ah == height_j) {
             BinaryArray ba;
@@ -1344,7 +1344,7 @@ bool Blockchain::get_block_long_hash(Crypto::cn_context& context, const Block& b
             uint32_t height_j = n % maxHeight;
             bool found_alt = false;
             for (auto alt_ch_iter = alt_chain.begin(); alt_ch_iter != alt_chain.end() && !found_alt; alt_ch_iter++) {
-                auto ch_ent = *alt_ch_iter;
+                auto &ch_ent = *alt_ch_iter;
                 Block b = ch_ent->second.bl;
                 uint32_t ah = boost::get<BaseInput>(b.baseTransaction.inputs[0]).blockIndex;
                 if (ah == height_j) {
