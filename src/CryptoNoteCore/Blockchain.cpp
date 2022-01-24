@@ -1293,6 +1293,88 @@ bool Blockchain::get_block_long_hash(Crypto::cn_context &context, const Block& b
   return true;
 }
 
+bool Blockchain::check_proof_of_work(Crypto::cn_context& context, const Block& block, difficulty_type currentDiffic, Crypto::Hash& proofOfWork, std::list<blocks_ext_by_hash::iterator>& alt_chain) {
+    if (block.majorVersion < CryptoNote::BLOCK_MAJOR_VERSION_5) {
+        return m_currency.checkProofOfWork(context, block, currentDiffic, proofOfWork);
+    }
+
+    if (!get_block_long_hash(context, block, proofOfWork, alt_chain)) {
+        return false;
+    }
+
+    if (!check_hash(proofOfWork, currentDiffic)) {
+        return false;
+    }
+
+    return true;
+}
+
+bool Blockchain::get_block_long_hash(Crypto::cn_context& context, const Block& b, Crypto::Hash& res, std::list<blocks_ext_by_hash::iterator>& alt_chain) {
+    if (b.majorVersion < CryptoNote::BLOCK_MAJOR_VERSION_5) {
+        return get_block_longhash(context, b, res);
+    }
+
+    BinaryArray pot;
+    if (!get_signed_block_hashing_blob(b, pot)) {
+        logger(ERROR, BRIGHT_RED) << "Failed to get_block_hashing_blob in get_block_long_hash";
+        return false;
+    }
+
+    Crypto::Hash hash_1, hash_2;
+    uint32_t currentHeight = boost::get<BaseInput>(b.baseTransaction.inputs[0]).blockIndex;
+    uint32_t maxHeight = std::min<uint32_t>(getCurrentBlockchainHeight() - 1, currentHeight - 1 - m_currency.minedMoneyUnlockWindow());
+
+#define ITER 128
+    for (uint32_t i = 0; i < ITER; i++) {
+        cn_fast_hash(pot.data(), pot.size(), hash_1);
+
+        for (uint8_t j = 1; j <= 8; j++) {
+            uint8_t chunk[4] = {
+              hash_1.data[j * 4 - 4],
+              hash_1.data[j * 4 - 3],
+              hash_1.data[j * 4 - 2],
+              hash_1.data[j * 4 - 1]
+            };
+
+            uint32_t n = (chunk[0] << 24) |
+                (chunk[1] << 16) |
+                (chunk[2] << 8) |
+                (chunk[3]);
+
+            uint32_t height_j = n % maxHeight;
+            bool found_alt = false;
+            for (auto alt_ch_iter = alt_chain.begin(); alt_ch_iter != alt_chain.end() && !found_alt; alt_ch_iter++) {
+                auto ch_ent = *alt_ch_iter;
+                Block b = ch_ent->second.bl;
+                uint32_t ah = boost::get<BaseInput>(b.baseTransaction.inputs[0]).blockIndex;
+                if (ah == height_j) {
+                    BinaryArray ba;
+                    if (!get_block_hashing_blob(b, ba)) {
+                        logger(ERROR, BRIGHT_RED) << "Failed to get_block_hashing_blob of alt block "
+                            << j << " at height " << height_j;
+                        return false;
+                    }
+                    pot.insert(std::end(pot), std::begin(ba), std::end(ba));
+                    found_alt = true;
+                }
+            }
+            if (!found_alt) {
+                BinaryArray& ba = m_blobs[height_j];
+                pot.insert(std::end(pot), std::begin(ba), std::end(ba));
+            }            
+        }
+    }
+
+    if (!Crypto::y_slow_hash(pot.data(), pot.size(), hash_1, hash_2)) {
+        logger(Logging::ERROR, Logging::BRIGHT_RED) << "Error getting Yespower hash";
+        return false;
+    }
+
+    res = hash_2;
+
+    return true;
+}
+
 bool Blockchain::complete_timestamps_vector(uint8_t blockMajorVersion, uint64_t start_top_height, std::vector<uint64_t>& timestamps) {
   if (timestamps.size() >= m_currency.timestampCheckWindow(blockMajorVersion))
     return true;
@@ -1427,7 +1509,7 @@ bool Blockchain::handle_alternative_block(const Block& b, const Crypto::Hash& id
     if (!(current_diff)) { logger(ERROR, BRIGHT_RED) << "!!!!!!! DIFFICULTY OVERHEAD !!!!!!!"; return false; }
     Crypto::Hash proof_of_work = NULL_HASH;
     // Always check PoW for alternative blocks
-    if (!checkProofOfWork(m_cn_context, bei.bl, current_diff, proof_of_work, true)) {
+    if (!check_proof_of_work(m_cn_context, bei.bl, current_diff, proof_of_work, alt_chain)) {
       logger(INFO, BRIGHT_RED) <<
         "Block with id: " << Common::podToHex(id)
         << ENDL << " for alternative chain, has not enough proof of work: " << proof_of_work
