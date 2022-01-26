@@ -162,18 +162,10 @@ namespace CryptoNote
     int handle_handshake(int command, COMMAND_HANDSHAKE::request& arg, COMMAND_HANDSHAKE::response& rsp, P2pConnectionContext& context);
     int handle_timed_sync(int command, COMMAND_TIMED_SYNC::request& arg, COMMAND_TIMED_SYNC::response& rsp, P2pConnectionContext& context);
     int handle_ping(int command, COMMAND_PING::request& arg, COMMAND_PING::response& rsp, P2pConnectionContext& context);
-#ifdef ALLOW_DEBUG_COMMANDS
-    int handle_get_stat_info(int command, COMMAND_REQUEST_STAT_INFO::request& arg, COMMAND_REQUEST_STAT_INFO::response& rsp, P2pConnectionContext& context);
-    int handle_get_network_state(int command, COMMAND_REQUEST_NETWORK_STATE::request& arg, COMMAND_REQUEST_NETWORK_STATE::response& rsp, P2pConnectionContext& context);
-    int handle_get_peer_id(int command, COMMAND_REQUEST_PEER_ID::request& arg, COMMAND_REQUEST_PEER_ID::response& rsp, P2pConnectionContext& context);
-#endif
 
     bool init_config();
     bool make_default_config();
     bool store_config();
-#ifdef ALLOW_DEBUG_COMMANDS
-    bool check_trust(const proof_of_trust& tr);
-#endif
 
     bool handshake(CryptoNote::LevinProtocol& proto, P2pConnectionContext& context, bool just_take_peerlist = false);
     bool timedSync();
@@ -280,9 +272,6 @@ namespace CryptoNote
 
     std::string m_bind_ip;
     std::string m_port;
-#ifdef ALLOW_DEBUG_COMMANDS
-    uint64_t m_last_stat_request_time;
-#endif
     std::vector<NetworkAddress> m_priority_peers;
     std::vector<NetworkAddress> m_exclusive_peers;
     std::vector<NetworkAddress> m_seed_nodes;
