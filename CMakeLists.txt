@@ -141,7 +141,7 @@ if(APPLE OR FREEBSD)
   if(POLICY CMP0042)
     cmake_policy(SET CMP0042 NEW)
   endif()
-  enable_language(ASM)
+  #enable_language(ASM)
 endif()
 
 if(MSVC OR MINGW)

@@ -11,7 +11,7 @@ on:
 jobs:
   build-windows:
     name: Windows
-    runs-on: windows-latest
+    runs-on: windows-2019
     env:
       BOOST_ROOT: C:\thirdparties\boost-1.72.0
     steps:
@@ -85,6 +85,69 @@ jobs:
           mkdir "$build_folder"
           cd "$build_folder"
           cmake -DCMAKE_C_FLAGS="-mmacosx-version-min=10.12" -DCMAKE_CXX_FLAGS="-mmacosx-version-min=10.12" -DOPENSSL_USE_STATIC_LIBS=ON ..
+          make
+          mkdir "$release_name"
+          exeFiles=()
+          for f in src/*; do [[ -x $f && -f $f ]] && strip "$f" && exeFiles+=( "$f" ); done
+          strip "${exeFiles[@]}"
+          cp "${exeFiles[@]}" "$release_name/"
+          zip -r "$release_name".zip "$release_name"
+          sha256=$(shasum -a 256 "$release_name".zip | awk '{print toupper($1)}')
+          asset_path="./$build_folder$release_name.zip"
+          echo "::set-output name=sha256::${sha256}"
+          echo "::set-output name=release_name::${release_name}.zip"
+          echo "::set-output name=asset_path::${asset_path}"
+          echo "::set-output name=krb_ver::${krb_ver}"
+          echo "::set-output name=artifact_path::$build_folder/$release_name"
+
+      - name: Upload To GH Artifacts
+        uses: actions/upload-artifact@v1.0.0
+        with:
+          name: ${{ steps.build.outputs.release_name }}
+          path: ${{ steps.build.outputs.artifact_path }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-macos-m1:
+    name: macOS M1
+    runs-on: macos-macos-11
+    steps:
+      - uses: actions/checkout@master
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref }}
+
+      - name: Install boost
+        shell: zsh {0}
+        run: |
+          setopt sh_word_split
+          mkdir arm-homebrew && curl -L https://github.com/Homebrew/brew/tarball/master | tar xz --strip 1 -C arm-homebrew 
+          alias arm-brew='$(pwd)/arm-homebrew/bin/brew'
+          response=$(arm-brew fetch --force --bottle-tag=arm64_big_sur boost | grep "Downloaded to")
+          parsed=($response)  
+          arm-brew install $parsed[3]
+          arm-brew link boost --force
+
+      - name: Install openssl
+        shell: zsh {0}
+        run: |
+          setopt sh_word_split
+          mkdir arm-homebrew && curl -L https://github.com/Homebrew/brew/tarball/master | tar xz --strip 1 -C arm-homebrew 
+          alias arm-brew='$(pwd)/arm-homebrew/bin/brew'
+          response=$(arm-brew fetch --force --bottle-tag=arm64_big_sur openssl | grep "Downloaded to")
+          parsed=($response)  
+          arm-brew install $parsed[3]
+
+      - name: Build
+        id: build
+        run: |
+          export PATH="/Users/runner/work/karbowanec/karbowanec/arm-homebrew/opt/openssl@3/bin:$PATH"
+          build_folder="build/"
+          krb_ver=${GITHUB_SHA::7}
+          release_name="Karbo-cli-macOS-M1-$krb_ver"
+          mkdir "$build_folder"
+          cd "$build_folder"
+          cmake -DCMAKE_C_FLAGS="-target arm64e-apple-macos11.0 -mmacosx-version-min=11.0" -DCMAKE_CXX_FLAGS="-target arm64e-apple-macos11.0 -mmacosx-version-min=11.0" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 -DCMAKE_OSX_ARCHITECTURES=arm64 -DOPENSSL_USE_STATIC_LIBS=ON -DBOOST_ROOT=/Users/runner/work/karbowanec/karbowanec/arm-homebrew/Cellar/boost/1.76.0 -DBOOST_INCLUDE_DIRS=/Users/runner/work/karbowanec/karbowanec/arm-homebrew/Cellar/boost/1.76.0/include ..
           make
           mkdir "$release_name"
           exeFiles=()
