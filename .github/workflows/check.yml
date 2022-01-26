@@ -142,6 +142,8 @@ jobs:
         id: build
         run: |
           export PATH="/Users/runner/work/karbowanec/karbowanec/arm-homebrew/opt/openssl@3/bin:$PATH"
+          export LDFLAGS="-L/Users/runner/work/karbowanec/karbowanec/arm-homebrew/opt/openssl@3/lib"
+          export CPPFLAGS="-I/Users/runner/work/karbowanec/karbowanec/arm-homebrew/opt/openssl@3/include"
           build_folder="build/"
           krb_ver=${GITHUB_SHA::7}
           release_name="Karbo-cli-macOS-M1-$krb_ver"
