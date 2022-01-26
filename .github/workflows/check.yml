@@ -110,7 +110,7 @@ jobs:
 
   build-macos-m1:
     name: macOS M1
-    runs-on: macos-macos-11
+    runs-on: macos-11
     steps:
       - uses: actions/checkout@master
         with:
