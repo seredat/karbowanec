@@ -149,7 +149,16 @@ jobs:
           release_name="Karbo-cli-macOS-M1-$krb_ver"
           mkdir "$build_folder"
           cd "$build_folder"
-          cmake -DCMAKE_C_FLAGS="-target arm64e-apple-macos11.0 -mmacosx-version-min=11.0" -DCMAKE_CXX_FLAGS="-target arm64e-apple-macos11.0 -mmacosx-version-min=11.0" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 -DCMAKE_OSX_ARCHITECTURES=arm64 -DOPENSSL_USE_STATIC_LIBS=ON -DBOOST_ROOT=/Users/runner/work/karbowanec/karbowanec/arm-homebrew/Cellar/boost/1.76.0 -DBOOST_INCLUDE_DIRS=/Users/runner/work/karbowanec/karbowanec/arm-homebrew/Cellar/boost/1.76.0/include ..
+          cmake -DCMAKE_C_FLAGS="-target arm64e-apple-macos11.0 -mmacosx-version-min=11.0" -DCMAKE_CXX_FLAGS="-target arm64e-apple-macos11.0 \
+          -mmacosx-version-min=11.0" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 -DCMAKE_OSX_ARCHITECTURES=arm64 -DOPENSSL_USE_STATIC_LIBS=ON \
+          -DBOOST_ROOT=/Users/runner/work/karbowanec/karbowanec/arm-homebrew/Cellar/boost/1.76.0 \
+          -D OPENSSL_ROOT_DIR=/Users/runner/work/karbowanec/karbowanec/arm-homebrew/opt/openssl@3/ \
+          -D OPENSSL_SSL_LIBRARY=/Users/runner/work/karbowanec/karbowanec/arm-homebrew/opt/openssl@3/lib/libssl.so \
+          -D OPENSSL_CRYPTO_LIBRARY=/Users/runner/work/karbowanec/karbowanec/arm-homebrew/opt/openssl@3/lib/libcrypto.so \
+          -D OPENSSL_INCLUDE_DIR=/Users/runner/work/karbowanec/karbowanec/arm-homebrew/opt/openssl@3/include \
+          -D BOOST_IGNORE_SYSTEM_PATHS_DEFAULT=ON -DBoost_NO_SYSTEM_PATHS=ON -D Boost_USE_STATIC_RUNTIME=ON \
+          -D BOOST_ROOT=${HOME}/opt/android/boost/ndk_21_boost_1.72.0 \
+          -D Boost_INCLUDE_DIR=/Users/runner/work/karbowanec/karbowanec/arm-homebrew/Cellar/boost/1.76.0/include ..
           make
           mkdir "$release_name"
           exeFiles=()
