@@ -102,6 +102,12 @@ bool is_valid_prefix(const std::string& prefix, Currency& currency) {
     if (prefix.length() <= 2 || prefix.length() >= 95)
         return false;
 
+    const char alphabet[] = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+    for (const char& c : prefix) {
+        if (std::string(alphabet).find(c) == std::string::npos)
+            return false;
+    }
+
     std::string zerohex = "0000000000000000000000000000000000000000000000000000000000000000";
     std::string ffhex = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
 
