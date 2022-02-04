@@ -118,6 +118,7 @@ bool is_valid_prefix(const std::string& prefix, Currency& currency) {
 
     std::string lowest = lowest_address.substr(0, prefix.length());
     std::string highest = highest_address.substr(0, prefix.length());
+
     if (prefix < lowest)
         return false;
     if (prefix > highest)
@@ -129,7 +130,6 @@ bool is_valid_prefix(const std::string& prefix, Currency& currency) {
 bool check_address_prefix(const std::string& prefix, Currency& currency, AccountKeys& _keys) {
     CryptoNote::AccountPublicAddress publicKeys;
     if (secret_key_to_public_key(_keys.spendSecretKey, publicKeys.spendPublicKey)) {
-        // Make sure the generated keys are deterministic
         AccountBase::generateViewFromSpend(_keys.spendSecretKey, _keys.viewSecretKey, publicKeys.viewPublicKey);
         std::string address = currency.accountAddressAsString(publicKeys);
         if ((address.substr(0, prefix.length()) == prefix)) {
@@ -139,14 +139,12 @@ bool check_address_prefix(const std::string& prefix, Currency& currency, Account
             std::cout << InformationMsg("View key:  ") << Common::podToHex(_keys.viewSecretKey) << std::endl;
 
             std::string electrum_words;
-
             std::string lang = "English";
             Crypto::ElectrumWords::bytes_to_words(_keys.spendSecretKey, electrum_words, lang);
             Crypto::SecretKey second;
             keccak((uint8_t*)&_keys.spendSecretKey, sizeof(Crypto::SecretKey), (uint8_t*)&second, sizeof(Crypto::SecretKey));
             sc_reduce32((uint8_t*)&second);
             bool success = memcmp(second.data, _keys.viewSecretKey.data, sizeof(Crypto::SecretKey)) == 0;
-
             if (success)
             {
                 seedFormater(electrum_words);
