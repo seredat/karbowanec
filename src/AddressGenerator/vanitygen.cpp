@@ -23,6 +23,7 @@
 
 #include <boost/program_options.hpp>
 #include <chrono>
+#include <fstream>
 #include <mutex>
 #include <random>
 
@@ -62,9 +63,11 @@ std::mutex outputMutex;
 
 namespace command_line
 {
-  const command_line::arg_descriptor<std::string> arg_prefix = {"prefix", "Specify address prefix"};
-  const command_line::arg_descriptor<int> arg_count = {"count", "Specify number of addresses to find", 1};
-  const command_line::arg_descriptor<int> arg_threads = {"threads", "Specify threads to use", 1};
+  const command_line::arg_descriptor<std::string> arg_prefix = {"prefix", "Specify the address prefix"};
+  const command_line::arg_descriptor<int> arg_count = {"count", "Specify the number of addresses to find", 1};
+  const command_line::arg_descriptor<int> arg_threads = {"threads", "Specify the number of threads to use", 1};
+  const command_line::arg_descriptor<std::string> arg_file = {"file", "Specify the file name to save generated keys to file, "
+    "by default found keys are just shown in console. If the file exists, new keys are appended"};
 }
 
 void seedFormater(std::string& seed) {
@@ -85,7 +88,6 @@ void seedFormater(std::string& seed) {
         }
     }
     seed.clear();
-    seed.append("\n ");
     for (std::string word : seed_array) {
         seed.append(word);
         for (unsigned int k = 2; k <= word_width - word.length() && word.length() <= word_width; k++) seed.append(" ");
@@ -93,9 +95,10 @@ void seedFormater(std::string& seed) {
         word_n++;
         if (word_n >= seed_col) {
             word_n = 0;
-            seed.append("\n ");
+            seed.append("\n           ");
         }
     }
+    seed.erase(seed.size() - 11); // remove last line of spacers
 }
 
 bool is_valid_prefix(const std::string& prefix, Currency& currency) {
@@ -133,16 +136,19 @@ bool is_valid_prefix(const std::string& prefix, Currency& currency) {
     return true;
 }
 
-bool check_address_prefix(const std::string& prefix, Currency& currency, AccountKeys& _keys) {
+bool check_address_prefix(const std::string& prefix, Currency& currency, const po::variables_map& vm, AccountKeys& _keys) {
     CryptoNote::AccountPublicAddress publicKeys;
     if (secret_key_to_public_key(_keys.spendSecretKey, publicKeys.spendPublicKey)) {
         AccountBase::generateViewFromSpend(_keys.spendSecretKey, _keys.viewSecretKey, publicKeys.viewPublicKey);
         std::string address = currency.accountAddressAsString(publicKeys);
         if ((address.substr(0, prefix.length()) == prefix)) {
             std::lock_guard<std::mutex> guard(outputMutex);
-            std::cout << InformationMsg("Address:   ") << address << std::endl;
-            std::cout << InformationMsg("Spend key: ") << Common::podToHex(_keys.spendSecretKey) << std::endl;
-            std::cout << InformationMsg("View key:  ") << Common::podToHex(_keys.viewSecretKey) << std::endl;
+
+            std::string found = "\n";
+
+            found += "Address:   " + address + "\n";
+            found += "Spend key: " + Common::podToHex(_keys.spendSecretKey) + "\n";
+            found += "View key:  " + Common::podToHex(_keys.viewSecretKey) + "\n";
 
             std::string electrum_words;
             std::string lang = "English";
@@ -154,8 +160,18 @@ bool check_address_prefix(const std::string& prefix, Currency& currency, Account
             if (success)
             {
                 seedFormater(electrum_words);
-                std::cout << InformationMsg("Mnemonic:   ");
-                std::cout << electrum_words << std::endl << std::endl;
+                found += "Mnemonic:  ";
+                found += electrum_words + "\n";
+            }
+
+            std::cout << SuccessMsg(found) << ENDL;
+
+            if (!command_line::get_arg(vm, command_line::arg_file).empty()) {
+                std::string filename = command_line::get_arg(vm, command_line::arg_file);
+                std::ofstream ofs;
+                ofs.open(filename + ".txt", std::ofstream::out | std::ofstream::app);
+                ofs << found;
+                ofs.close();
             }
 
             return true;
@@ -165,7 +181,7 @@ bool check_address_prefix(const std::string& prefix, Currency& currency, Account
     return false;
 }
 
-void prefix_worker(const std::string& prefix, Currency& currency, int threads, int threadId, volatile int& found, int count) {
+void prefix_worker(const std::string& prefix, Currency& currency, const po::variables_map& vm, int threads, int threadId, volatile int& found, int count) {
     bool found_needed = false;
     while (!found_needed) {
         AccountKeys keys;
@@ -174,7 +190,7 @@ void prefix_worker(const std::string& prefix, Currency& currency, int threads, i
         keccak((uint8_t*)&keys.spendSecretKey, sizeof(Crypto::SecretKey), (uint8_t*)&second, sizeof(Crypto::SecretKey));
         Crypto::generate_deterministic_keys(keys.address.viewPublicKey, keys.viewSecretKey, second);
 
-        if (check_address_prefix(prefix, currency, keys)) {
+        if (check_address_prefix(prefix, currency, vm, keys)) {
             found++;
         }
 
@@ -209,7 +225,7 @@ bool find_prefix(const po::variables_map& vm, Currency& currency, System::Dispat
     for (int i = 0; i < threads; i++) {
         m_workers.emplace_back(
                new System::RemoteContext<void>(dispatcher, [&, i]() {
-                   prefix_worker(prefix, currency, threads, i, found, count);
+                   prefix_worker(prefix, currency, vm, threads, i, found, count);
                })
         );
     }
@@ -241,6 +257,7 @@ int main(int argc, char** argv) {
         command_line::add_arg(desc_cmd_only, command_line::arg_prefix);
         command_line::add_arg(desc_cmd_only, command_line::arg_count);
         command_line::add_arg(desc_cmd_only, command_line::arg_threads);
+        command_line::add_arg(desc_cmd_only, command_line::arg_file);
 
         command_line::add_arg(desc_cmd_only, command_line::arg_help);
 
