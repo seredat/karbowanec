@@ -1326,19 +1326,18 @@ bool Blockchain::get_block_long_hash(Crypto::cn_context& context, const Block& b
         uint32_t ah = boost::get<BaseInput>(b.baseTransaction.inputs[0]).blockIndex;
         if (ah == height_j) {
           BinaryArray ba;
-          if (!get_block_hashing_blob(b, ba)) {
-            logger(ERROR, BRIGHT_RED) << "Failed to get_block_hashing_blob of alt block "
-              << j << " at height " << height_j;
-            return false;
-          }
+          if (!get_block_hashing_blob(b, ba)) return false;
           pot.insert(std::end(pot), std::begin(ba), std::end(ba));
           found_alt = true;
         }
       }
       if (!found_alt) {
-        BinaryArray& ba = m_blobs[height_j];
+        std::lock_guard<decltype(m_blockchain_lock)> lk(m_blockchain_lock);
+        const Block& bj = m_blocks[height_j].bl;
+        BinaryArray ba;
+        if (!get_block_hashing_blob(bj, ba)) return false;
         pot.insert(std::end(pot), std::begin(ba), std::end(ba));
-      }            
+      }
     }
   }
 
