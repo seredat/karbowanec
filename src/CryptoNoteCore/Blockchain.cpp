@@ -358,6 +358,7 @@ m_timestampIndex(blockchainIndexesEnabled),
 m_generatedTransactionsIndex(blockchainIndexesEnabled),
 m_orphanBlocksIndex(blockchainIndexesEnabled),
 m_blockchainIndexesEnabled(blockchainIndexesEnabled),
+m_allowDeepReorg(allowDeepReorg),
 m_no_blobs(noBlobs)
 {
 }
@@ -1276,7 +1277,7 @@ bool Blockchain::getBlockLongHash(Crypto::cn_context& context, const Block& b, C
         }
       }
       if (!found_alt) {
-        if (no_blobs) {
+        if (no_blobs || m_allowDeepReorg) {
           std::lock_guard<decltype(m_blockchain_lock)> lk(m_blockchain_lock);
           const Block& bj = m_blocks[height_j].bl;
           BinaryArray ba;
