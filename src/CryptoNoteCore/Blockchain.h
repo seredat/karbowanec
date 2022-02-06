@@ -304,6 +304,7 @@ namespace CryptoNote {
     GeneratedTransactionsIndex m_generatedTransactionsIndex;
     OrphanBlocksIndex m_orphanBlocksIndex;
     bool m_blockchainIndexesEnabled;
+    bool m_allowDeepReorg;
 
     IntrusiveLinkedList<MessageQueue<BlockchainMessage>> m_messageQueueList;
 

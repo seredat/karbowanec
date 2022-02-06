@@ -357,7 +357,9 @@ m_paymentIdIndex(blockchainIndexesEnabled),
 m_timestampIndex(blockchainIndexesEnabled),
 m_generatedTransactionsIndex(blockchainIndexesEnabled),
 m_orphanBlocksIndex(blockchainIndexesEnabled),
-m_blockchainIndexesEnabled(blockchainIndexesEnabled) {
+m_blockchainIndexesEnabled(blockchainIndexesEnabled),
+m_allowDeepReorg(allowDeepReorg)
+{
 }
 
 bool Blockchain::addObserver(IBlockchainStorageObserver* observer) {
@@ -1209,7 +1211,7 @@ bool Blockchain::getHashingBlob(const uint32_t height, BinaryArray& blob) {
 bool Blockchain::checkProofOfWork(Crypto::cn_context& context, const Block& block, difficulty_type currentDiffic, Crypto::Hash& proofOfWork) {
   std::list<blocks_ext_by_hash::iterator> dummy_alt_chain;
 
-  return checkProofOfWork(context, block, currentDiffic, proofOfWork, dummy_alt_chain, false);
+  return checkProofOfWork(context, block, currentDiffic, proofOfWork, dummy_alt_chain, m_allowDeepReorg);
 }
 
 bool Blockchain::checkProofOfWork(Crypto::cn_context& context, const Block& block, difficulty_type currentDiffic, Crypto::Hash& proofOfWork, std::list<blocks_ext_by_hash::iterator>& alt_chain, bool no_blobs) {
