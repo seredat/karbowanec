@@ -316,7 +316,7 @@ namespace CryptoNote
           for (uint32_t nonce = startNonce + i; !found; nonce += nthreads) {
             lb.nonce = nonce;
 
-            if (!m_handler.get_block_long_hash(localctx, lb, h)) {
+            if (!m_handler.getBlockLongHash(localctx, lb, h)) {
               return;
             }
 
@@ -341,7 +341,7 @@ namespace CryptoNote
     } else {
       for (; bl.nonce != std::numeric_limits<uint32_t>::max(); bl.nonce++) {
         Crypto::Hash h;
-        if (!m_handler.get_block_long_hash(context, bl, h)) {
+        if (!m_handler.getBlockLongHash(context, bl, h)) {
           return false;
         }
 
@@ -448,7 +448,7 @@ namespace CryptoNote
       // step 2: get long hash
       Crypto::Hash pow;
       if (!m_stop) {
-        if (!m_handler.get_block_long_hash(context, b, pow)) {
+        if (!m_handler.getBlockLongHash(context, b, pow)) {
           logger(ERROR) << "getBlockLongHash failed.";
           m_stop = true;
         }

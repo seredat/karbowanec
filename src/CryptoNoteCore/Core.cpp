@@ -863,7 +863,7 @@ bool Core::getBlockHeight(const Crypto::Hash& blockId, uint32_t& blockHeight) {
   return m_blockchain.getBlockHeight(blockId, blockHeight);
 }
 
-bool Core::get_block_long_hash(Crypto::cn_context &context, const Block& b, Crypto::Hash& res) {
+bool Core::getBlockLongHash(Crypto::cn_context &context, const Block& b, Crypto::Hash& res) {
   return m_blockchain.getBlockLongHash(context, b, res);
 }
 
