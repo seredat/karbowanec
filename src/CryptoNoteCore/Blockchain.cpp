@@ -1223,42 +1223,32 @@ bool Blockchain::getHashingBlob(const uint32_t height, BinaryArray& blob) {
 }
 
 bool Blockchain::get_block_long_hash(Crypto::cn_context &context, const Block& b, Crypto::Hash& res) {
-  if (b.majorVersion < CryptoNote::BLOCK_MAJOR_VERSION_5) {
-    return get_block_longhash(context, b, res);
-  }
-
   std::list<blocks_ext_by_hash::iterator> dummy_alt_chain;
 
   return get_block_long_hash(context, b, res, dummy_alt_chain, false);
 }
 
 bool Blockchain::check_proof_of_work(Crypto::cn_context& context, const Block& block, difficulty_type currentDiffic, Crypto::Hash& proofOfWork, std::list<blocks_ext_by_hash::iterator>& alt_chain, bool no_blobs) {
-  if (block.majorVersion < CryptoNote::BLOCK_MAJOR_VERSION_5) {
+  if (block.majorVersion < CryptoNote::BLOCK_MAJOR_VERSION_5)
     return m_currency.checkProofOfWork(context, block, currentDiffic, proofOfWork);
-  }
 
-  if (!get_block_long_hash(context, block, proofOfWork, alt_chain, no_blobs)) {
+  if (!get_block_long_hash(context, block, proofOfWork, alt_chain, no_blobs))
     return false;
-  }
 
-  if (!check_hash(proofOfWork, currentDiffic)) {
+  if (!check_hash(proofOfWork, currentDiffic))
     return false;
-  }
 
   return true;
 }
 
 bool Blockchain::get_block_long_hash(Crypto::cn_context& context, const Block& b, Crypto::Hash& res, std::list<blocks_ext_by_hash::iterator>& alt_chain, bool no_blobs) {
-  if (b.majorVersion < CryptoNote::BLOCK_MAJOR_VERSION_5) {
+  if (b.majorVersion < CryptoNote::BLOCK_MAJOR_VERSION_5)
     return get_block_longhash(context, b, res);
-  }
 
   BinaryArray pot;
-  if (!get_signed_block_hashing_blob(b, pot)) {
-    logger(ERROR, BRIGHT_RED) << "Failed to get_block_hashing_blob in get_block_long_hash";
+  if (!get_signed_block_hashing_blob(b, pot))
     return false;
-  }
-
+  
   Crypto::Hash hash_1, hash_2;
   uint32_t currentHeight = boost::get<BaseInput>(b.baseTransaction.inputs[0]).blockIndex;
   uint32_t maxHeight = std::min<uint32_t>(getCurrentBlockchainHeight() - 1, currentHeight - 1 - m_currency.minedMoneyUnlockWindow());
@@ -1308,10 +1298,8 @@ bool Blockchain::get_block_long_hash(Crypto::cn_context& context, const Block& b
     }
   }
 
-  if (!Crypto::y_slow_hash(pot.data(), pot.size(), hash_1, hash_2)) {
-    logger(Logging::ERROR, Logging::BRIGHT_RED) << "Error getting Yespower hash";
+  if (!Crypto::y_slow_hash(pot.data(), pot.size(), hash_1, hash_2))
     return false;
-  }
 
   res = hash_2;
 
