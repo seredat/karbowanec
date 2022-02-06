@@ -1200,6 +1200,12 @@ uint64_t Blockchain::getCurrentCumulativeBlocksizeLimit() {
   return m_current_block_cumul_sz_limit;
 }
 
+bool Blockchain::getHashingBlob(const uint32_t height, BinaryArray& blob) {
+  blob = m_blobs[height];
+
+  return true;
+}
+
 bool Blockchain::checkProofOfWork(Crypto::cn_context& context, const Block& block, difficulty_type currentDiffic, Crypto::Hash& proofOfWork) {
   if (block.majorVersion < CryptoNote::BLOCK_MAJOR_VERSION_5) {
     return m_currency.checkProofOfWork(context, block, currentDiffic, proofOfWork);
@@ -1212,12 +1218,6 @@ bool Blockchain::checkProofOfWork(Crypto::cn_context& context, const Block& bloc
   if (!check_hash(proofOfWork, currentDiffic)) {
 	  return false;
   }
-
-  return true;
-}
-
-bool Blockchain::getHashingBlob(const uint32_t height, BinaryArray& blob) {
-  blob = m_blobs[height];
 
   return true;
 }
