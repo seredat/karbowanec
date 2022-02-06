@@ -343,7 +343,7 @@ private:
 };
 
 
-Blockchain::Blockchain(const Currency& currency, tx_memory_pool& tx_pool, ILogger& logger, bool blockchainIndexesEnabled, bool allowDeepReorg) :
+Blockchain::Blockchain(const Currency& currency, tx_memory_pool& tx_pool, ILogger& logger, bool blockchainIndexesEnabled, bool allowDeepReorg, bool noBlobs) :
 logger(logger, "Blockchain"),
 m_currency(currency),
 m_tx_pool(tx_pool),
@@ -358,7 +358,7 @@ m_timestampIndex(blockchainIndexesEnabled),
 m_generatedTransactionsIndex(blockchainIndexesEnabled),
 m_orphanBlocksIndex(blockchainIndexesEnabled),
 m_blockchainIndexesEnabled(blockchainIndexesEnabled),
-m_allowDeepReorg(allowDeepReorg)
+m_no_blobs(noBlobs)
 {
 }
 
@@ -1211,7 +1211,7 @@ bool Blockchain::getHashingBlob(const uint32_t height, BinaryArray& blob) {
 bool Blockchain::checkProofOfWork(Crypto::cn_context& context, const Block& block, difficulty_type currentDiffic, Crypto::Hash& proofOfWork) {
   std::list<blocks_ext_by_hash::iterator> dummy_alt_chain;
 
-  return checkProofOfWork(context, block, currentDiffic, proofOfWork, dummy_alt_chain, m_allowDeepReorg);
+  return checkProofOfWork(context, block, currentDiffic, proofOfWork, dummy_alt_chain, m_no_blobs);
 }
 
 bool Blockchain::checkProofOfWork(Crypto::cn_context& context, const Block& block, difficulty_type currentDiffic, Crypto::Hash& proofOfWork, std::list<blocks_ext_by_hash::iterator>& alt_chain, bool no_blobs) {
