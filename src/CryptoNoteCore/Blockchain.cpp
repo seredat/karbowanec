@@ -1216,7 +1216,7 @@ bool Blockchain::checkProofOfWork(Crypto::cn_context& context, const Block& bloc
   if (block.majorVersion < CryptoNote::BLOCK_MAJOR_VERSION_5)
     return m_currency.checkProofOfWork(context, block, currentDiffic, proofOfWork);
 
-  if (!get_block_long_hash(context, block, proofOfWork, alt_chain, no_blobs))
+  if (!getBlockLongHash(context, block, proofOfWork, alt_chain, no_blobs))
     return false;
 
   if (!check_hash(proofOfWork, currentDiffic))
@@ -1225,20 +1225,20 @@ bool Blockchain::checkProofOfWork(Crypto::cn_context& context, const Block& bloc
   return true;
 }
 
-bool Blockchain::get_block_long_hash(Crypto::cn_context& context, const Block& b, Crypto::Hash& res) {
-    std::list<blocks_ext_by_hash::iterator> dummy_alt_chain;
+bool Blockchain::getBlockLongHash(Crypto::cn_context& context, const Block& b, Crypto::Hash& res) {
+  std::list<blocks_ext_by_hash::iterator> dummy_alt_chain;
 
-    return get_block_long_hash(context, b, res, dummy_alt_chain, false);
+  return getBlockLongHash(context, b, res, dummy_alt_chain, false);
 }
 
-bool Blockchain::get_block_long_hash(Crypto::cn_context& context, const Block& b, Crypto::Hash& res, std::list<blocks_ext_by_hash::iterator>& alt_chain, bool no_blobs) {
+bool Blockchain::getBlockLongHash(Crypto::cn_context& context, const Block& b, Crypto::Hash& res, std::list<blocks_ext_by_hash::iterator>& alt_chain, bool no_blobs) {
   if (b.majorVersion < CryptoNote::BLOCK_MAJOR_VERSION_5)
     return get_block_longhash(context, b, res);
 
   BinaryArray pot;
   if (!get_signed_block_hashing_blob(b, pot))
     return false;
-  
+
   Crypto::Hash hash_1, hash_2;
   uint32_t currentHeight = boost::get<BaseInput>(b.baseTransaction.inputs[0]).blockIndex;
   uint32_t maxHeight = std::min<uint32_t>(getCurrentBlockchainHeight() - 1, currentHeight - 1 - m_currency.minedMoneyUnlockWindow());
@@ -1257,7 +1257,7 @@ bool Blockchain::get_block_long_hash(Crypto::cn_context& context, const Block& b
 
       uint32_t n = (chunk[0] << 24) |
                    (chunk[1] << 16) |
-                   (chunk[2] << 8) |
+                   (chunk[2] << 8)  |
                    (chunk[3]);
 
       uint32_t height_j = n % maxHeight;

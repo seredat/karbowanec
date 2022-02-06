@@ -864,7 +864,7 @@ bool Core::getBlockHeight(const Crypto::Hash& blockId, uint32_t& blockHeight) {
 }
 
 bool Core::get_block_long_hash(Crypto::cn_context &context, const Block& b, Crypto::Hash& res) {
-  return m_blockchain.get_block_long_hash(context, b, res);
+  return m_blockchain.getBlockLongHash(context, b, res);
 }
 
 //void Core::get_all_known_block_ids(std::list<Crypto::Hash> &main, std::list<Crypto::Hash> &alt, std::list<Crypto::Hash> &invalid) {
