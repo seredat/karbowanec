@@ -1228,7 +1228,7 @@ bool Blockchain::get_block_long_hash(Crypto::cn_context &context, const Block& b
   return get_block_long_hash(context, b, res, dummy_alt_chain, false);
 }
 
-bool Blockchain::check_proof_of_work(Crypto::cn_context& context, const Block& block, difficulty_type currentDiffic, Crypto::Hash& proofOfWork, std::list<blocks_ext_by_hash::iterator>& alt_chain, bool no_blobs) {
+bool Blockchain::checkProofOfWork(Crypto::cn_context& context, const Block& block, difficulty_type currentDiffic, Crypto::Hash& proofOfWork, std::list<blocks_ext_by_hash::iterator>& alt_chain, bool no_blobs) {
   if (block.majorVersion < CryptoNote::BLOCK_MAJOR_VERSION_5)
     return m_currency.checkProofOfWork(context, block, currentDiffic, proofOfWork);
 
@@ -1440,7 +1440,7 @@ bool Blockchain::handle_alternative_block(const Block& b, const Crypto::Hash& id
     if (!(current_diff)) { logger(ERROR, BRIGHT_RED) << "!!!!!!! DIFFICULTY OVERHEAD !!!!!!!"; return false; }
     Crypto::Hash proof_of_work = NULL_HASH;
     // Always check PoW for alternative blocks
-    if (!check_proof_of_work(m_cn_context, bei.bl, current_diff, proof_of_work, alt_chain, true)) {
+    if (!checkProofOfWork(m_cn_context, bei.bl, current_diff, proof_of_work, alt_chain, true)) {
       logger(INFO, BRIGHT_RED) <<
         "Block with id: " << Common::podToHex(id)
         << ENDL << " for alternative chain, has not enough proof of work: " << proof_of_work
