@@ -1222,12 +1222,6 @@ bool Blockchain::checkProofOfWork(Crypto::cn_context& context, const Block& bloc
   return true;
 }
 
-bool Blockchain::get_block_long_hash(Crypto::cn_context &context, const Block& b, Crypto::Hash& res) {
-  std::list<blocks_ext_by_hash::iterator> dummy_alt_chain;
-
-  return get_block_long_hash(context, b, res, dummy_alt_chain, false);
-}
-
 bool Blockchain::checkProofOfWork(Crypto::cn_context& context, const Block& block, difficulty_type currentDiffic, Crypto::Hash& proofOfWork, std::list<blocks_ext_by_hash::iterator>& alt_chain, bool no_blobs) {
   if (block.majorVersion < CryptoNote::BLOCK_MAJOR_VERSION_5)
     return m_currency.checkProofOfWork(context, block, currentDiffic, proofOfWork);
@@ -1239,6 +1233,12 @@ bool Blockchain::checkProofOfWork(Crypto::cn_context& context, const Block& bloc
     return false;
 
   return true;
+}
+
+bool Blockchain::get_block_long_hash(Crypto::cn_context& context, const Block& b, Crypto::Hash& res) {
+    std::list<blocks_ext_by_hash::iterator> dummy_alt_chain;
+
+    return get_block_long_hash(context, b, res, dummy_alt_chain, false);
 }
 
 bool Blockchain::get_block_long_hash(Crypto::cn_context& context, const Block& b, Crypto::Hash& res, std::list<blocks_ext_by_hash::iterator>& alt_chain, bool no_blobs) {
