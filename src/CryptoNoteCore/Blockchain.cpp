@@ -1207,17 +1207,14 @@ bool Blockchain::getHashingBlob(const uint32_t height, BinaryArray& blob) {
 }
 
 bool Blockchain::checkProofOfWork(Crypto::cn_context& context, const Block& block, difficulty_type currentDiffic, Crypto::Hash& proofOfWork) {
-  if (block.majorVersion < CryptoNote::BLOCK_MAJOR_VERSION_5) {
+  if (block.majorVersion < CryptoNote::BLOCK_MAJOR_VERSION_5)
     return m_currency.checkProofOfWork(context, block, currentDiffic, proofOfWork);
-  }
-
-  if (!get_block_long_hash(context, block, proofOfWork)) {
+  
+  if (!get_block_long_hash(context, block, proofOfWork))
     return false;
-  }
 
-  if (!check_hash(proofOfWork, currentDiffic)) {
+  if (!check_hash(proofOfWork, currentDiffic))
 	  return false;
-  }
 
   return true;
 }
