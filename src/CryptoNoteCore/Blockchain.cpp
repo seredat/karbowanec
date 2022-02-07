@@ -589,6 +589,7 @@ void Blockchain::rebuildCache() {
   m_outputs.clear();
   m_multisignatureOutputs.clear();
   m_blobs.clear();
+  m_blobs.reserve(m_blocks.size());
   for (uint32_t b = 0; b < m_blocks.size(); ++b) {
     if (b % 1000 == 0) {
       logger(INFO, BRIGHT_WHITE) << "Height " << b << " of " << m_blocks.size();
