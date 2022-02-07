@@ -46,7 +46,7 @@ namespace CryptoNote {
 
   class Core : public ICore, public IMinerHandler, public IBlockchainStorageObserver, public ITxPoolObserver {
    public:
-     Core(const Currency& currency, i_cryptonote_protocol* pprotocol, Logging::ILogger& logger, System::Dispatcher& dispatcher, bool blockchainIndexesEnabled, bool allowDeepReorg = false);
+     Core(const Currency& currency, i_cryptonote_protocol* pprotocol, Logging::ILogger& logger, System::Dispatcher& dispatcher, bool blockchainIndexesEnabled, bool allowDeepReorg = false, bool noBlobs = false);
      ~Core();
 
      bool on_idle() override;
@@ -59,7 +59,7 @@ namespace CryptoNote {
      //-------------------- IMinerHandler -----------------------
      virtual bool handle_block_found(Block& b) override;
      virtual bool get_block_template(Block& b, const AccountKeys& acc, difficulty_type& diffic, uint32_t& height, const BinaryArray& ex_nonce) override;
-     virtual bool get_block_long_hash(Crypto::cn_context &context, const Block& b, Crypto::Hash& res) override;
+     virtual bool getBlockLongHash(Crypto::cn_context &context, const Block& b, Crypto::Hash& res) override;
 
      bool addObserver(ICoreObserver* observer) override;
      bool removeObserver(ICoreObserver* observer) override;

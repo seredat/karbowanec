@@ -58,7 +58,7 @@ namespace CryptoNote {
   using CryptoNote::BlockInfo;
   class Blockchain : public CryptoNote::ITransactionValidator {
   public:
-    Blockchain(const Currency& currency, tx_memory_pool& tx_pool, Logging::ILogger& logger, bool blockchainIndexesEnabled, bool allowDeepReorg);
+    Blockchain(const Currency& currency, tx_memory_pool& tx_pool, Logging::ILogger& logger, bool blockchainIndexesEnabled, bool allowDeepReorg, bool noBlobs);
 
     bool addObserver(IBlockchainStorageObserver* observer);
     bool removeObserver(IBlockchainStorageObserver* observer);
@@ -215,7 +215,7 @@ namespace CryptoNote {
     bool storeCache();
 
     bool checkProofOfWork(Crypto::cn_context& context, const Block& block, difficulty_type currentDiffic, Crypto::Hash& proofOfWork);
-    bool get_block_long_hash(Crypto::cn_context &context, const Block& b, Crypto::Hash& res);
+    bool getBlockLongHash(Crypto::cn_context &context, const Block& b, Crypto::Hash& res);
 
   private:
 
@@ -304,6 +304,8 @@ namespace CryptoNote {
     GeneratedTransactionsIndex m_generatedTransactionsIndex;
     OrphanBlocksIndex m_orphanBlocksIndex;
     bool m_blockchainIndexesEnabled;
+    bool m_allowDeepReorg;
+    bool m_no_blobs;
 
     IntrusiveLinkedList<MessageQueue<BlockchainMessage>> m_messageQueueList;
 
@@ -311,6 +313,8 @@ namespace CryptoNote {
 
     bool switch_to_alternative_blockchain(std::list<blocks_ext_by_hash::iterator>& alt_chain, bool discard_disconnected_chain);
     bool handle_alternative_block(const Block& b, const Crypto::Hash& id, block_verification_context& bvc, bool sendNewAlternativeBlockMessage = true);
+    bool checkProofOfWork(Crypto::cn_context& context, const Block& block, difficulty_type currentDiffic, Crypto::Hash& proofOfWork, std::list<blocks_ext_by_hash::iterator>& alt_chain, bool no_blobs = false);
+    bool getBlockLongHash(Crypto::cn_context& context, const Block& b, Crypto::Hash& res, std::list<blocks_ext_by_hash::iterator>& alt_chain, bool no_blobs = false);
     bool prevalidate_miner_transaction(const Block& b, uint32_t height);
     bool validate_miner_transaction(const Block& b, uint32_t height, size_t cumulativeBlockSize, uint64_t alreadyGeneratedCoins, uint64_t fee, uint64_t& reward, int64_t& emissionChange);
     bool validate_block_signature(const Block& b, const Crypto::Hash& id, uint32_t height);

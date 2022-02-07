@@ -343,7 +343,7 @@ private:
 };
 
 
-Blockchain::Blockchain(const Currency& currency, tx_memory_pool& tx_pool, ILogger& logger, bool blockchainIndexesEnabled, bool allowDeepReorg) :
+Blockchain::Blockchain(const Currency& currency, tx_memory_pool& tx_pool, ILogger& logger, bool blockchainIndexesEnabled, bool allowDeepReorg, bool noBlobs) :
 logger(logger, "Blockchain"),
 m_currency(currency),
 m_tx_pool(tx_pool),
@@ -357,7 +357,10 @@ m_paymentIdIndex(blockchainIndexesEnabled),
 m_timestampIndex(blockchainIndexesEnabled),
 m_generatedTransactionsIndex(blockchainIndexesEnabled),
 m_orphanBlocksIndex(blockchainIndexesEnabled),
-m_blockchainIndexesEnabled(blockchainIndexesEnabled) {
+m_blockchainIndexesEnabled(blockchainIndexesEnabled),
+m_allowDeepReorg(allowDeepReorg),
+m_no_blobs(noBlobs)
+{
 }
 
 bool Blockchain::addObserver(IBlockchainStorageObserver* observer) {
@@ -1200,38 +1203,44 @@ uint64_t Blockchain::getCurrentCumulativeBlocksizeLimit() {
   return m_current_block_cumul_sz_limit;
 }
 
-bool Blockchain::checkProofOfWork(Crypto::cn_context& context, const Block& block, difficulty_type currentDiffic, Crypto::Hash& proofOfWork) {
-  if (block.majorVersion < CryptoNote::BLOCK_MAJOR_VERSION_5) {
-    return m_currency.checkProofOfWork(context, block, currentDiffic, proofOfWork);
-  }
-
-  if (!get_block_long_hash(context, block, proofOfWork)) {
-    return false;
-  }
-
-  if (!check_hash(proofOfWork, currentDiffic)) {
-	  return false;
-  }
-
-  return true;
-}
-
 bool Blockchain::getHashingBlob(const uint32_t height, BinaryArray& blob) {
   blob = m_blobs[height];
 
   return true;
 }
 
-bool Blockchain::get_block_long_hash(Crypto::cn_context &context, const Block& b, Crypto::Hash& res) {
-  if (b.majorVersion < CryptoNote::BLOCK_MAJOR_VERSION_5) {
+bool Blockchain::checkProofOfWork(Crypto::cn_context& context, const Block& block, difficulty_type currentDiffic, Crypto::Hash& proofOfWork) {
+  std::list<blocks_ext_by_hash::iterator> dummy_alt_chain;
+
+  return checkProofOfWork(context, block, currentDiffic, proofOfWork, dummy_alt_chain, m_no_blobs);
+}
+
+bool Blockchain::checkProofOfWork(Crypto::cn_context& context, const Block& block, difficulty_type currentDiffic, Crypto::Hash& proofOfWork, std::list<blocks_ext_by_hash::iterator>& alt_chain, bool no_blobs) {
+  if (block.majorVersion < CryptoNote::BLOCK_MAJOR_VERSION_5)
+    return m_currency.checkProofOfWork(context, block, currentDiffic, proofOfWork);
+
+  if (!getBlockLongHash(context, block, proofOfWork, alt_chain, no_blobs))
+    return false;
+
+  if (!check_hash(proofOfWork, currentDiffic))
+    return false;
+
+  return true;
+}
+
+bool Blockchain::getBlockLongHash(Crypto::cn_context& context, const Block& b, Crypto::Hash& res) {
+  std::list<blocks_ext_by_hash::iterator> dummy_alt_chain;
+
+  return getBlockLongHash(context, b, res, dummy_alt_chain, false);
+}
+
+bool Blockchain::getBlockLongHash(Crypto::cn_context& context, const Block& b, Crypto::Hash& res, std::list<blocks_ext_by_hash::iterator>& alt_chain, bool no_blobs) {
+  if (b.majorVersion < CryptoNote::BLOCK_MAJOR_VERSION_5)
     return get_block_longhash(context, b, res);
-  }
 
   BinaryArray pot;
-  if (!get_signed_block_hashing_blob(b, pot)) {
-    logger(ERROR, BRIGHT_RED) << "Failed to get_block_hashing_blob in get_block_long_hash";
+  if (!get_signed_block_hashing_blob(b, pot))
     return false;
-  }
 
   Crypto::Hash hash_1, hash_2;
   uint32_t currentHeight = boost::get<BaseInput>(b.baseTransaction.inputs[0]).blockIndex;
@@ -1243,9 +1252,9 @@ bool Blockchain::get_block_long_hash(Crypto::cn_context &context, const Block& b
 
     for (uint8_t j = 1; j <= 8; j++) {
       uint8_t chunk[4] = {
-        hash_1.data[j * 4 - 4], 
-        hash_1.data[j * 4 - 3], 
-        hash_1.data[j * 4 - 2], 
+        hash_1.data[j * 4 - 4],
+        hash_1.data[j * 4 - 3],
+        hash_1.data[j * 4 - 2],
         hash_1.data[j * 4 - 1]
       };
 
@@ -1255,15 +1264,35 @@ bool Blockchain::get_block_long_hash(Crypto::cn_context &context, const Block& b
                    (chunk[3]);
 
       uint32_t height_j = n % maxHeight;
-      BinaryArray &ba = m_blobs[height_j];
-      pot.insert(std::end(pot), std::begin(ba), std::end(ba));
+      bool found_alt = false;
+      for (auto alt_ch_iter = alt_chain.begin(); alt_ch_iter != alt_chain.end() && !found_alt; alt_ch_iter++) {
+        auto &ch_ent = *alt_ch_iter;
+        Block b = ch_ent->second.bl;
+        uint32_t ah = boost::get<BaseInput>(b.baseTransaction.inputs[0]).blockIndex;
+        if (ah == height_j) {
+          BinaryArray ba;
+          if (!get_block_hashing_blob(b, ba)) return false;
+          pot.insert(std::end(pot), std::begin(ba), std::end(ba));
+          found_alt = true;
+        }
+      }
+      if (!found_alt) {
+        if (no_blobs || m_allowDeepReorg) {
+          std::lock_guard<decltype(m_blockchain_lock)> lk(m_blockchain_lock);
+          const Block& bj = m_blocks[height_j].bl;
+          BinaryArray ba;
+          if (!get_block_hashing_blob(bj, ba)) return false;
+          pot.insert(std::end(pot), std::begin(ba), std::end(ba));
+        } else {
+          BinaryArray& ba = m_blobs[height_j];
+          pot.insert(std::end(pot), std::begin(ba), std::end(ba));
+        }
+      }
     }
   }
 
-  if (!Crypto::y_slow_hash(pot.data(), pot.size(), hash_1, hash_2)) {
-    logger(Logging::ERROR, Logging::BRIGHT_RED) << "Error getting Yespower hash";
+  if (!Crypto::y_slow_hash(pot.data(), pot.size(), hash_1, hash_2))
     return false;
-  }
 
   res = hash_2;
 
@@ -1404,7 +1433,7 @@ bool Blockchain::handle_alternative_block(const Block& b, const Crypto::Hash& id
     if (!(current_diff)) { logger(ERROR, BRIGHT_RED) << "!!!!!!! DIFFICULTY OVERHEAD !!!!!!!"; return false; }
     Crypto::Hash proof_of_work = NULL_HASH;
     // Always check PoW for alternative blocks
-    if (!checkProofOfWork(m_cn_context, bei.bl, current_diff, proof_of_work)) {
+    if (!checkProofOfWork(m_cn_context, bei.bl, current_diff, proof_of_work, alt_chain, true)) {
       logger(INFO, BRIGHT_RED) <<
         "Block with id: " << Common::podToHex(id)
         << ENDL << " for alternative chain, has not enough proof of work: " << proof_of_work
@@ -1472,7 +1501,7 @@ bool Blockchain::handle_alternative_block(const Block& b, const Crypto::Hash& id
     } else {
       logger(INFO, BRIGHT_BLUE) <<
         "----- BLOCK ADDED AS ALTERNATIVE ON HEIGHT " << bei.height
-        << ENDL << "id:\t" << id
+        << ENDL << "id:\t\t" << id
         << ENDL << "PoW:\t" << proof_of_work
         << ENDL << "difficulty:\t" << current_diff;
       if (sendNewAlternativeBlockMessage) {
