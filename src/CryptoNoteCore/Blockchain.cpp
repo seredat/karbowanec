@@ -1501,7 +1501,7 @@ bool Blockchain::handle_alternative_block(const Block& b, const Crypto::Hash& id
     } else {
       logger(INFO, BRIGHT_BLUE) <<
         "----- BLOCK ADDED AS ALTERNATIVE ON HEIGHT " << bei.height
-        << ENDL << "id:\t" << id
+        << ENDL << "id:\t\t" << id
         << ENDL << "PoW:\t" << proof_of_work
         << ENDL << "difficulty:\t" << current_diff;
       if (sendNewAlternativeBlockMessage) {
