@@ -59,7 +59,6 @@ bool Checkpoints::add_checkpoint(uint32_t height, const std::string &hash_str) {
     return false;
   }
 
-  m_points[height] = h;
   return true;
 }
 //---------------------------------------------------------------------------
