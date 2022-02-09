@@ -47,6 +47,12 @@
 #define INIT_SIZE_BLK   8
 #define INIT_SIZE_BYTE (INIT_SIZE_BLK * AES_BLOCK_SIZE)
 
+#if defined(_MSC_VER)
+#define THREADV __declspec(thread)
+#else
+#define THREADV __thread
+#endif
+
 #pragma pack(push, 1)
 union cn_slow_hash_state
 {
@@ -149,12 +155,6 @@ union cn_slow_hash_state
   a[0] ^= b[0]; a[1] ^= b[1]; \
   _b = _c; \
 
-#if defined(_MSC_VER)
-#define THREADV __declspec(thread)
-#else
-#define THREADV __thread
-#endif
-
 THREADV uint8_t *hp_state = NULL;
 THREADV int hp_allocated = 0;
 
@@ -174,6 +174,15 @@ void cpuid(int CPUInfo[4], int InfoType)
         );
 }
 #endif
+
+STATIC INLINE void aligned_free(void* ptr)
+{
+#ifdef _MSC_VER
+    _aligned_free(ptr);
+#else
+    free(ptr);
+#endif
+}
 
 /**
  * @brief a = (a xor b), where a and b point to 128 bit values
@@ -544,7 +553,7 @@ void cn_slow_hash(const void *data, size_t length, char *hash)
 	// hp_state is supposed to be managed externally with respect to the 2MB scratchpad reusage logic.
 	// However, if it is not managed, it needs to be locally allocated/freed.
     int bLocalStateAllocation = (hp_state == NULL);
-	if (bLocalStateAllocation)
+    if (bLocalStateAllocation)
         slow_hash_allocate_state();
 
     /* CryptoNight Step 1:  Use Keccak1600 to initialize the 'state' (and 'text') buffers from the data. */
@@ -649,11 +658,49 @@ void cn_slow_hash(const void *data, size_t length, char *hash)
     hash_permutation(&state.hs);
     extra_hashes[state.hs.b[0] & 3](&state, 200, hash);
 
-	if (bLocalStateAllocation)
-		slow_hash_free_state();
+    if (bLocalStateAllocation)
+        slow_hash_free_state();
 }
 
 #elif !defined NO_AES && (defined(__arm__) || defined(__aarch64__))
+#ifdef __aarch64__
+#include <sys/mman.h>
+THREADV uint8_t *hp_state = NULL;
+THREADV int hp_malloced = 0;
+
+void slow_hash_allocate_state(void)
+{
+    if(hp_state != NULL)
+        return;
+
+#ifndef	MAP_HUGETLB
+#define	MAP_HUGETLB	0
+#endif
+    hp_state = mmap(0, MEMORY, PROT_READ | PROT_WRITE,
+                    MAP_PRIVATE | MAP_ANON | MAP_HUGETLB, -1, 0);
+
+    if(hp_state == MAP_FAILED)
+        hp_state = NULL;
+    if(hp_state == NULL)
+    {
+        hp_malloced = 1;
+        hp_state = (uint8_t *) malloc(MEMORY);
+    }
+}
+
+void slow_hash_free_state(void)
+{
+    if(hp_state == NULL)
+        return;
+
+    if (hp_malloced)
+        free(hp_state);
+    else
+        munmap(hp_state, MEMORY);
+    hp_state = NULL;
+    hp_malloced = 0;
+}
+#else
 void slow_hash_allocate_state(void)
 {
   // Do nothing, this is just to maintain compatibility with the upgraded slow-hash.c
@@ -665,6 +712,7 @@ void slow_hash_free_state(void)
   // As above
   return;
 }
+#endif
 
 #if defined(__GNUC__)
 #define RDATA_ALIGN16 __attribute__ ((aligned(16)))
@@ -775,7 +823,6 @@ __asm__(
 STATIC INLINE void aes_pseudo_round(const uint8_t *in, uint8_t *out, const uint8_t *expandedKey, int nblocks)
 {
 	const uint8x16_t *k = (const uint8x16_t *)expandedKey, zero = {0};
-	uint8x16_t tmp;
 	int i;
 
 	for (i=0; i<nblocks; i++)
@@ -810,7 +857,6 @@ STATIC INLINE void aes_pseudo_round_xor(const uint8_t *in, uint8_t *out, const u
 {
 	const uint8x16_t *k = (const uint8x16_t *)expandedKey;
 	const uint8x16_t *x = (const uint8x16_t *)xor;
-	uint8x16_t tmp;
 	int i;
 
 	for (i=0; i<nblocks; i++)
@@ -839,15 +885,6 @@ STATIC INLINE void aes_pseudo_round_xor(const uint8_t *in, uint8_t *out, const u
 		tmp = veorq_u8(tmp,  k[9]);
 		vst1q_u8(out + i * AES_BLOCK_SIZE, tmp);
 	}
-}
-
-STATIC INLINE void aligned_free(void* ptr)
-{
-#ifdef _MSC_VER
-    _aligned_free(ptr);
-#else
-    free(ptr);
-#endif
 }
 
 void cn_slow_hash(const void *data, size_t length, char *hash)
