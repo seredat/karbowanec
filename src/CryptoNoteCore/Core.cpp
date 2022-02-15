@@ -1050,7 +1050,7 @@ bool Core::queryBlocksLite(const std::vector<Crypto::Hash>& knownBlockIds, uint6
       std::list<Crypto::Hash> missedTxs;
       lbs->getTransactions(b.transactionHashes, txs, missedTxs);
 
-      b.majorVersion = BLOCK_MAJOR_VERSION_4; // dirty hack: make it backward compatible with old wallets, i.e. serialize without signature
+      b.majorVersion = BLOCK_MAJOR_VERSION_4; // Workaround backward compatible with old wallets, i.e. serialize without signature
 
       item.block = asString(toBinaryArray(b));
 
