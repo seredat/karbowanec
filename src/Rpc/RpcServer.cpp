@@ -635,12 +635,11 @@ bool RpcServer::on_get_random_outs_json(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR
     return true;
   }
 
-  std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount> outs = bin.outs;
-  res.outs.reserve(outs.size());
+  res.outs.reserve(bin.outs.size());
   for (size_t i = 0; i < bin.outs.size(); ++i) {
     COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_JSON::outs_for_amount out;
     out.amount = bin.outs[i].amount;
-    for (auto& o : outs[i].outs) {
+    for (auto& o : bin.outs[i].outs) {
       out.outs.push_back(static_cast<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_JSON::out_entry&>(o));
     }
     res.outs.push_back(out);
