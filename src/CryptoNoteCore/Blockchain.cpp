@@ -789,7 +789,7 @@ difficulty_type Blockchain::getDifficultyForNextBlock(const Crypto::Hash &prevHa
 
   uint32_t height = static_cast<uint32_t>(m_blocks.size());
   uint8_t BlockMajorVersion = getBlockMajorVersionForHeight(height);
-  uint32_t difficultyBlocksCount = std::min<uint32_t>(std::max<uint32_t>(height - 1, 1), m_currency.difficultyBlocksCountByBlockVersion(BlockMajorVersion));
+  uint32_t difficultyBlocksCount = std::min<uint32_t>(std::max<uint32_t>(height - 1, 1), static_cast<uint32_t>(m_currency.difficultyBlocksCountByBlockVersion(BlockMajorVersion)));
   uint32_t processed = 0;
 
   Crypto::Hash h = prevHash;
@@ -1254,7 +1254,7 @@ bool Blockchain::getBlockLongHash(Crypto::cn_context& context, const Block& b, C
 
   Crypto::Hash hash_1, hash_2;
   uint32_t currentHeight = boost::get<BaseInput>(b.baseTransaction.inputs[0]).blockIndex;
-  uint32_t maxHeight = std::min<uint32_t>(getCurrentBlockchainHeight() - 1, currentHeight - 1 - m_currency.minedMoneyUnlockWindow());
+  uint32_t maxHeight = std::min<uint32_t>(getCurrentBlockchainHeight() - 1, currentHeight - 1 - static_cast<uint32_t>(m_currency.minedMoneyUnlockWindow()));
 
 #define ITER 128
   for (uint32_t i = 0; i < ITER; i++) {

@@ -34,6 +34,8 @@
 // limitations under the License.
 // ---------------------------------------------------------------------------
 
+#define PHMAP_BIDIRECTIONAL 0
+
 #ifdef _MSC_VER
     #pragma warning(push)  
 

@@ -276,7 +276,6 @@ namespace CryptoNote
     std::vector<NetworkAddress> m_exclusive_peers;
     std::vector<NetworkAddress> m_seed_nodes;
     std::vector<PeerlistEntry> m_command_line_peers;
-    uint64_t m_peer_livetime;
     boost::uuids::uuid m_network_id;
     std::map<uint32_t, time_t> m_blocked_hosts;
     std::map<uint32_t, uint64_t> m_host_fails_score;
