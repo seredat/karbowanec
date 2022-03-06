@@ -1,7 +1,7 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2014-2016, XDN developers
 // Copyright (c) 2014-2017, The Monero Project
-// Copyright (c) 2016-2020, The Karbo developers
+// Copyright (c) 2016-2022, The Karbo developers
 //
 // All rights reserved.
 // 
@@ -99,13 +99,13 @@ namespace CryptoNote
     bool close_wallet();
 
     bool help(const std::vector<std::string> &args = std::vector<std::string>());
-    bool seed(const std::vector<std::string> &args = std::vector<std::string>());
     bool exit(const std::vector<std::string> &args);
     bool start_mining(const std::vector<std::string> &args);
     bool stop_mining(const std::vector<std::string> &args);
     bool show_balance(const std::vector<std::string> &args = std::vector<std::string>());
-    bool export_keys(const std::vector<std::string> &args = std::vector<std::string>());
-    bool export_tracking_key(const std::vector<std::string> &args = std::vector<std::string>());
+    bool show_keys(const std::vector<std::string> &args = std::vector<std::string>());
+    bool export_keys_to_file(const std::vector<std::string>& args = std::vector<std::string>());
+    bool show_tracking_key(const std::vector<std::string> &args = std::vector<std::string>());
     bool show_incoming_transfers(const std::vector<std::string> &args);
     bool show_outgoing_transfers(const std::vector<std::string> &args);
     bool show_payments(const std::vector<std::string> &args);
@@ -115,8 +115,7 @@ namespace CryptoNote
     bool transfer(const std::vector<std::string> &args);
     bool prepare_tx(const std::vector<std::string>& args);
     bool print_address(const std::vector<std::string> &args = std::vector<std::string>());
-    bool save_address(const std::vector<std::string> &args = std::vector<std::string>());
-    bool save_keys(const std::vector<std::string> &args = std::vector<std::string>());
+    bool save_address_to_file(const std::vector<std::string> &args = std::vector<std::string>());
     bool save(const std::vector<std::string> &args);
     bool reset(const std::vector<std::string> &args);
     bool set_log(const std::vector<std::string> &args);
@@ -129,6 +128,8 @@ namespace CryptoNote
     bool get_reserve_proof(const std::vector<std::string> &args);
     bool sign_message(const std::vector<std::string> &args);
     bool verify_message(const std::vector<std::string> &args);
+
+    std::string get_formatted_wallet_keys();
 
     void printConnectionError() const;
 
