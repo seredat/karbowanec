@@ -198,6 +198,7 @@ namespace CryptoNote
     std::string m_daemon_path;
     std::string m_daemon_cert;
     std::string m_mnemonic_seed;
+    std::string m_mnemonic_seed_file;
     std::string m_view_key;
     std::string m_spend_key;
     std::string m_wallet_file;
