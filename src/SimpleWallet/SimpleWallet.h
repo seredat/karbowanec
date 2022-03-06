@@ -198,7 +198,6 @@ namespace CryptoNote
     std::string m_daemon_path;
     std::string m_daemon_cert;
     std::string m_mnemonic_seed;
-    std::string m_mnemonic_seed_file;
     std::string m_view_key;
     std::string m_spend_key;
     std::string m_wallet_file;
@@ -207,6 +206,7 @@ namespace CryptoNote
     bool m_daemon_ssl;
     bool m_daemon_no_verify;
     bool m_do_not_relay_tx;
+    bool m_dump_keys_file;
     
     std::unique_ptr<std::promise<std::error_code>> m_initResultPromise;
 
