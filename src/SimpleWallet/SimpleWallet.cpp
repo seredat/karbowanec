@@ -122,6 +122,7 @@ const command_line::arg_descriptor<bool> arg_dump_keys_file = { "export-keys", "
 const command_line::arg_descriptor<std::string> arg_view_secret_key = { "view-key", "Specify view secret key for wallet recovery", "" };
 const command_line::arg_descriptor<std::string> arg_spend_secret_key = { "spend-key", "Specify spend secret key for wallet recovery", "" };
 const command_line::arg_descriptor<bool> arg_restore_wallet = { "restore", "Recover wallet using electrum-style mnemonic or raw keys", false };
+const command_line::arg_descriptor<bool> arg_non_deterministic = { "non-deterministic", "Creates non-deterministic (independent) view and spend keys", false };
 const command_line::arg_descriptor<uint16_t> arg_daemon_port = { "daemon-port", "Use daemon instance at port <arg> instead of 32348", 0 };
 const command_line::arg_descriptor<std::string> arg_log_file = {"log-file", "Set the log file location", ""};
 const command_line::arg_descriptor<uint32_t> arg_log_level = { "log-level", "Set the log verbosity level", INFO, true };
@@ -951,8 +952,20 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     return false;
   }
 
-  if (!m_generate_new.empty() && command_line::has_arg(vm, arg_restore_wallet)) {
+  if (!m_generate_new.empty() && m_restore_wallet) {
     fail_msg_writer() << "You can't generate new and restore wallet simultaneously.";
+    return false;
+  }
+
+  if (m_restore_wallet && m_non_deterministic)
+  {
+    fail_msg_writer() << "Cannot specify both --restore and --non-deterministic";
+    return false;
+  }
+
+  if (!m_mnemonic_seed_file.empty() && m_non_deterministic)
+  {
+    fail_msg_writer() << "Cannot specify both --mnemonic-file and --non-deterministic";
     return false;
   }
 
@@ -1036,11 +1049,11 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     std::cout << WarningMsg(feemsg.str()) << std::endl;
   }
 
-  if (command_line::has_arg(vm, arg_restore_wallet) && m_wallet_file_arg.empty()) {
+  if (m_restore_wallet && m_wallet_file_arg.empty()) {
     fail_msg_writer() << "Specify a wallet file name with the '--wallet-file <filename>' parameter";
     return false;
   }
-  else if (command_line::has_arg(vm, arg_restore_wallet) && !m_wallet_file_arg.empty()) {
+  else if (m_restore_wallet && !m_wallet_file_arg.empty()) {
     std::string walletFileName, ignoredString;
     WalletHelper::prepareFileNames(m_wallet_file_arg, ignoredString, walletFileName);
     boost::system::error_code ignore;
@@ -1167,9 +1180,9 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
       return false;
     }
 
-    if (!new_wallet(walletFileName, pwd_container.password()))
+    if (!new_wallet(walletFileName, pwd_container.password(), m_non_deterministic))
     {
-      logger(ERROR, BRIGHT_RED) << "account creation failed";
+      logger(ERROR, BRIGHT_RED) << "Account creation failed";
       return false;
     }
 
@@ -1406,6 +1419,8 @@ void simple_wallet::handle_command_line(const boost::program_options::variables_
   m_daemon_port                  = command_line::get_arg(vm, arg_daemon_port);
   m_daemon_cert                  = command_line::get_arg(vm, arg_daemon_cert);
   m_daemon_no_verify             = command_line::get_arg(vm, arg_daemon_no_verify);
+  m_restore_wallet               = command_line::get_arg(vm, arg_restore_wallet);
+  m_non_deterministic            = command_line::get_arg(vm, arg_non_deterministic);
   m_mnemonic_seed                = command_line::get_arg(vm, arg_mnemonic_seed);
   m_dump_keys_file               = command_line::get_arg(vm, arg_dump_keys_file);
   m_mnemonic_seed_file           = command_line::get_arg(vm, arg_mnemonic_seed_file);
@@ -1415,7 +1430,7 @@ void simple_wallet::handle_command_line(const boost::program_options::variables_
 }
 
 //----------------------------------------------------------------------------------------------------
-bool simple_wallet::new_wallet(const std::string &wallet_file, const std::string& password)
+bool simple_wallet::new_wallet(const std::string &wallet_file, const std::string& password, bool two_random)
 {
   m_wallet_file = wallet_file;
 
@@ -1427,9 +1442,12 @@ bool simple_wallet::new_wallet(const std::string &wallet_file, const std::string
   {
     m_initResultPromise.reset(new std::promise<std::error_code>());
     std::future<std::error_code> f_initError = m_initResultPromise->get_future();
-    // m_wallet->initAndGenerateNonDeterministic(password);
-    // Create deterministic wallets by default
-    m_wallet->initAndGenerateDeterministic(password);
+    if (two_random) {
+      m_wallet->initAndGenerateNonDeterministic(password);
+    }
+    else {
+      m_wallet->initAndGenerateDeterministic(password);
+    }
     auto initError = f_initError.get();
     m_initResultPromise.reset(nullptr);
     if (initError)
@@ -1459,15 +1477,11 @@ bool simple_wallet::new_wallet(const std::string &wallet_file, const std::string
   AccountKeys keys;
   m_wallet->getAccountKeys(keys);
 
-  logger(INFO, BRIGHT_WHITE) <<
-    "Generated new wallet: " << m_wallet->getAddress() << std::endl <<
-    "view key: " << Common::podToHex(keys.viewSecretKey);
-
-  // convert rng value to electrum-style word list
-  std::string electrum_words;
-  Crypto::ElectrumWords::bytes_to_words(keys.spendSecretKey, electrum_words, "English");
-  seedFormater(electrum_words);
-  std::string print_electrum = "";
+  logger(INFO, BRIGHT_WHITE) << "Generated new wallet: "
+                             << m_wallet->getAddress()
+                             << std::endl
+                             << "view key: "
+                             << Common::podToHex(keys.viewSecretKey);
 
   success_msg_writer() <<
     "**********************************************************************\n" <<
@@ -1478,29 +1492,38 @@ bool simple_wallet::new_wallet(const std::string &wallet_file, const std::string
     "your wallet again. Your wallet key is NOT under risk anyway.\n" <<
     "**********************************************************************";
 
-  std::cout << "\nPLEASE NOTE: the following 25 words can be used to recover access to your wallet. " 
-            << "Please write them down and store them somewhere safe and secure. Please do not store them in your email or " 
-            << "on file storage services outside of your immediate control.\n\n";
-  std::cout << electrum_words << std::endl;
-  success_msg_writer() << "**********************************************************************";
+  if (!two_random)
+  {
+    // convert rng value to electrum-style word list
+    std::string electrum_words;
+    Crypto::ElectrumWords::bytes_to_words(keys.spendSecretKey, electrum_words, "English");
+    seedFormater(electrum_words);
+    std::string print_electrum = "";
+
+    std::cout << "\nPLEASE NOTE: the following 25 words can be used to recover access to your wallet. " <<
+      "Please write them down and store them somewhere safe and secure. Please do not store them in your email or " <<
+      "on file storage services outside of your immediate control.\n\n";
+    std::cout << electrum_words << std::endl;
+
+    if (!m_mnemonic_seed_file.empty()) {
+      boost::system::error_code ignore;
+      if (boost::filesystem::exists(m_mnemonic_seed_file, ignore)) {
+        fail_msg_writer() << "Seed file already exists: " + m_mnemonic_seed_file;
+        return true;
+      }
+      if (writeToFile(m_mnemonic_seed_file, electrum_words)) {
+        success_msg_writer() << "Wallet mnemonic seed saved to file: " + m_mnemonic_seed_file;
+      } else {
+        fail_msg_writer() << "Couldn't write wallet mnemonic seed to file: " + m_mnemonic_seed_file;
+      }
+    }
+  }
 
   if (m_dump_keys_file) {
     export_keys_to_file();
   }
 
-  if (!m_mnemonic_seed_file.empty()) {
-    boost::system::error_code ignore;
-    if (boost::filesystem::exists(m_mnemonic_seed_file, ignore)) {
-      fail_msg_writer() << "Seed file already exists: " + m_mnemonic_seed_file;
-      return true;
-    }
-    if (writeToFile(m_mnemonic_seed_file, electrum_words)) {
-      success_msg_writer() << "Wallet mnemonic seed saved to file: " + m_mnemonic_seed_file;
-    } else {
-      fail_msg_writer() << "Couldn't write wallet mnemonic seed to file: " + m_mnemonic_seed_file;
-    }
-  }
-
+  success_msg_writer() << "**********************************************************************";
   return true;
 }
 
@@ -2463,6 +2486,7 @@ int main(int argc, char* argv[]) {
   command_line::add_arg(desc_params, arg_wallet_file);
   command_line::add_arg(desc_params, arg_generate_new_wallet);
   command_line::add_arg(desc_params, arg_restore_wallet);
+  command_line::add_arg(desc_params, arg_non_deterministic);
   command_line::add_arg(desc_params, arg_mnemonic_seed);
   command_line::add_arg(desc_params, arg_mnemonic_seed_file);
   command_line::add_arg(desc_params, arg_dump_keys_file);

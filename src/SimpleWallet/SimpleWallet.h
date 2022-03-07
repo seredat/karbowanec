@@ -92,7 +92,7 @@ namespace CryptoNote
 
     void handle_command_line(const boost::program_options::variables_map& vm);
 
-    bool new_wallet(const std::string &wallet_file, const std::string& password);
+    bool new_wallet(const std::string &wallet_file, const std::string& password, bool two_random = false); // Create deterministic wallets by default
     bool new_wallet(const std::string &wallet_file, const std::string& password, const Crypto::SecretKey& spend_secret_key, const Crypto::SecretKey& view_secret_key);
     bool new_wallet(const std::string &wallet_file, const std::string& password, const AccountKeys& private_keys);
     bool new_tracking_wallet(AccountKeys &tracking_key, const std::string &wallet_file, const std::string& password);
@@ -205,6 +205,8 @@ namespace CryptoNote
     std::string m_wallet_file;
     uint16_t m_daemon_port;
     uint32_t m_scan_height;
+    bool m_restore_wallet;                // recover flag
+    bool m_non_deterministic;             // old 2-random generation
     bool m_daemon_ssl;
     bool m_daemon_no_verify;
     bool m_do_not_relay_tx;
