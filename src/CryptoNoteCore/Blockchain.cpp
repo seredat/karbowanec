@@ -201,27 +201,9 @@ public:
 
     logger(INFO) << operation << "transaction map...";
     s(m_bs.m_transactionMap, "transactions");
-    // Could this speed load/dump cause corruption???
-    /*if (s.type() == ISerializer::INPUT) {
-      phmap::BinaryInputArchive ar_in(appendPath(m_bs.m_config_folder, "transactionsmap.dat").c_str());
-      m_bs.m_transactionMap.phmap_load(ar_in);
-    }
-    else {
-      phmap::BinaryOutputArchive ar_out(appendPath(m_bs.m_config_folder, "transactionsmap.dat").c_str());
-      m_bs.m_transactionMap.phmap_dump(ar_out);
-    }*/
 
     logger(INFO) << operation << "spent keys...";
     s(m_bs.m_spent_key_images, "spent_keys");
-    // Could this speed load/dump cause corruption???
-    /*if (s.type() == ISerializer::INPUT) {
-      phmap::BinaryInputArchive ar_in(appendPath(m_bs.m_config_folder, "spentkeys.dat").c_str());
-      m_bs.m_spent_key_images.phmap_load(ar_in);
-    }
-    else {
-      phmap::BinaryOutputArchive ar_out(appendPath(m_bs.m_config_folder, "spentkeys.dat").c_str());
-      m_bs.m_spent_key_images.phmap_dump(ar_out);
-    }*/
 
     logger(INFO) << operation << "outputs...";
     s(m_bs.m_outputs, "outputs");
