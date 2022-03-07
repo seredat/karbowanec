@@ -72,7 +72,7 @@ public:
   virtual void addObserver(IWalletLegacyObserver* observer) override;
   virtual void removeObserver(IWalletLegacyObserver* observer) override;
 
-  virtual void initAndGenerate(const std::string& password) override;
+  virtual void initAndGenerateNonDeterministic(const std::string& password) override;
   virtual void initAndGenerateDeterministic(const std::string& password) override;
   virtual void initAndLoad(std::istream& source, const std::string& password) override;
   virtual void initWithKeys(const AccountKeys& accountKeys, const std::string& password) override;

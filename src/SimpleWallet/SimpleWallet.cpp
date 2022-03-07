@@ -1427,7 +1427,7 @@ bool simple_wallet::new_wallet(const std::string &wallet_file, const std::string
   {
     m_initResultPromise.reset(new std::promise<std::error_code>());
     std::future<std::error_code> f_initError = m_initResultPromise->get_future();
-    // m_wallet->initAndGenerate(password);
+    // m_wallet->initAndGenerateNonDeterministic(password);
     // Create deterministic wallets by default
     m_wallet->initAndGenerateDeterministic(password);
     auto initError = f_initError.get();
@@ -1938,15 +1938,15 @@ bool simple_wallet::export_keys_to_file(const std::vector<std::string>& args/* =
 }
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::show_tracking_key(const std::vector<std::string>& args/* = std::vector<std::string>()*/) {
-    AccountKeys keys;
-    m_wallet->getAccountKeys(keys);
-    std::string spend_public_key = Common::podToHex(keys.address.spendPublicKey);
-    keys.spendSecretKey = boost::value_initialized<Crypto::SecretKey>();
-    success_msg_writer(true) << "Tracking key: " << spend_public_key << Common::podToHex(keys.address.viewPublicKey) << Common::podToHex(keys.spendSecretKey) << Common::podToHex(keys.viewSecretKey);
-    // This will show Tracking Key in style of Private Key Backup or Paperwallet, to prevent confusing we use above style of Bytecoin like tracking keys
-    // success_msg_writer(true) << "Tracking key: " << Tools::Base58::encode_addr(parameters::CRYPTONOTE_PUBLIC_ADDRESS_BASE58_PREFIX, std::string(reinterpret_cast<char*>(&keys), sizeof(keys)));
+  AccountKeys keys;
+  m_wallet->getAccountKeys(keys);
+  std::string spend_public_key = Common::podToHex(keys.address.spendPublicKey);
+  keys.spendSecretKey = boost::value_initialized<Crypto::SecretKey>();
+  success_msg_writer(true) << "Tracking key: " << spend_public_key << Common::podToHex(keys.address.viewPublicKey) << Common::podToHex(keys.spendSecretKey) << Common::podToHex(keys.viewSecretKey);
+  // This will show Tracking Key in style of Private Key Backup or Paperwallet, to prevent confusing we use above style of Bytecoin like tracking keys
+  // success_msg_writer(true) << "Tracking key: " << Tools::Base58::encode_addr(parameters::CRYPTONOTE_PUBLIC_ADDRESS_BASE58_PREFIX, std::string(reinterpret_cast<char*>(&keys), sizeof(keys)));
 
-    return true;
+  return true;
 }
 //---------------------------------------------------------------------------------------------------- 
 bool simple_wallet::show_balance(const std::vector<std::string>& args/* = std::vector<std::string>()*/) {
