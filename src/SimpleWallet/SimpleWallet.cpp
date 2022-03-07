@@ -177,6 +177,32 @@ void seedFormater(std::string& seed){
   }
 }
 
+void seedLoader(const char *seed_file, std::string& seed) {
+  bool sub_space = false;
+  unsigned int word_n = 0;
+  std::string seed_buffer;
+  seed.clear();
+  FILE *fd;
+  int sub = 0;
+  fd = fopen(seed_file, "r");
+  if (fd != NULL) {
+    while(true) {
+      sub = getc(fd);
+      if (sub == EOF) break;
+      if (sub != 0x20 && sub != 0x0A) {
+        seed_buffer += (char) sub;
+        sub_space = false;
+      } else {
+        if (!sub_space && !seed_buffer.empty()) { seed_buffer += ' '; word_n++; sub_space = true; };
+      }
+    }
+    fclose(fd);
+    seed_buffer.resize(seed_buffer.length() - 1);
+    seed_buffer += (char) 0x00;
+    seed = seed_buffer;
+  }
+}
+
 inline std::string interpret_rpc_response(bool ok, const std::string& status) {
   std::string err;
   if (ok) {
@@ -1028,7 +1054,8 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
       return false;
     }
 
-    if (!m_mnemonic_seed.empty() && m_view_key.empty() && m_spend_key.empty()) {
+    if ((!m_mnemonic_seed.empty() || !m_mnemonic_seed_file.empty()) && m_view_key.empty() && m_spend_key.empty()) {
+      if (!m_mnemonic_seed_file.empty()) seedLoader(m_mnemonic_seed_file.c_str(), m_mnemonic_seed);
       Crypto::SecretKey private_spend_key;
       std::string languageName;
       if (!Crypto::ElectrumWords::words_to_bytes(m_mnemonic_seed, private_spend_key, languageName)) {
