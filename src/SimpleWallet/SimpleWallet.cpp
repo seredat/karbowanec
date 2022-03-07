@@ -1054,8 +1054,11 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
       return false;
     }
 
-    if ((!m_mnemonic_seed.empty() || !m_mnemonic_seed_file.empty()) && m_view_key.empty() && m_spend_key.empty()) {
-      if (!m_mnemonic_seed_file.empty()) seedLoader(m_mnemonic_seed_file.c_str(), m_mnemonic_seed);
+    if (!m_mnemonic_seed_file.empty() && m_view_key.empty() && m_spend_key.empty()) {
+      seedLoader(m_mnemonic_seed_file.c_str(), m_mnemonic_seed);
+    }
+
+    if (!m_mnemonic_seed.empty() && m_view_key.empty() && m_spend_key.empty()) {     
       Crypto::SecretKey private_spend_key;
       std::string languageName;
       if (!Crypto::ElectrumWords::words_to_bytes(m_mnemonic_seed, private_spend_key, languageName)) {
