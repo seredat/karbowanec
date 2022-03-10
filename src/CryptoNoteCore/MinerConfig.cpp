@@ -28,6 +28,7 @@ const command_line::arg_descriptor<std::string> arg_mining_spend_key = { "mining
 const command_line::arg_descriptor<std::string> arg_mining_view_key  = { "mining-view-key", "Specify secret view key of miner address", "", true };
 const command_line::arg_descriptor<uint32_t>    arg_mining_threads   = { "mining-threads", "Specify mining threads count", 0, true };
 const command_line::arg_descriptor<bool>        arg_print_hashrate   = { "print-hashrate", "Show hashrate", true };
+const command_line::arg_descriptor<bool>        arg_log_hashrate     = { "log-hashrate", "Log hashrate", true };
 }
 
 MinerConfig::MinerConfig() {
@@ -40,6 +41,7 @@ void MinerConfig::initOptions(boost::program_options::options_description& desc)
   command_line::add_arg(desc, arg_mining_view_key);
   command_line::add_arg(desc, arg_mining_threads);
   command_line::add_arg(desc, arg_print_hashrate);
+  command_line::add_arg(desc, arg_log_hashrate);
 }
 
 void MinerConfig::init(const boost::program_options::variables_map& options) {
@@ -61,6 +63,10 @@ void MinerConfig::init(const boost::program_options::variables_map& options) {
 
   if (command_line::has_arg(options, arg_print_hashrate)) {
     printHashrate = true;
+  }
+  
+  if (command_line::has_arg(options, arg_log_hashrate)) {
+    logHashrate = true;
   }
 }
 

@@ -59,7 +59,7 @@ namespace CryptoNote {
   private:
     bool worker_thread(uint32_t th_local_index);
     bool request_block_template();
-    void merge_hr();
+    void merge_hr(bool do_log = false);
 
     struct miner_config
     {
@@ -89,6 +89,7 @@ namespace CryptoNote {
     AccountKeys m_mine_account;
     OnceInInterval m_update_block_template_interval;
     OnceInInterval m_update_merge_hr_interval;
+    OnceInInterval m_update_log_hr_interval;
 
     std::vector<BinaryArray> m_extra_messages;
     miner_config m_config;
@@ -99,6 +100,7 @@ namespace CryptoNote {
     std::mutex m_last_hash_rates_lock;
     std::list<uint64_t> m_last_hash_rates;
     bool m_do_print_hashrate;
+    bool m_do_log_hashrate;
     bool m_do_mining;
   };
 }
