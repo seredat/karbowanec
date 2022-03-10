@@ -222,7 +222,6 @@ namespace CryptoNote {
      std::string m_config_folder;
      cryptonote_protocol_stub m_protocol_stub;
      friend class tx_validate_inputs;
-     std::atomic<bool> m_starter_message_showed;
      Tools::ObserverManager<ICoreObserver> m_observerManager;
      time_t start_time;
    };

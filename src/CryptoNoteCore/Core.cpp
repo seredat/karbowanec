@@ -76,7 +76,6 @@ Core::Core(const Currency& currency, i_cryptonote_protocol* pprotocol, Logging::
   m_mempool(currency, m_blockchain, *this, m_timeProvider, logger, blockchainIndexesEnabled),
   m_blockchain(currency, m_mempool, logger, blockchainIndexesEnabled, allowDeepReorg, noBlobs),
   m_miner(new miner(currency, *this, logger)),
-  m_starter_message_showed(false),
   m_checkpoints(logger, allowDeepReorg) {
     set_cryptonote_protocol(pprotocol);
     m_blockchain.addObserver(this);
@@ -880,19 +879,6 @@ bool Core::update_miner_block_template() {
 }
 
 bool Core::on_idle() {
-  if (!m_starter_message_showed) {
-    std::cout << ENDL << "**********************************************************************" << ENDL
-      << "The daemon will start synchronizing with the network. It may take up to several hours." << ENDL
-      << ENDL
-      << "You can set the level of process detailization* through \"set_log <level>\" command*, where <level> is between 0 (no details) and 4 (very verbose)." << ENDL
-      << ENDL
-      << "Use \"help\" command to see the list of available commands." << ENDL
-      << ENDL
-      << "Note: in case you need to interrupt the process, use \"exit\" command. Otherwise, the current progress won't be saved." << ENDL
-      << "**********************************************************************" << ENDL;
-    m_starter_message_showed = true;
-  }
-
   m_miner->on_idle();
   m_mempool.on_idle();
   return true;

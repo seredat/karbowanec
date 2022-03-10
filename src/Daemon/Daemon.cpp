@@ -430,6 +430,20 @@ int main(int argc, char* argv[])
     }
     logger(INFO) << "Core rpc server started ok";
 
+
+    std::cout << ENDL << "**********************************************************************" << ENDL
+      << "The daemon will start synchronizing with the network. It may take up to several hours." << ENDL
+      << ENDL
+      << "You can set the level of process detailization through \"set_log <level>\" command, "
+      << "where <level> is between 0 (no details) and 4 (very verbose)." << ENDL
+      << ENDL
+      << "Use \"help\" command to see the list of available commands." << ENDL
+      << ENDL
+      << "Note: in case you need to interrupt the process, use \"exit\" command. "
+      << "Otherwise, the current progress won't be saved." << ENDL
+      << "**********************************************************************" << ENDL;
+
+
     Tools::SignalHandler::install([&dch, &p2psrv] {
       dch.stop_handling();
       p2psrv.sendStopSignal();
