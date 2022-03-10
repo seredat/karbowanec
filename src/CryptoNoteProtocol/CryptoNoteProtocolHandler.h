@@ -193,8 +193,6 @@ namespace CryptoNote
     std::atomic<size_t> m_peersCount;
     Tools::ObserverManager<ICryptoNoteProtocolObserver> m_observerManager;
 
-    OnceInInterval m_dandelionStemSelectInterval;
-    OnceInInterval m_dandelionStemFluffInterval;
     std::vector<CryptoNoteConnectionContext> m_dandelion_stem;
 
     StemPool m_stemPool;

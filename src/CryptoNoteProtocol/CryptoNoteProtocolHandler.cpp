@@ -67,8 +67,6 @@ CryptoNoteProtocolHandler::CryptoNoteProtocolHandler(const Currency& currency, S
   m_stop(false),
   m_observedHeight(0),
   m_peersCount(0),
-  m_dandelionStemSelectInterval(CryptoNote::parameters::DANDELION_EPOCH),
-  m_dandelionStemFluffInterval(CryptoNote::parameters::DANDELION_STEM_EMBARGO),
   logger(log, "protocol"),
   m_stemPool() {
   
@@ -667,7 +665,7 @@ bool CryptoNoteProtocolHandler::select_dandelion_stem() {
   }
 
   logger(Logging::WARNING) << "No alive peers for dandelion stem...";
-  
+
   return false;
 }
 
@@ -695,8 +693,6 @@ bool CryptoNoteProtocolHandler::fluffStemPool() {
 }
 
 bool CryptoNoteProtocolHandler::on_idle() {
-  m_dandelionStemSelectInterval.call([&]() { return select_dandelion_stem(); });
-  m_dandelionStemFluffInterval.call([&]() { return fluffStemPool(); });
   return m_core.on_idle();
 }
 

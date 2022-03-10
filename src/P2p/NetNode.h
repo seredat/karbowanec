@@ -268,6 +268,8 @@ namespace CryptoNote
     OnceInInterval m_connections_maker_interval;
     OnceInInterval m_peerlist_store_interval;
     OnceInInterval m_gray_peerlist_housekeeping_interval;
+    OnceInInterval m_dandelionStemSelectInterval;
+    OnceInInterval m_dandelionStemFluffInterval;
     System::Timer m_timedSyncTimer;
 
     std::string m_bind_ip;

@@ -244,7 +244,9 @@ namespace CryptoNote
     m_peer_handshake_idle_maker_interval(CryptoNote::P2P_DEFAULT_HANDSHAKE_INTERVAL),
     m_connections_maker_interval(1),
     m_peerlist_store_interval(60*30, false),
-    m_gray_peerlist_housekeeping_interval(CryptoNote::P2P_DEFAULT_HANDSHAKE_INTERVAL)
+    m_gray_peerlist_housekeeping_interval(CryptoNote::P2P_DEFAULT_HANDSHAKE_INTERVAL),
+    m_dandelionStemSelectInterval(CryptoNote::parameters::DANDELION_EPOCH),
+    m_dandelionStemFluffInterval(CryptoNote::parameters::DANDELION_STEM_EMBARGO)
   {
   }
 
@@ -601,12 +603,6 @@ namespace CryptoNote
     m_workingContextGroup.spawn(std::bind(&NodeServer::onIdle, this));
     m_workingContextGroup.spawn(std::bind(&NodeServer::timedSyncLoop, this));
     m_workingContextGroup.spawn(std::bind(&NodeServer::timeoutLoop, this));
-
-    // Get initial stems after 10 s. delay (should suffice to establish connections)
-    auto tr = std::async(std::launch::async, [&] {
-      std::this_thread::sleep_for(std::chrono::seconds(10));
-      return m_payload_handler.select_dandelion_stem();
-    });
 
     m_stopEvent.wait();
 
@@ -1105,6 +1101,8 @@ namespace CryptoNote
   bool NodeServer::idle_worker() {
     try {
       m_connections_maker_interval.call(std::bind(&NodeServer::connections_maker, this));
+      m_dandelionStemSelectInterval.call([&]() { return m_payload_handler.select_dandelion_stem(); });
+      m_dandelionStemFluffInterval.call([&]() { return m_payload_handler.fluffStemPool(); });
       m_peerlist_store_interval.call(std::bind(&NodeServer::store_config, this));
       m_gray_peerlist_housekeeping_interval.call(std::bind(&NodeServer::gray_peerlist_housekeeping, this));
     } catch (std::exception& e) {
@@ -1503,8 +1501,8 @@ namespace CryptoNote
 
     try {
       while (!m_stop) {
-        idle_worker();
         m_payload_handler.on_idle();
+        idle_worker();
         m_idleTimer.sleep(std::chrono::seconds(1));
       }
     } catch (System::InterruptedException&) {
