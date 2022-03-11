@@ -72,6 +72,7 @@ private:
   bool print_cn(const std::vector<std::string>& args);
   bool print_bc(const std::vector<std::string>& args);
   bool print_bci(const std::vector<std::string>& args);
+  bool print_dand(const std::vector<std::string>& args);
   bool print_height(const std::vector<std::string>& args);
   bool set_log(const std::vector<std::string>& args);
   bool print_block(const std::vector<std::string>& args);

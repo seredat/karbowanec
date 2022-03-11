@@ -79,6 +79,16 @@ size_t CryptoNoteProtocolHandler::getPeerCount() const {
   return m_peersCount;
 }
 
+void CryptoNoteProtocolHandler::printDandelions() const {
+  if (m_dandelion_stem.size() == 0)
+    std::cout << "No dandelion connections" << ENDL;
+  std::stringstream ss;
+  for (const auto& d : m_dandelion_stem) {
+    ss << Common::ipAddressToString(d.m_remote_ip) << ":" << d.m_remote_port << std::endl;
+  }
+  std::cout << ss.str();
+}
+
 void CryptoNoteProtocolHandler::set_p2p_endpoint(IP2pEndpoint* p2p) {
   if (p2p)
     m_p2p = p2p;

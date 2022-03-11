@@ -148,6 +148,7 @@ namespace CryptoNote
     void requestMissingPoolTransactions(const CryptoNoteConnectionContext& context);
     bool select_dandelion_stem();
     bool fluffStemPool();
+    void printDandelions() const override;
 
   private:
     //----------------- commands handlers ----------------------------------------------
