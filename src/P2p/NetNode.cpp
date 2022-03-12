@@ -25,7 +25,6 @@
 #include <algorithm>
 #include <chrono>
 #include <fstream>
-#include <future>
 #include <thread>
 
 #include <boost/bind.hpp>
@@ -237,6 +236,7 @@ namespace CryptoNote
     logger(log, "node_server"),
     m_stopEvent(m_dispatcher),
     m_idleTimer(m_dispatcher),
+    m_connTimer(m_dispatcher),
     m_timedSyncTimer(m_dispatcher),
     m_timeoutTimer(m_dispatcher),
     m_stop(false),
@@ -244,9 +244,7 @@ namespace CryptoNote
     m_peer_handshake_idle_maker_interval(CryptoNote::P2P_DEFAULT_HANDSHAKE_INTERVAL),
     m_connections_maker_interval(1),
     m_peerlist_store_interval(60*30, false),
-    m_gray_peerlist_housekeeping_interval(CryptoNote::P2P_DEFAULT_HANDSHAKE_INTERVAL),
-    m_dandelionStemSelectInterval(CryptoNote::parameters::DANDELION_EPOCH),
-    m_dandelionStemFluffInterval(CryptoNote::parameters::DANDELION_STEM_EMBARGO)
+    m_gray_peerlist_housekeeping_interval(CryptoNote::P2P_DEFAULT_HANDSHAKE_INTERVAL)
   {
   }
 
@@ -600,6 +598,7 @@ namespace CryptoNote
     logger(INFO) << "Starting NodeServer...";
 
     m_workingContextGroup.spawn(std::bind(&NodeServer::acceptLoop, this));
+    m_workingContextGroup.spawn(std::bind(&NodeServer::connectionWorker, this));
     m_workingContextGroup.spawn(std::bind(&NodeServer::onIdle, this));
     m_workingContextGroup.spawn(std::bind(&NodeServer::timedSyncLoop, this));
     m_workingContextGroup.spawn(std::bind(&NodeServer::timeoutLoop, this));
@@ -1099,20 +1098,6 @@ namespace CryptoNote
   }
 
   //-----------------------------------------------------------------------------------
-  bool NodeServer::idle_worker() {
-    try {
-      m_connections_maker_interval.call(std::bind(&NodeServer::connections_maker, this));
-      m_dandelionStemSelectInterval.call([&]() { return m_payload_handler.select_dandelion_stem(); });
-      m_dandelionStemFluffInterval.call([&]() { return m_payload_handler.fluffStemPool(); });
-      m_peerlist_store_interval.call(std::bind(&NodeServer::store_config, this));
-      m_gray_peerlist_housekeeping_interval.call(std::bind(&NodeServer::gray_peerlist_housekeeping, this));
-    } catch (std::exception& e) {
-      logger(DEBUGGING) << "exception in idle_worker: " << e.what();
-    }
-    return true;
-  }
-
-  //-----------------------------------------------------------------------------------
   bool NodeServer::fix_time_delta(std::vector<PeerlistEntry>& local_peerlist, time_t local_time, int64_t& delta)
   {
     //fix time delta
@@ -1503,16 +1488,34 @@ namespace CryptoNote
     try {
       while (!m_stop) {
         m_payload_handler.on_idle();
-        idle_worker();
+        m_peerlist_store_interval.call(std::bind(&NodeServer::store_config, this));
+        m_gray_peerlist_housekeeping_interval.call(std::bind(&NodeServer::gray_peerlist_housekeeping, this));
         m_idleTimer.sleep(std::chrono::seconds(1));
       }
     } catch (System::InterruptedException&) {
       logger(DEBUGGING) << "onIdle() is interrupted";
     } catch (std::exception& e) {
-      logger(TRACE) << "Exception in onIdle: " << e.what();
+      logger(DEBUGGING) << "Exception in onIdle: " << e.what();
     }
 
     logger(DEBUGGING) << "onIdle finished";
+  }
+
+  void NodeServer::connectionWorker() {
+    logger(DEBUGGING) << "connectionWorker started";
+
+    try {
+      while (!m_stop) {
+        m_connections_maker_interval.call(std::bind(&NodeServer::connections_maker, this));
+        m_connTimer.sleep(std::chrono::seconds(1));
+      }
+    } catch (System::InterruptedException&) {
+      logger(DEBUGGING) << "connectionWorker() is interrupted";
+    } catch (std::exception& e) {
+      logger(DEBUGGING) << "Exception in connectionWorker: " << e.what();
+    }
+
+    logger(DEBUGGING) << "connectionWorker finished";
   }
 
   void NodeServer::timeoutLoop() {

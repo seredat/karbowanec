@@ -191,7 +191,6 @@ namespace CryptoNote
     bool is_addr_recently_failed(const uint32_t address_ip);
     bool handleConfig(const NetNodeConfig& config);
     bool append_net_address(std::vector<NetworkAddress>& nodes, const std::string& addr);
-    bool idle_worker();
     bool handle_remote_peerlist(const std::vector<PeerlistEntry>& peerlist, time_t local_time, const CryptoNoteConnectionContext& context);
     bool get_local_node_data(basic_node_data& node_data);
 
@@ -226,6 +225,7 @@ namespace CryptoNote
     void connectionHandler(const boost::uuids::uuid& connectionId, P2pConnectionContext& connection);
     void writeHandler(P2pConnectionContext& ctx);
     void onIdle();
+    void connectionWorker();
     void timedSyncLoop();
     void timeoutLoop();
 
@@ -256,6 +256,7 @@ namespace CryptoNote
     System::ContextGroup m_workingContextGroup;
     System::Event m_stopEvent;
     System::Timer m_idleTimer;
+    System::Timer m_connTimer;
     System::Timer m_timeoutTimer;
     System::TcpListener m_listener;
     Logging::LoggerRef logger;
@@ -268,8 +269,6 @@ namespace CryptoNote
     OnceInInterval m_connections_maker_interval;
     OnceInInterval m_peerlist_store_interval;
     OnceInInterval m_gray_peerlist_housekeeping_interval;
-    OnceInInterval m_dandelionStemSelectInterval;
-    OnceInInterval m_dandelionStemFluffInterval;
     System::Timer m_timedSyncTimer;
 
     std::string m_bind_ip;

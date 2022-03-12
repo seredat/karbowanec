@@ -67,6 +67,8 @@ CryptoNoteProtocolHandler::CryptoNoteProtocolHandler(const Currency& currency, S
   m_stop(false),
   m_observedHeight(0),
   m_peersCount(0),
+  m_dandelionStemSelectInterval(CryptoNote::parameters::DANDELION_EPOCH),
+  m_dandelionStemFluffInterval(CryptoNote::parameters::DANDELION_STEM_EMBARGO),
   logger(log, "protocol"),
   m_stemPool() {
   
@@ -703,7 +705,15 @@ bool CryptoNoteProtocolHandler::fluffStemPool() {
 }
 
 bool CryptoNoteProtocolHandler::on_idle() {
-  return m_core.on_idle();
+  try {
+    m_core.on_idle();
+    m_dandelionStemSelectInterval.call(std::bind(&CryptoNoteProtocolHandler::select_dandelion_stem, this));
+    m_dandelionStemFluffInterval.call(std::bind(&CryptoNoteProtocolHandler::fluffStemPool, this));
+  } catch (std::exception& e) {
+    logger(DEBUGGING) << "exception in on_idle: " << e.what();
+  }
+
+  return true;
 }
 
 int CryptoNoteProtocolHandler::doPushLiteBlock(NOTIFY_NEW_LITE_BLOCK::request arg, CryptoNoteConnectionContext &context,
