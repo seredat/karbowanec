@@ -261,7 +261,6 @@ namespace CryptoNote
     System::TcpListener m_listener;
     Logging::LoggerRef logger;
     std::atomic<bool> m_stop;
-    std::atomic<bool> m_init_select_dandelion_called;
 
     CryptoNoteProtocolHandler& m_payload_handler;
     PeerlistManager m_peerlist;
