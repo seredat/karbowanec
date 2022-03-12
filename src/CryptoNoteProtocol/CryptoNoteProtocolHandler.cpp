@@ -646,11 +646,11 @@ int CryptoNoteProtocolHandler::processObjects(CryptoNoteConnectionContext& conte
 bool CryptoNoteProtocolHandler::select_dandelion_stem() {
   m_dandelion_stem.clear();
 
-  //TODO: select from outgoing connections preferably supporting Dandelion: context.version >= P2P_VERSION_4)
-
   std::vector<CryptoNoteConnectionContext> alive_peers;
   m_p2p->for_each_connection([&](const CryptoNoteConnectionContext& ctx, PeerIdType peer_id) {
-    if ((ctx.m_state == CryptoNoteConnectionContext::state_normal || ctx.m_state == CryptoNoteConnectionContext::state_synchronizing) && !ctx.m_is_income) {
+    if ((ctx.m_state == CryptoNoteConnectionContext::state_normal || 
+         ctx.m_state == CryptoNoteConnectionContext::state_synchronizing) && 
+        !ctx.m_is_income && ctx.version >= P2P_VERSION_4) {
       alive_peers.push_back(ctx);
     }
   });
