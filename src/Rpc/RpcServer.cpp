@@ -926,7 +926,7 @@ bool RpcServer::on_get_transactions_details_by_heights(const COMMAND_RPC_GET_TRA
           std::string("The range is set to true but heights size is not equal to 2") };
       }
       uint32_t upperBound = std::min(req.heights[1], m_core.getCurrentBlockchainHeight());
-      for (size_t i = 0; i < (upperBound - req.heights[0]); i++) {
+      for (uint32_t i = 0; i < (upperBound - req.heights[0]); i++) {
         heights.push_back(req.heights[0] + i);
       }
     }
