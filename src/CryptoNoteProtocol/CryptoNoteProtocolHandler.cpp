@@ -65,6 +65,7 @@ CryptoNoteProtocolHandler::CryptoNoteProtocolHandler(const Currency& currency, S
   m_p2p(p_net_layout),
   m_synchronized(false),
   m_stop(false),
+  m_init_select_dandelion_called(false),
   m_observedHeight(0),
   m_peersCount(0),
   m_dandelionStemSelectInterval(CryptoNote::parameters::DANDELION_EPOCH),
@@ -646,6 +647,8 @@ int CryptoNoteProtocolHandler::processObjects(CryptoNoteConnectionContext& conte
 }
 
 bool CryptoNoteProtocolHandler::select_dandelion_stem() {
+  m_init_select_dandelion_called = true;
+
   m_dandelion_stem.clear();
 
   std::vector<CryptoNoteConnectionContext> alive_peers;
@@ -707,7 +710,10 @@ bool CryptoNoteProtocolHandler::fluffStemPool() {
 bool CryptoNoteProtocolHandler::on_idle() {
   try {
     m_core.on_idle();
-    m_dandelionStemSelectInterval.call(std::bind(&CryptoNoteProtocolHandler::select_dandelion_stem, this));
+    // We don't have peers yet to select dandelion stems
+    if (m_init_select_dandelion_called) {
+      m_dandelionStemSelectInterval.call(std::bind(&CryptoNoteProtocolHandler::select_dandelion_stem, this));
+    }
     m_dandelionStemFluffInterval.call(std::bind(&CryptoNoteProtocolHandler::fluffStemPool, this));
   } catch (std::exception& e) {
     logger(DEBUGGING) << "exception in on_idle: " << e.what();

@@ -199,5 +199,7 @@ namespace CryptoNote
     std::vector<CryptoNoteConnectionContext> m_dandelion_stem;
 
     StemPool m_stemPool;
+
+    std::atomic<bool> m_init_select_dandelion_called;
   };
 }

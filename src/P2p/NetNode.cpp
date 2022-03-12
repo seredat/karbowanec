@@ -240,6 +240,7 @@ namespace CryptoNote
     m_timedSyncTimer(m_dispatcher),
     m_timeoutTimer(m_dispatcher),
     m_stop(false),
+    m_init_select_dandelion_called(false),
     // intervals
     m_peer_handshake_idle_maker_interval(CryptoNote::P2P_DEFAULT_HANDSHAKE_INTERVAL),
     m_connections_maker_interval(1),
@@ -1050,6 +1051,12 @@ namespace CryptoNote
           return false;
       }
     }
+
+    // Now we have peers to select dandelion stems
+    if (!m_init_select_dandelion_called) {
+      m_payload_handler.select_dandelion_stem();
+    }
+    m_init_select_dandelion_called = true;
 
     return true;
   }
