@@ -3,7 +3,7 @@
 // Copyright (c) 2014-2018, The Monero Project
 // Copyright (c) 2018, The Unprll Project
 // Copyright (c) 2018-2019, The TurtleCoin Developers
-// Copyright (c) 2016-2020, The Karbo developers
+// Copyright (c) 2016-2022, The Karbo developers
 //
 // This file is part of Karbo.
 //
