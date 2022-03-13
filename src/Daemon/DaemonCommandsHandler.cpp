@@ -52,6 +52,7 @@ DaemonCommandsHandler::DaemonCommandsHandler(CryptoNote::Core& core, CryptoNote:
   m_consoleHandler.setHandler("help", boost::bind(&DaemonCommandsHandler::help, this, boost::arg<1>()), "Show this help");
   m_consoleHandler.setHandler("print_pl", boost::bind(&DaemonCommandsHandler::print_pl, this, boost::arg<1>()), "Print peer list");
   m_consoleHandler.setHandler("print_cn", boost::bind(&DaemonCommandsHandler::print_cn, this, boost::arg<1>()), "Print connections");
+  m_consoleHandler.setHandler("print_dandelion", boost::bind(&DaemonCommandsHandler::print_dand, this, boost::arg<1>()), "Print current dandelion connections");
   m_consoleHandler.setHandler("print_bc", boost::bind(&DaemonCommandsHandler::print_bc, this, boost::arg<1>()), "Print blockchain info in a given blocks range, print_bc <begin_height> [<end_height>]");
   m_consoleHandler.setHandler("height", boost::bind(&DaemonCommandsHandler::print_height, this, boost::arg<1>()), "Print blockchain height");
   //m_consoleHandler.setHandler("print_bci", boost::bind(&DaemonCommandsHandler::print_bci, this, boost::arg<1>()));
@@ -199,6 +200,12 @@ bool DaemonCommandsHandler::print_bc_outs(const std::vector<std::string>& args)
 bool DaemonCommandsHandler::print_cn(const std::vector<std::string>& args)
 {
   m_srv.get_payload_object().log_connections();
+  return true;
+}
+//--------------------------------------------------------------------------------
+bool DaemonCommandsHandler::print_dand(const std::vector<std::string>& args)
+{
+  protocolQuery.printDandelions();
   return true;
 }
 //--------------------------------------------------------------------------------

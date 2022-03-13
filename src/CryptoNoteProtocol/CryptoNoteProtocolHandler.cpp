@@ -65,8 +65,11 @@ CryptoNoteProtocolHandler::CryptoNoteProtocolHandler(const Currency& currency, S
   m_p2p(p_net_layout),
   m_synchronized(false),
   m_stop(false),
+  m_init_select_dandelion_called(false),
   m_observedHeight(0),
   m_peersCount(0),
+  m_dandelionStemSelectInterval(CryptoNote::parameters::DANDELION_EPOCH),
+  m_dandelionStemFluffInterval(CryptoNote::parameters::DANDELION_STEM_EMBARGO),
   logger(log, "protocol"),
   m_stemPool() {
   
@@ -77,6 +80,16 @@ CryptoNoteProtocolHandler::CryptoNoteProtocolHandler(const Currency& currency, S
 
 size_t CryptoNoteProtocolHandler::getPeerCount() const {
   return m_peersCount;
+}
+
+void CryptoNoteProtocolHandler::printDandelions() const {
+  if (m_dandelion_stem.size() == 0)
+    std::cout << "No dandelion connections" << ENDL;
+  std::stringstream ss;
+  for (const auto& d : m_dandelion_stem) {
+    ss << Common::ipAddressToString(d.m_remote_ip) << ":" << d.m_remote_port << std::endl;
+  }
+  std::cout << ss.str();
 }
 
 void CryptoNoteProtocolHandler::set_p2p_endpoint(IP2pEndpoint* p2p) {
@@ -634,13 +647,15 @@ int CryptoNoteProtocolHandler::processObjects(CryptoNoteConnectionContext& conte
 }
 
 bool CryptoNoteProtocolHandler::select_dandelion_stem() {
-  m_dandelion_stem.clear();
+  m_init_select_dandelion_called = true;
 
-  //TODO: select from outgoing connections preferably supporting Dandelion: context.version >= P2P_VERSION_4)
+  m_dandelion_stem.clear();
 
   std::vector<CryptoNoteConnectionContext> alive_peers;
   m_p2p->for_each_connection([&](const CryptoNoteConnectionContext& ctx, PeerIdType peer_id) {
-    if ((ctx.m_state == CryptoNoteConnectionContext::state_normal || ctx.m_state == CryptoNoteConnectionContext::state_synchronizing) && !ctx.m_is_income) {
+    if ((ctx.m_state == CryptoNoteConnectionContext::state_normal || 
+         ctx.m_state == CryptoNoteConnectionContext::state_synchronizing) && 
+        !ctx.m_is_income && ctx.version >= P2P_VERSION_4) {
       alive_peers.push_back(ctx);
     }
   });
@@ -693,7 +708,18 @@ bool CryptoNoteProtocolHandler::fluffStemPool() {
 }
 
 bool CryptoNoteProtocolHandler::on_idle() {
-  return m_core.on_idle();
+  try {
+    m_core.on_idle();
+    // We don't have peers yet to select dandelion stems
+    if (m_init_select_dandelion_called) {
+      m_dandelionStemSelectInterval.call(std::bind(&CryptoNoteProtocolHandler::select_dandelion_stem, this));
+    }
+    m_dandelionStemFluffInterval.call(std::bind(&CryptoNoteProtocolHandler::fluffStemPool, this));
+  } catch (std::exception& e) {
+    logger(DEBUGGING) << "exception in on_idle: " << e.what();
+  }
+
+  return true;
 }
 
 int CryptoNoteProtocolHandler::doPushLiteBlock(NOTIFY_NEW_LITE_BLOCK::request arg, CryptoNoteConnectionContext &context,

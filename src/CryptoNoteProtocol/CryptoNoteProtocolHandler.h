@@ -148,6 +148,9 @@ namespace CryptoNote
     void requestMissingPoolTransactions(const CryptoNoteConnectionContext& context);
     bool select_dandelion_stem();
     bool fluffStemPool();
+    void printDandelions() const override;
+
+    std::atomic<bool> m_init_select_dandelion_called;
 
   private:
     //----------------- commands handlers ----------------------------------------------
@@ -193,6 +196,8 @@ namespace CryptoNote
     std::atomic<size_t> m_peersCount;
     Tools::ObserverManager<ICryptoNoteProtocolObserver> m_observerManager;
 
+    OnceInInterval m_dandelionStemSelectInterval;
+    OnceInInterval m_dandelionStemFluffInterval;
     std::vector<CryptoNoteConnectionContext> m_dandelion_stem;
 
     StemPool m_stemPool;

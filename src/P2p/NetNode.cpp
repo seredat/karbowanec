@@ -25,7 +25,6 @@
 #include <algorithm>
 #include <chrono>
 #include <fstream>
-#include <future>
 #include <thread>
 
 #include <boost/bind.hpp>
@@ -237,6 +236,7 @@ namespace CryptoNote
     logger(log, "node_server"),
     m_stopEvent(m_dispatcher),
     m_idleTimer(m_dispatcher),
+    m_connTimer(m_dispatcher),
     m_timedSyncTimer(m_dispatcher),
     m_timeoutTimer(m_dispatcher),
     m_stop(false),
@@ -244,9 +244,7 @@ namespace CryptoNote
     m_peer_handshake_idle_maker_interval(CryptoNote::P2P_DEFAULT_HANDSHAKE_INTERVAL),
     m_connections_maker_interval(1),
     m_peerlist_store_interval(60*30, false),
-    m_gray_peerlist_housekeeping_interval(CryptoNote::P2P_DEFAULT_HANDSHAKE_INTERVAL),
-    m_dandelionStemSelectInterval(CryptoNote::parameters::DANDELION_EPOCH),
-    m_dandelionStemFluffInterval(CryptoNote::parameters::DANDELION_STEM_EMBARGO)
+    m_gray_peerlist_housekeeping_interval(CryptoNote::P2P_DEFAULT_HANDSHAKE_INTERVAL)
   {
   }
 
@@ -600,6 +598,7 @@ namespace CryptoNote
     logger(INFO) << "Starting NodeServer...";
 
     m_workingContextGroup.spawn(std::bind(&NodeServer::acceptLoop, this));
+    m_workingContextGroup.spawn(std::bind(&NodeServer::connectionWorker, this));
     m_workingContextGroup.spawn(std::bind(&NodeServer::onIdle, this));
     m_workingContextGroup.spawn(std::bind(&NodeServer::timedSyncLoop, this));
     m_workingContextGroup.spawn(std::bind(&NodeServer::timeoutLoop, this));
@@ -993,11 +992,11 @@ namespace CryptoNote
 
     return false;
   }
-  //-----------------------------------------------------------------------------------
 
+  //-----------------------------------------------------------------------------------
   bool NodeServer::connections_maker()
   {
-    if (!connect_to_peerlist(m_exclusive_peers)) {
+    if (!m_exclusive_peers.empty() && !connect_to_peerlist(m_exclusive_peers)) {
       return false;
     }
 
@@ -1005,56 +1004,62 @@ namespace CryptoNote
       return true;
     }
 
-    if(!m_peerlist.get_white_peers_count() && m_seed_nodes.size()) {
+    if (!m_peerlist.get_white_peers_count() && m_seed_nodes.size()) {
       size_t try_count = 0;
       size_t current_index = Random::randomValue<size_t>() % m_seed_nodes.size();
-      
-      while(true) {
-        if(try_to_connect_and_handshake_with_new_peer(m_seed_nodes[current_index], true))
+
+      while (true) {
+        if (try_to_connect_and_handshake_with_new_peer(m_seed_nodes[current_index], true))
           break;
 
-        if(++try_count > m_seed_nodes.size()) {
+        if (++try_count > m_seed_nodes.size()) {
           logger(ERROR) << "Failed to connect to any of seed peers, continuing without seeds";
           break;
         }
-        if(++current_index >= m_seed_nodes.size())
+        if (++current_index >= m_seed_nodes.size())
           current_index = 0;
       }
     }
 
-    if (!connect_to_peerlist(m_priority_peers)) return false;
+    if (!m_priority_peers.empty() && !connect_to_peerlist(m_priority_peers)) return false;
 
     size_t expected_white_connections = (m_config.m_net_config.connections_count * CryptoNote::P2P_DEFAULT_WHITELIST_CONNECTIONS_PERCENT) / 100;
 
     size_t conn_count = get_outgoing_connections_count();
-    if(conn_count < m_config.m_net_config.connections_count)
+    if (conn_count < m_config.m_net_config.connections_count)
     {
-      if(conn_count < expected_white_connections)
+      if (conn_count < expected_white_connections)
       {
         //start from anchor list
         if (!make_expected_connections_count(anchor, P2P_DEFAULT_ANCHOR_CONNECTIONS_COUNT))
           return false;
         //start from white list
-        if(!make_expected_connections_count(white, expected_white_connections))
+        if (!make_expected_connections_count(white, expected_white_connections))
           return false;
         //and then do grey list
-        if(!make_expected_connections_count(gray, m_config.m_net_config.connections_count))
+        if (!make_expected_connections_count(gray, m_config.m_net_config.connections_count))
           return false;
-      } else
+      }
+      else
       {
         //start from grey list
-        if(!make_expected_connections_count(gray, m_config.m_net_config.connections_count))
+        if (!make_expected_connections_count(gray, m_config.m_net_config.connections_count))
           return false;
         //and then do white list
-        if(!make_expected_connections_count(white, m_config.m_net_config.connections_count))
+        if (!make_expected_connections_count(white, m_config.m_net_config.connections_count))
           return false;
       }
     }
 
+    // Now we have peers to select dandelion stems
+    if (!m_payload_handler.m_init_select_dandelion_called) {
+      m_payload_handler.select_dandelion_stem();
+    }
+
     return true;
   }
+
   //-----------------------------------------------------------------------------------
-  
   bool NodeServer::make_expected_connections_count(PeerType peer_type, size_t expected_connections)
   {
     std::vector<AnchorPeerlistEntry> apl;
@@ -1095,20 +1100,6 @@ namespace CryptoNote
         ++count;
     }
     return count;
-  }
-
-  //-----------------------------------------------------------------------------------
-  bool NodeServer::idle_worker() {
-    try {
-      m_connections_maker_interval.call(std::bind(&NodeServer::connections_maker, this));
-      m_dandelionStemSelectInterval.call([&]() { return m_payload_handler.select_dandelion_stem(); });
-      m_dandelionStemFluffInterval.call([&]() { return m_payload_handler.fluffStemPool(); });
-      m_peerlist_store_interval.call(std::bind(&NodeServer::store_config, this));
-      m_gray_peerlist_housekeeping_interval.call(std::bind(&NodeServer::gray_peerlist_housekeeping, this));
-    } catch (std::exception& e) {
-      logger(DEBUGGING) << "exception in idle_worker: " << e.what();
-    }
-    return true;
   }
 
   //-----------------------------------------------------------------------------------
@@ -1502,16 +1493,34 @@ namespace CryptoNote
     try {
       while (!m_stop) {
         m_payload_handler.on_idle();
-        idle_worker();
+        m_peerlist_store_interval.call(std::bind(&NodeServer::store_config, this));
+        m_gray_peerlist_housekeeping_interval.call(std::bind(&NodeServer::gray_peerlist_housekeeping, this));
         m_idleTimer.sleep(std::chrono::seconds(1));
       }
     } catch (System::InterruptedException&) {
       logger(DEBUGGING) << "onIdle() is interrupted";
     } catch (std::exception& e) {
-      logger(TRACE) << "Exception in onIdle: " << e.what();
+      logger(DEBUGGING) << "Exception in onIdle: " << e.what();
     }
 
     logger(DEBUGGING) << "onIdle finished";
+  }
+
+  void NodeServer::connectionWorker() {
+    logger(DEBUGGING) << "connectionWorker started";
+
+    try {
+      while (!m_stop) {
+        m_connections_maker_interval.call(std::bind(&NodeServer::connections_maker, this));
+        m_connTimer.sleep(std::chrono::seconds(1));
+      }
+    } catch (System::InterruptedException&) {
+      logger(DEBUGGING) << "connectionWorker() is interrupted";
+    } catch (std::exception& e) {
+      logger(DEBUGGING) << "Exception in connectionWorker: " << e.what();
+    }
+
+    logger(DEBUGGING) << "connectionWorker finished";
   }
 
   void NodeServer::timeoutLoop() {
