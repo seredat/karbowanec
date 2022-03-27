@@ -1032,10 +1032,14 @@ bool Blockchain::switch_to_alternative_blockchain(std::list<blocks_ext_by_hash::
   blocksFromCommonRoot.push_back(alt_chain.front()->second.bl.previousBlockHash);
 
   //removing alt_chain entries from alternative chain
-  for (auto &ch_ent : alt_chain) {
-    blocksFromCommonRoot.push_back(get_block_hash(ch_ent->second.bl));
-    m_orphanBlocksIndex.remove(ch_ent->second.bl);
-    m_alternative_chains.erase(ch_ent);
+  try {
+    for (auto& ch_ent : alt_chain) {
+      blocksFromCommonRoot.push_back(get_block_hash(ch_ent->second.bl));
+      m_orphanBlocksIndex.remove(ch_ent->second.bl);
+      m_alternative_chains.erase(ch_ent);
+    }
+  } catch (std::exception& e) {
+    logger(ERROR) << "removing alt_chain entries from alternative chain failed: " << e.what();
   }
 
   sendMessage(BlockchainMessage(ChainSwitchMessage(std::move(blocksFromCommonRoot))));
