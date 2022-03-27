@@ -975,13 +975,9 @@ bool Blockchain::switch_to_alternative_blockchain(std::list<blocks_ext_by_hash::
     std::copy(b.transactionHashes.begin(), b.transactionHashes.end(), std::inserter(altChainTxHashes, altChainTxHashes.end()));
   }
   for (auto main_ch_it = mainChainTxHashes.begin(); main_ch_it != mainChainTxHashes.end(); main_ch_it++) {
-    auto tx_hash = *main_ch_it;
+    auto &tx_hash = *main_ch_it;
     if (std::find(altChainTxHashes.begin(), altChainTxHashes.end(), tx_hash) == altChainTxHashes.end()) {
       logger(ERROR, BRIGHT_RED) << "Attempting to switch to an alternate chain, but it lacks transaction " << Common::podToHex(tx_hash) << " from main chain, rejected";
-      mainChainTxHashes.clear();
-      mainChainTxHashes.shrink_to_fit();
-      altChainTxHashes.clear();
-      altChainTxHashes.shrink_to_fit();
       return false;
     }
   }
@@ -1319,12 +1315,6 @@ bool Blockchain::handle_alternative_block(const Block& b, const Crypto::Hash& id
     return false;
   }
 
-  // get fresh checkpoints from DNS - the best we have right now
-#ifndef __ANDROID__
-//  if (!m_currency.isTestnet())
-//    m_checkpoints.load_checkpoints_from_dns();
-#endif
-
   if (!m_checkpoints.is_alternative_block_allowed(getCurrentBlockchainHeight(), block_height)) {
     logger(TRACE) << "Block with id: " << id << std::endl <<
       " can't be accepted for alternative chain, block height: " << block_height << std::endl <<
@@ -1476,7 +1466,7 @@ bool Blockchain::handle_alternative_block(const Block& b, const Crypto::Hash& id
         bvc.m_verification_failed = true;
       }
       return r;
-    } else if (m_blocks.back().cumulative_difficulty < bei.cumulative_difficulty) //check if difficulty bigger then in main chain
+    } else if (m_blocks.back().cumulative_difficulty < bei.cumulative_difficulty) //check if difficulty is bigger than in main chain
     {
       //do reorganize!
       logger(INFO, BRIGHT_GREEN) <<
@@ -1494,7 +1484,7 @@ bool Blockchain::handle_alternative_block(const Block& b, const Crypto::Hash& id
       logger(INFO, BRIGHT_BLUE) <<
         "----- BLOCK ADDED AS ALTERNATIVE ON HEIGHT " << bei.height
         << ENDL << "id:\t\t" << id
-        << ENDL << "PoW:\t" << proof_of_work
+        << ENDL << "PoW:\t\t" << proof_of_work
         << ENDL << "difficulty:\t" << current_diff;
       if (sendNewAlternativeBlockMessage) {
         sendMessage(BlockchainMessage(NewAlternativeBlockMessage(id)));
