@@ -21,8 +21,6 @@
 #include <atomic>
 #include <unordered_map>
 #include <parallel_hashmap/phmap.h>
-#include "google/sparse_hash_set"
-#include "google/sparse_hash_map"
 
 #include "Common/ObserverManager.h"
 #include "Common/Util.h"

@@ -74,35 +74,6 @@ class BlockchainIndicesSerializer;
 
 namespace CryptoNote {
 
-template<typename K, typename V, typename Hash>
-bool serialize(google::sparse_hash_map<K, V, Hash>& value, Common::StringView name, CryptoNote::ISerializer& serializer) {
-  return serializeMap(value, name, serializer, [&value](size_t size) { value.resize(size); });
-}
-
-template<typename K, typename Hash>
-bool serialize(google::sparse_hash_set<K, Hash>& value, Common::StringView name, CryptoNote::ISerializer& serializer) {
-  size_t size = value.size();
-  if (!serializer.beginArray(size, name)) {
-    return false;
-  }
-
-  if (serializer.type() == ISerializer::OUTPUT) {
-    for (auto& key : value) {
-      serializer(const_cast<K&>(key), "");
-    }
-  } else {
-    value.resize(size);
-    while (size--) {
-      K key;
-      serializer(key, "");
-      value.insert(key);
-    }
-  }
-
-  serializer.endArray();
-  return true;
-}
-
 // custom serialization to speedup cache loading
 bool serialize(std::vector<std::pair<Blockchain::TransactionIndex, uint16_t>>& value, Common::StringView name, CryptoNote::ISerializer& s) {
   const size_t elementSize = sizeof(std::pair<Blockchain::TransactionIndex, uint16_t>);
