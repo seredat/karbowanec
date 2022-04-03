@@ -1927,15 +1927,15 @@ std::string simple_wallet::get_formatted_wallet_keys() {
 
   Crypto::PublicKey unused_dummy_variable;
   Crypto::SecretKey deterministic_private_view_key;
-
   AccountBase::generateViewFromSpend(keys.spendSecretKey, deterministic_private_view_key, unused_dummy_variable);
   bool deterministic_private_keys = deterministic_private_view_key == keys.viewSecretKey;
-
-  std::string electrum_words;
-  bool success = m_wallet->getSeed(electrum_words);
-  if (success) {
-    seedFormater(electrum_words);
-    priv_keys += "Mnemonic seed:\n" + electrum_words + "\n";
+  if (deterministic_private_keys) {
+    std::string electrum_words;
+    bool success = m_wallet->getSeed(electrum_words);
+    if (success) {
+      seedFormater(electrum_words);
+      priv_keys += "Mnemonic seed:\n" + electrum_words + "\n";
+    }
   } else {
     priv_keys += "The wallet is non-deterministic and does not have a mnemonic seed.\n";
   }

@@ -1018,7 +1018,7 @@ bool RpcServer::on_get_transactions_with_output_global_indexes_by_heights(const 
 
       std::sort(range.begin(), range.end());
       uint32_t upperBound = std::min(range[1], m_core.getCurrentBlockchainHeight());
-      for (size_t i = 0; i < (upperBound - range[0]); i++) {
+      for (uint32_t i = 0; i < (upperBound - range[0]); i++) {
         heights.push_back(range[0] + i);
       }
     }
