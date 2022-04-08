@@ -48,31 +48,31 @@ namespace {
 
 DaemonCommandsHandler::DaemonCommandsHandler(CryptoNote::Core& core, CryptoNote::NodeServer& srv, Logging::LoggerManager& log, const CryptoNote::ICryptoNoteProtocolQuery& protocol, CryptoNote::RpcServer* prpc_server) :
   m_core(core), m_srv(srv), logger(log, "daemon"), m_logManager(log), protocolQuery(protocol), m_prpc_server(prpc_server) {
-  m_consoleHandler.setHandler("exit", boost::bind(&DaemonCommandsHandler::exit, this, boost::arg<1>()), "Shutdown the daemon");
-  m_consoleHandler.setHandler("help", boost::bind(&DaemonCommandsHandler::help, this, boost::arg<1>()), "Show this help");
-  m_consoleHandler.setHandler("print_pl", boost::bind(&DaemonCommandsHandler::print_pl, this, boost::arg<1>()), "Print peer list");
-  m_consoleHandler.setHandler("print_cn", boost::bind(&DaemonCommandsHandler::print_cn, this, boost::arg<1>()), "Print connections");
-  m_consoleHandler.setHandler("print_dandelion", boost::bind(&DaemonCommandsHandler::print_dand, this, boost::arg<1>()), "Print current dandelion connections");
-  m_consoleHandler.setHandler("print_bc", boost::bind(&DaemonCommandsHandler::print_bc, this, boost::arg<1>()), "Print blockchain info in a given blocks range, print_bc <begin_height> [<end_height>]");
-  m_consoleHandler.setHandler("height", boost::bind(&DaemonCommandsHandler::print_height, this, boost::arg<1>()), "Print blockchain height");
-  //m_consoleHandler.setHandler("print_bci", boost::bind(&DaemonCommandsHandler::print_bci, this, boost::arg<1>()));
-  //m_consoleHandler.setHandler("print_bc_outs", boost::bind(&DaemonCommandsHandler::print_bc_outs, this, boost::arg<1>()));
-  m_consoleHandler.setHandler("print_block", boost::bind(&DaemonCommandsHandler::print_block, this, boost::arg<1>()), "Print block, print_block <block_hash> | <block_height>");
-  m_consoleHandler.setHandler("print_tx", boost::bind(&DaemonCommandsHandler::print_tx, this, boost::arg<1>()), "Print transaction, print_tx <transaction_hash>");
-  m_consoleHandler.setHandler("start_mining", boost::bind(&DaemonCommandsHandler::start_mining, this, boost::arg<1>()), "Start mining with keys, start_mining <spend key> <view key> [threads=1]");
-  m_consoleHandler.setHandler("stop_mining", boost::bind(&DaemonCommandsHandler::stop_mining, this, boost::arg<1>()), "Stop mining");
-  m_consoleHandler.setHandler("print_pool", boost::bind(&DaemonCommandsHandler::print_pool, this, boost::arg<1>()), "Print transaction pool (long format)");
-  m_consoleHandler.setHandler("print_pool_sh", boost::bind(&DaemonCommandsHandler::print_pool_sh, this, boost::arg<1>()), "Print transaction pool (short format)");
-  m_consoleHandler.setHandler("print_mp", boost::bind(&DaemonCommandsHandler::print_pool_count, this, boost::arg<1>()), "Print number of transactions in memory pool");
-  m_consoleHandler.setHandler("show_hr", boost::bind(&DaemonCommandsHandler::show_hr, this, boost::arg<1>()), "Start showing hash rate");
-  m_consoleHandler.setHandler("hide_hr", boost::bind(&DaemonCommandsHandler::hide_hr, this, boost::arg<1>()), "Stop showing hash rate");
-  m_consoleHandler.setHandler("set_log", boost::bind(&DaemonCommandsHandler::set_log, this, boost::arg<1>()), "set_log <level> - Change current log level, <level> is a number 0-4");
-  m_consoleHandler.setHandler("print_diff", boost::bind(&DaemonCommandsHandler::print_diff, this, boost::arg<1>()), "Difficulty for next block");
-  m_consoleHandler.setHandler("print_ban", boost::bind(&DaemonCommandsHandler::print_ban, this, boost::arg<1>()), "Print banned nodes");
-  m_consoleHandler.setHandler("ban", boost::bind(&DaemonCommandsHandler::ban, this, boost::arg<1>()), "Ban a given <IP> for [<seconds>] or permanently if no duration provided, ban <IP> [<seconds>]");
-  m_consoleHandler.setHandler("unban", boost::bind(&DaemonCommandsHandler::unban, this, boost::arg<1>()), "Unban a given <IP>, unban <IP>");
-  m_consoleHandler.setHandler("status", boost::bind(&DaemonCommandsHandler::status, this, boost::arg<1>()), "Show daemon status");
-  m_consoleHandler.setHandler("save", boost::bind(&DaemonCommandsHandler::save, this, boost::arg<1>()), "Store blockchain");
+  m_consoleHandler.setHandler("exit", std::bind(&DaemonCommandsHandler::exit, this, std::placeholders::_1), "Shutdown the daemon");
+  m_consoleHandler.setHandler("help", std::bind(&DaemonCommandsHandler::help, this, std::placeholders::_1), "Show this help");
+  m_consoleHandler.setHandler("print_pl", std::bind(&DaemonCommandsHandler::print_pl, this, std::placeholders::_1), "Print peer list");
+  m_consoleHandler.setHandler("print_cn", std::bind(&DaemonCommandsHandler::print_cn, this, std::placeholders::_1), "Print connections");
+  m_consoleHandler.setHandler("print_dandelion", std::bind(&DaemonCommandsHandler::print_dand, this, std::placeholders::_1), "Print current dandelion connections");
+  m_consoleHandler.setHandler("print_bc", std::bind(&DaemonCommandsHandler::print_bc, this, std::placeholders::_1), "Print blockchain info in a given blocks range, print_bc <begin_height> [<end_height>]");
+  m_consoleHandler.setHandler("height", std::bind(&DaemonCommandsHandler::print_height, this, std::placeholders::_1), "Print blockchain height");
+  //m_consoleHandler.setHandler("print_bci", std::bind(&DaemonCommandsHandler::print_bci, this, std::placeholders::_1));
+  //m_consoleHandler.setHandler("print_bc_outs", std::bind(&DaemonCommandsHandler::print_bc_outs, this, std::placeholders::_1));
+  m_consoleHandler.setHandler("print_block", std::bind(&DaemonCommandsHandler::print_block, this, std::placeholders::_1), "Print block, print_block <block_hash> | <block_height>");
+  m_consoleHandler.setHandler("print_tx", std::bind(&DaemonCommandsHandler::print_tx, this, std::placeholders::_1), "Print transaction, print_tx <transaction_hash>");
+  m_consoleHandler.setHandler("start_mining", std::bind(&DaemonCommandsHandler::start_mining, this, std::placeholders::_1), "Start mining with keys, start_mining <spend key> <view key> [threads=1]");
+  m_consoleHandler.setHandler("stop_mining", std::bind(&DaemonCommandsHandler::stop_mining, this, std::placeholders::_1), "Stop mining");
+  m_consoleHandler.setHandler("print_pool", std::bind(&DaemonCommandsHandler::print_pool, this, std::placeholders::_1), "Print transaction pool (long format)");
+  m_consoleHandler.setHandler("print_pool_sh", std::bind(&DaemonCommandsHandler::print_pool_sh, this, std::placeholders::_1), "Print transaction pool (short format)");
+  m_consoleHandler.setHandler("print_mp", std::bind(&DaemonCommandsHandler::print_pool_count, this, std::placeholders::_1), "Print number of transactions in memory pool");
+  m_consoleHandler.setHandler("show_hr", std::bind(&DaemonCommandsHandler::show_hr, this, std::placeholders::_1), "Start showing hash rate");
+  m_consoleHandler.setHandler("hide_hr", std::bind(&DaemonCommandsHandler::hide_hr, this, std::placeholders::_1), "Stop showing hash rate");
+  m_consoleHandler.setHandler("set_log", std::bind(&DaemonCommandsHandler::set_log, this, std::placeholders::_1), "set_log <level> - Change current log level, <level> is a number 0-4");
+  m_consoleHandler.setHandler("print_diff", std::bind(&DaemonCommandsHandler::print_diff, this, std::placeholders::_1), "Difficulty for next block");
+  m_consoleHandler.setHandler("print_ban", std::bind(&DaemonCommandsHandler::print_ban, this, std::placeholders::_1), "Print banned nodes");
+  m_consoleHandler.setHandler("ban", std::bind(&DaemonCommandsHandler::ban, this, std::placeholders::_1), "Ban a given <IP> for [<seconds>] or permanently if no duration provided, ban <IP> [<seconds>]");
+  m_consoleHandler.setHandler("unban", std::bind(&DaemonCommandsHandler::unban, this, std::placeholders::_1), "Unban a given <IP>, unban <IP>");
+  m_consoleHandler.setHandler("status", std::bind(&DaemonCommandsHandler::status, this, std::placeholders::_1), "Show daemon status");
+  m_consoleHandler.setHandler("save", std::bind(&DaemonCommandsHandler::save, this, std::placeholders::_1), "Store blockchain");
 }
 
 //--------------------------------------------------------------------------------
