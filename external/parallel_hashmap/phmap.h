@@ -34,7 +34,57 @@
 // limitations under the License.
 // ---------------------------------------------------------------------------
 
-#define PHMAP_BIDIRECTIONAL 0
+// ---------------------------------------------------------------------------
+// IMPLEMENTATION DETAILS
+//
+// The table stores elements inline in a slot array. In addition to the slot
+// array the table maintains some control state per slot. The extra state is one
+// byte per slot and stores empty or deleted marks, or alternatively 7 bits from
+// the hash of an occupied slot. The table is split into logical groups of
+// slots, like so:
+//
+//      Group 1         Group 2        Group 3
+// +---------------+---------------+---------------+
+// | | | | | | | | | | | | | | | | | | | | | | | | |
+// +---------------+---------------+---------------+
+//
+// On lookup the hash is split into two parts:
+// - H2: 7 bits (those stored in the control bytes)
+// - H1: the rest of the bits
+// The groups are probed using H1. For each group the slots are matched to H2 in
+// parallel. Because H2 is 7 bits (128 states) and the number of slots per group
+// is low (8 or 16) in almost all cases a match in H2 is also a lookup hit.
+//
+// On insert, once the right group is found (as in lookup), its slots are
+// filled in order.
+//
+// On erase a slot is cleared. In case the group did not have any empty slots
+// before the erase, the erased slot is marked as deleted.
+//
+// Groups without empty slots (but maybe with deleted slots) extend the probe
+// sequence. The probing algorithm is quadratic. Given N the number of groups,
+// the probing function for the i'th probe is:
+//
+//   P(0) = H1 % N
+//
+//   P(i) = (P(i - 1) + i) % N
+//
+// This probing function guarantees that after N probes, all the groups of the
+// table will be probed exactly once.
+//
+// The control state and slot array are stored contiguously in a shared heap
+// allocation. The layout of this allocation is: `capacity()` control bytes,
+// one sentinel control byte, `Group::kWidth - 1` cloned control bytes,
+// <possible padding>, `capacity()` slots. The sentinel control byte is used in
+// iteration so we know when we reach the end of the table. The cloned control
+// bytes at the end of the table are cloned from the beginning of the table so
+// groups that begin near the end of the table can see a full group. In cases in
+// which there are more than `capacity()` cloned control bytes, the extra bytes
+// are `kEmpty`, and these ensure that we always see at least one empty slot and
+// can stop an unsuccessful search.
+// ---------------------------------------------------------------------------
+
+
 
 #ifdef _MSC_VER
     #pragma warning(push)  
@@ -77,6 +127,17 @@
 namespace phmap {
 
 namespace priv {
+
+// --------------------------------------------------------------------------
+template <typename AllocType>
+void SwapAlloc(AllocType& lhs, AllocType& rhs,
+               std::true_type /* propagate_on_container_swap */) {
+  using std::swap;
+  swap(lhs, rhs);
+}
+template <typename AllocType>
+void SwapAlloc(AllocType& /*lhs*/, AllocType& /*rhs*/,
+               std::false_type /* propagate_on_container_swap */) {}
 
 // --------------------------------------------------------------------------
 template <size_t Width>
@@ -178,31 +239,33 @@ public:
     using const_iterator = BitMask;
 
     explicit BitMask(T mask) : mask_(mask) {}
-    BitMask& operator++() {
-        mask_ &= (mask_ - 1);
+
+    BitMask& operator++() {    // ++iterator
+        mask_ &= (mask_ - 1);  // clear the least significant bit set
         return *this;
     }
+
     explicit operator bool() const { return mask_ != 0; }
-    int operator*() const { return LowestBitSet(); }
-    int LowestBitSet() const {
+    uint32_t operator*() const { return LowestBitSet(); }
+
+    uint32_t LowestBitSet() const {
         return priv::TrailingZeros(mask_) >> Shift;
     }
-    int HighestBitSet() const {
-        return (sizeof(T) * CHAR_BIT - priv::LeadingZeros(mask_) -
-                1) >>
-            Shift;
+
+    uint32_t HighestBitSet() const {
+        return (sizeof(T) * CHAR_BIT - priv::LeadingZeros(mask_) - 1) >> Shift;
     }
 
     BitMask begin() const { return *this; }
     BitMask end() const { return BitMask(0); }
 
-    int TrailingZeros() const {
+    uint32_t TrailingZeros() const {
         return priv::TrailingZeros(mask_) >> Shift;
     }
 
-    int LeadingZeros() const {
-        constexpr int total_significant_bits = SignificantBits << Shift;
-        constexpr int extra_bits = sizeof(T) * 8 - total_significant_bits;
+    uint32_t LeadingZeros() const {
+        constexpr uint32_t total_significant_bits = SignificantBits << Shift;
+        constexpr uint32_t extra_bits = sizeof(T) * 8 - total_significant_bits;
         return priv::LeadingZeros(mask_ << extra_bits) >> Shift;
     }
 
@@ -227,9 +290,9 @@ using h2_t = uint8_t;
 // --------------------------------------------------------------------------
 enum Ctrl : ctrl_t 
 {
-    kEmpty = -128,   // 0b10000000
-    kDeleted = -2,   // 0b11111110
-    kSentinel = -1,  // 0b11111111
+    kEmpty = -128,   // 0b10000000 or 0x80
+    kDeleted = -2,   // 0b11111110 or 0xfe
+    kSentinel = -1,  // 0b11111111 or 0xff
 };
 
 static_assert(
@@ -288,10 +351,10 @@ inline size_t H1(size_t hashval, const ctrl_t* ) {
 #endif
 
 
-inline ctrl_t H2(size_t hashval)       { return (ctrl_t)(hashval & 0x7F); }
+inline h2_t H2(size_t hashval)       { return (ctrl_t)(hashval & 0x7F); }
 
 inline bool IsEmpty(ctrl_t c)          { return c == kEmpty; }
-inline bool IsFull(ctrl_t c)           { return c >= 0; }
+inline bool IsFull(ctrl_t c)           { return c >= static_cast<ctrl_t>(0); }
 inline bool IsDeleted(ctrl_t c)        { return c == kDeleted; }
 inline bool IsEmptyOrDeleted(ctrl_t c) { return c < kSentinel; }
 
@@ -340,7 +403,7 @@ struct GroupSse2Impl
     BitMask<uint32_t, kWidth> Match(h2_t hash) const {
         auto match = _mm_set1_epi8((char)hash);
         return BitMask<uint32_t, kWidth>(
-            _mm_movemask_epi8(_mm_cmpeq_epi8(match, ctrl)));
+            static_cast<uint32_t>(_mm_movemask_epi8(_mm_cmpeq_epi8(match, ctrl))));
     }
 
     // Returns a bitmask representing the positions of empty slots.
@@ -349,7 +412,7 @@ struct GroupSse2Impl
 #if PHMAP_HAVE_SSSE3
         // This only works because kEmpty is -128.
         return BitMask<uint32_t, kWidth>(
-            _mm_movemask_epi8(_mm_sign_epi8(ctrl, ctrl)));
+            static_cast<uint32_t>(_mm_movemask_epi8(_mm_sign_epi8(ctrl, ctrl))));
 #else
         return Match(static_cast<h2_t>(kEmpty));
 #endif
@@ -358,17 +421,17 @@ struct GroupSse2Impl
     // Returns a bitmask representing the positions of empty or deleted slots.
     // -----------------------------------------------------------------------
     BitMask<uint32_t, kWidth> MatchEmptyOrDeleted() const {
-        auto special = _mm_set1_epi8(kSentinel);
+        auto special = _mm_set1_epi8(static_cast<uint8_t>(kSentinel));
         return BitMask<uint32_t, kWidth>(
-            _mm_movemask_epi8(_mm_cmpgt_epi8_fixed(special, ctrl)));
+            static_cast<uint32_t>(_mm_movemask_epi8(_mm_cmpgt_epi8_fixed(special, ctrl))));
     }
 
     // Returns the number of trailing empty or deleted elements in the group.
     // ----------------------------------------------------------------------
     uint32_t CountLeadingEmptyOrDeleted() const {
-        auto special = _mm_set1_epi8(kSentinel);
+        auto special = _mm_set1_epi8(static_cast<uint8_t>(kSentinel));
         return TrailingZeros(
-            _mm_movemask_epi8(_mm_cmpgt_epi8_fixed(special, ctrl)) + 1);
+            static_cast<uint32_t>(_mm_movemask_epi8(_mm_cmpgt_epi8_fixed(special, ctrl)) + 1));
     }
 
     // ----------------------------------------------------------------------
@@ -423,12 +486,12 @@ struct GroupPortableImpl
         return BitMask<uint64_t, kWidth, 3>((x - lsbs) & ~x & msbs);
     }
 
-    BitMask<uint64_t, kWidth, 3> MatchEmpty() const {
+    BitMask<uint64_t, kWidth, 3> MatchEmpty() const {          // bit 1 of each byte is 0 for empty (but not for deleted)
         constexpr uint64_t msbs = 0x8080808080808080ULL;
         return BitMask<uint64_t, kWidth, 3>((ctrl & (~ctrl << 6)) & msbs);
     }
 
-    BitMask<uint64_t, kWidth, 3> MatchEmptyOrDeleted() const {
+    BitMask<uint64_t, kWidth, 3> MatchEmptyOrDeleted() const { // lsb of each byte is 0 for empty or deleted
         constexpr uint64_t msbs = 0x8080808080808080ULL;
         return BitMask<uint64_t, kWidth, 3>((ctrl & (~ctrl << 7)) & msbs);
     }
@@ -454,6 +517,11 @@ struct GroupPortableImpl
 #else
     using Group = GroupPortableImpl;
 #endif
+
+// The number of cloned control bytes that we copy from the beginning to the
+// end of the control bytes array.
+// -------------------------------------------------------------------------
+constexpr size_t NumClonedBytes() { return Group::kWidth - 1; }
 
 template <class Policy, class Hash, class Eq, class Alloc>
 class raw_hash_set;
@@ -1086,7 +1154,7 @@ public:
 
     raw_hash_set(const raw_hash_set& that, const allocator_type& a)
         : raw_hash_set(0, that.hash_ref(), that.eq_ref(), a) {
-        reserve(that.size());
+        rehash(that.capacity());   // operator=() should preserve load_factor
         // Because the table is guaranteed to be empty, we can do something faster
         // than a full `insert`.
         for (const auto& v : that) {
@@ -1343,7 +1411,9 @@ public:
     }
 
     iterator insert(const_iterator, node_type&& node) {
-        return insert(std::move(node)).first;
+        auto res = insert(std::move(node));
+        node = std::move(res.node);
+        return res.position;
     }
 
     // This overload kicks in if we can deduce the key from args. This enables us
@@ -1453,7 +1523,7 @@ public:
     }
 
     template <class K = key_type, class F>
-    iterator lazy_emplace_with_hash(const key_arg<K>& key, size_t &hashval, F&& f) {
+    iterator lazy_emplace_with_hash(const key_arg<K>& key, size_t hashval, F&& f) {
         auto res = find_or_prepare_insert(key, hashval);
         if (res.second) {
             lazy_emplace_at(res.first, std::forward<F>(f));
@@ -1466,6 +1536,15 @@ public:
         slot_type* slot = slots_ + idx;
         std::forward<F>(f)(constructor(&alloc_ref(), &slot));
         assert(!slot);
+    }
+
+    template <class K = key_type, class F>
+    void emplace_single_with_hash(const key_arg<K>& key, size_t hashval, F&& f) {
+        auto res = find_or_prepare_insert(key, hashval);
+        if (res.second)
+            lazy_emplace_at(res.first, std::forward<F>(f));
+        else
+            _erase(iterator_at(res.first));
     }
 
 
@@ -1752,7 +1831,7 @@ private:
         auto seq = probe(hashval);
         while (true) {
             Group g{ ctrl_ + seq.offset() };
-            for (int i : g.Match((h2_t)H2(hashval))) {
+            for (uint32_t i : g.Match((h2_t)H2(hashval))) {
                 offset = seq.offset((size_t)i);
                 if (PHMAP_PREDICT_TRUE(PolicyTraits::apply(
                     EqualElement<K>{key, eq_ref()},
@@ -2026,7 +2105,7 @@ private:
         auto seq = probe(hashval);
         while (true) {
             Group g{ctrl_ + seq.offset()};
-            for (int i : g.Match((h2_t)H2(hashval))) {
+            for (uint32_t i : g.Match((h2_t)H2(hashval))) {
                 if (PHMAP_PREDICT_TRUE(PolicyTraits::element(slots_ + seq.offset((size_t)i)) ==
                                       elem))
                     return true;
@@ -2088,7 +2167,7 @@ protected:
         auto seq = probe(hashval);
         while (true) {
             Group g{ctrl_ + seq.offset()};
-            for (int i : g.Match((h2_t)H2(hashval))) {
+            for (uint32_t i : g.Match((h2_t)H2(hashval))) {
                 if (PHMAP_PREDICT_TRUE(PolicyTraits::apply(
                                           EqualElement<K>{key, eq_ref()},
                                           PolicyTraits::element(slots_ + seq.offset((size_t)i)))))
@@ -2254,9 +2333,10 @@ public:
     using key_arg = typename KeyArgImpl::template type<K, key_type>;
 
     static_assert(!std::is_reference<key_type>::value, "");
-    // TODO(alkis): remove this assertion and verify that reference mapped_type is
-    // supported.
-    static_assert(!std::is_reference<mapped_type>::value, "");
+
+    // TODO(b/187807849): Evaluate whether to support reference mapped_type and
+    // remove this assertion if/when it is supported.
+     static_assert(!std::is_reference<mapped_type>::value, "");
 
     using iterator = typename raw_hash_map::raw_hash_set::iterator;
     using const_iterator = typename raw_hash_map::raw_hash_set::const_iterator;
@@ -2453,6 +2533,19 @@ protected:
     // --------------------------------------------------------------------
     struct Inner : public Lockable
     {
+        struct Params
+        {
+            size_t bucket_cnt;
+            const hasher& hashfn;
+            const key_equal& eq;
+            const allocator_type& alloc;
+        };
+
+        Inner() {}
+
+        Inner(Params const &p) : set_(p.bucket_cnt, p.hashfn, p.eq, p.alloc)
+        {}
+
         bool operator==(const Inner& o) const
         {
             typename Lockable::SharedLocks l(const_cast<Inner &>(*this), const_cast<Inner &>(o));
@@ -2627,6 +2720,20 @@ public:
         std::is_nothrow_default_constructible<key_equal>::value&&
         std::is_nothrow_default_constructible<allocator_type>::value) {}
 
+#if  (__cplusplus >= 201703L || (defined(_MSVC_LANG) && _MSVC_LANG >= 201402)) && (defined(_MSC_VER) || defined(__clang__) || (defined(__GNUC__) && __GNUC__ > 6))
+    explicit parallel_hash_set(size_t bucket_cnt, 
+                               const hasher& hash_param    = hasher(),
+                               const key_equal& eq         = key_equal(),
+                               const allocator_type& alloc = allocator_type()) :
+        parallel_hash_set(typename Inner::Params{bucket_cnt, hash_param, eq, alloc}, 
+                          phmap::make_index_sequence<num_tables>{})
+    {}
+
+    template <std::size_t... i>
+    parallel_hash_set(typename Inner::Params const &p,
+                      phmap::index_sequence<i...>) : sets_{((void)i, p)...}
+    {}
+#else
     explicit parallel_hash_set(size_t bucket_cnt, 
                                const hasher& hash_param    = hasher(),
                                const key_equal& eq         = key_equal(),
@@ -2634,6 +2741,7 @@ public:
         for (auto& inner : sets_)
             inner.set_ = EmbeddedSet(bucket_cnt / N, hash_param, eq, alloc);
     }
+#endif
 
     parallel_hash_set(size_t bucket_cnt, 
                       const hasher& hash_param,
@@ -2922,7 +3030,7 @@ public:
     };
 
     // --------------------------------------------------------------------
-    // phmap expension: emplace_with_hash
+    // phmap extension: emplace_with_hash
     // ----------------------------------
     // same as emplace, but hashval is provided
     // --------------------------------------------------------------------
@@ -3074,6 +3182,8 @@ public:
         return {iterator(inner, &sets_[0] + num_tables, res.first), res.second};
     }
 
+    // lazy_emplace
+    // ------------
     template <class K = key_type, class F>
     iterator lazy_emplace(const key_arg<K>& key, F&& f) {
         auto hashval = this->hash(key);
@@ -3082,7 +3192,96 @@ public:
         typename Lockable::UniqueLock m(inner);
         return make_iterator(&inner, set.lazy_emplace_with_hash(key, hashval, std::forward<F>(f)));
     }
+    
+    // emplace_single
+    // --------------
+    template <class K = key_type, class F>
+    void emplace_single_with_hash(const key_arg<K>& key, size_t hashval, F&& f) {
+        Inner& inner = sets_[subidx(hashval)];
+        auto&  set   = inner.set_;
+        typename Lockable::UniqueLock m(inner);
+        set.emplace_single_with_hash(key, hashval, std::forward<F>(f));
+    }
 
+    template <class K = key_type, class F>
+    void emplace_single(const key_arg<K>& key, F&& f) {
+        auto hashval = this->hash(key);
+        emplace_single_with_hash<K, F>(key, hashval, std::forward<F>(f));
+    }
+
+    // if set contains key, lambda is called with the value_type (under read lock protection),
+    // and if_contains returns true. This is a const API and lambda should not modify the value
+    // -----------------------------------------------------------------------------------------
+    template <class K = key_type, class F>
+    bool if_contains(const key_arg<K>& key, F&& f) const {
+        return const_cast<parallel_hash_set*>(this)->template 
+            modify_if_impl<K, F, typename Lockable::SharedLock>(key, std::forward<F>(f));
+    }
+
+    // if set contains key, lambda is called with the value_type  without read lock protection,
+    // and if_contains_unsafe returns true. This is a const API and lambda should not modify the value
+    // This should be used only if we know that no other thread may be mutating the set at the time.
+    // -----------------------------------------------------------------------------------------
+    template <class K = key_type, class F>
+    bool if_contains_unsafe(const key_arg<K>& key, F&& f) const {
+        return const_cast<parallel_hash_set*>(this)->template 
+            modify_if_impl<K, F, LockableBaseImpl<phmap::NullMutex>::DoNothing>(key, std::forward<F>(f));
+    }
+
+    // if map contains key, lambda is called with the value_type  (under write lock protection),
+    // and modify_if returns true. This is a non-const API and lambda is allowed to modify the mapped value
+    // ----------------------------------------------------------------------------------------------------
+    template <class K = key_type, class F>
+    bool modify_if(const key_arg<K>& key, F&& f) {
+        return modify_if_impl<K, F, typename Lockable::UniqueLock>(key, std::forward<F>(f));
+    }
+
+    // -----------------------------------------------------------------------------------------
+    template <class K = key_type, class F, class L>
+    bool modify_if_impl(const key_arg<K>& key, F&& f) {
+#if __cplusplus >= 201703L
+        static_assert(std::is_invocable<F, value_type&>::value);
+#endif
+        L m;
+        auto ptr = this->template find_ptr<K, L>(key, this->hash(key), m);
+        if (ptr == nullptr)
+            return false;
+        std::forward<F>(f)(*ptr);
+        return true;
+    }
+
+    // if map contains key, lambda is called with the mapped value  (under write lock protection).
+    // If the lambda returns true, the key is subsequently erased from the map (the write lock
+    // is only released after erase).
+    // returns true if key was erased, false otherwise.
+    // ----------------------------------------------------------------------------------------------------
+    template <class K = key_type, class F>
+    bool erase_if(const key_arg<K>& key, F&& f) {
+        return erase_if_impl<K, F, typename Lockable::UniqueLock>(key, std::forward<F>(f));
+    }
+
+    template <class K = key_type, class F, class L>
+    bool erase_if_impl(const key_arg<K>& key, F&& f) {
+#if __cplusplus >= 201703L
+        static_assert(std::is_invocable<F, value_type&>::value);
+#endif
+        L m;
+        auto it = this->template find<K, L>(key, this->hash(key), m);
+        if (it == this->end()) return false;
+        if (std::forward<F>(f)(const_cast<value_type &>(*it)))
+        {
+            this->erase(it);
+            return true;
+        }
+        return false;
+    }
+
+    // if map does not contains key, it is inserted and the mapped value is value-constructed 
+    // with the provided arguments (if any), as with try_emplace. 
+    // if map already  contains key, then the lambda is called with the mapped value (under 
+    // write lock protection) and can update the mapped value.
+    // returns true if key was not already present, false otherwise.
+    // ---------------------------------------------------------------------------------------
     template <class K = key_type, class FExists, class FEmplace>
     bool lazy_emplace_l(const key_arg<K>& key, FExists&& fExists, FEmplace&& fEmplace) {
         typename Lockable::UniqueLock m;
@@ -3092,7 +3291,7 @@ public:
             inner->set_.lazy_emplace_at(std::get<1>(res), std::forward<FEmplace>(fEmplace));
         else {
             auto it = this->iterator_at(inner, inner->set_.iterator_at(std::get<1>(res)));
-            std::forward<FExists>(fExists)(Policy::value(&*it));
+            std::forward<FExists>(fExists)(const_cast<value_type &>(*it)); // in case of the set, non "key" part of value_type can be changed
         }
         return std::get<2>(res);
     }
@@ -3552,8 +3751,9 @@ class parallel_hash_map : public parallel_hash_set<N, RefSet, Mtx_, Policy, Hash
     using Lockable = phmap::LockableImpl<Mtx_>;
 
 public:
-    using key_type = typename Policy::key_type;
+    using key_type    = typename Policy::key_type;
     using mapped_type = typename Policy::mapped_type;
+    using value_type  = typename Base::value_type;
     template <class K>
     using key_arg = typename KeyArgImpl::template type<K, key_type>;
 
@@ -3690,44 +3890,6 @@ public:
         return try_emplace_with_hash(hashval, k, std::forward<Args>(args)...).first;
     }
 
-    // if map contains key, lambda is called with the mapped value (under read lock protection),
-    // and if_contains returns true. This is a const API and lambda should not modify the value
-    // -----------------------------------------------------------------------------------------
-    template <class K = key_type, class F>
-    bool if_contains(const key_arg<K>& key, F&& f) const {
-        return const_cast<parallel_hash_map*>(this)->template 
-            modify_if_impl<K, F, typename Lockable::SharedLock>(key, std::forward<F>(f));
-    }
-
-    // if map contains key, lambda is called with the mapped value without read lock protection,
-    // and if_contains_unsafe returns true. This is a const API and lambda should not modify the value
-    // This should be used only if we know that no other thread may be mutating the map at the time.
-    // -----------------------------------------------------------------------------------------
-    template <class K = key_type, class F>
-    bool if_contains_unsafe(const key_arg<K>& key, F&& f) const {
-        return const_cast<parallel_hash_map*>(this)->template 
-            modify_if_impl<K, F, LockableBaseImpl<phmap::NullMutex>::DoNothing>(key, std::forward<F>(f));
-    }
-
-    // if map contains key, lambda is called with the mapped value  (under write lock protection),
-    // and modify_if returns true. This is a non-const API and lambda is allowed to modify the mapped value
-    // ----------------------------------------------------------------------------------------------------
-    template <class K = key_type, class F>
-    bool modify_if(const key_arg<K>& key, F&& f) {
-        return modify_if_impl<K, F, typename Lockable::UniqueLock>(key, std::forward<F>(f));
-    }
-
-
-    // if map contains key, lambda is called with the mapped value  (under write lock protection).
-    // If the lambda returns true, the key is subsequently erased from the map (the write lock
-    // is only released after erase).
-    // returns true if key was erased, false otherwise.
-    // ----------------------------------------------------------------------------------------------------
-    template <class K = key_type, class F>
-    bool erase_if(const key_arg<K>& key, F&& f) {
-        return erase_if_impl<K, F, typename Lockable::UniqueLock>(key, std::forward<F>(f));
-    }
-
     // if map does not contains key, it is inserted and the mapped value is value-constructed 
     // with the provided arguments (if any), as with try_emplace. 
     // if map already  contains key, then the lambda is called with the mapped value (under 
@@ -3745,7 +3907,7 @@ public:
                                    std::forward_as_tuple(std::forward<Args>(args)...));
         else {
             auto it = this->iterator_at(inner, inner->set_.iterator_at(std::get<1>(res)));
-            std::forward<F>(f)(Policy::value(&*it));
+            std::forward<F>(f)(const_cast<value_type &>(*it)); // in case of the set, non "key" part of value_type can be changed
         }
         return std::get<2>(res);
     }
@@ -3763,35 +3925,6 @@ public:
     }
 
 private:
-    template <class K = key_type, class F, class L>
-    bool modify_if_impl(const key_arg<K>& key, F&& f) {
-#if __cplusplus >= 201703L
-        static_assert(std::is_invocable<F, mapped_type&>::value);
-#endif
-        L m;
-        auto ptr = this->template find_ptr<K, L>(key, this->hash(key), m);
-        if (ptr == nullptr)
-            return false;
-        std::forward<F>(f)(Policy::value(ptr));
-        return true;
-    }
-
-    template <class K = key_type, class F, class L>
-    bool erase_if_impl(const key_arg<K>& key, F&& f) {
-#if __cplusplus >= 201703L
-        static_assert(std::is_invocable<F, mapped_type&>::value);
-#endif
-        L m;
-        auto it = this->template find<K, L>(key, this->hash(key), m);
-        if (it == this->end()) return false;
-        if (std::forward<F>(f)(Policy::value(&*it)))
-        {
-            this->erase(it);
-            return true;
-        }
-        return false;
-    }
-
 
     template <class K, class V>
     std::pair<iterator, bool> insert_or_assign_impl(K&& k, V&& v) {
@@ -4267,7 +4400,7 @@ struct HashtableDebugAccess<Set, phmap::void_t<typename Set::raw_hash_set>>
         auto seq = set.probe(hashval);
         while (true) {
             priv::Group g{set.ctrl_ + seq.offset()};
-            for (int i : g.Match(priv::H2(hashval))) {
+            for (uint32_t i : g.Match(priv::H2(hashval))) {
                 if (Traits::apply(
                         typename Set::template EqualElement<typename Set::key_type>{
                             key, set.eq_ref()},
