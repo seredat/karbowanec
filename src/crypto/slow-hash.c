@@ -65,6 +65,15 @@ union cn_slow_hash_state
 };
 #pragma pack(pop)
 
+static inline void aligned_free(void* ptr)
+{
+#ifdef _MSC_VER
+  _aligned_free(ptr);
+#else
+  free(ptr);
+#endif
+}
+
 #if !defined NO_AES && (defined(__x86_64__) || (defined(_MSC_VER) && defined(_WIN64)))
 // Optimised code below, uses x86-specific intrinsics, SSE2, AES-NI
 // Fall back to more portable code is down at the bottom
@@ -174,15 +183,6 @@ void cpuid(int CPUInfo[4], int InfoType)
         );
 }
 #endif
-
-STATIC INLINE void aligned_free(void* ptr)
-{
-#ifdef _MSC_VER
-    _aligned_free(ptr);
-#else
-    free(ptr);
-#endif
-}
 
 /**
  * @brief a = (a xor b), where a and b point to 128 bit values
