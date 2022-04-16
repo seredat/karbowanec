@@ -84,7 +84,7 @@
 // can stop an unsuccessful search.
 // ---------------------------------------------------------------------------
 
-
+#define PHMAP_BIDIRECTIONAL 0
 
 #ifdef _MSC_VER
     #pragma warning(push)  
