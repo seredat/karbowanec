@@ -368,8 +368,8 @@ int main(int argc, char* argv[])
       if (!rollback_str.empty()) {
         uint32_t _index = 0;
         if (!Common::fromString(rollback_str, _index)) {
-          std::cout << "wrong block index parameter" << ENDL;
-          return false;
+          std::cout << "Wrong block index parameter for a rollback" << ENDL;
+          return 1;
         }
         m_core.rollbackBlockchain(_index);
       }
