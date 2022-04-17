@@ -1,7 +1,7 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2014-2016, XDN developers
 // Copyright (c) 2014-2016, The Monero Project
-// Copyright (c) 2016-2018, Karbo developers
+// Copyright (c) 2016-2022, Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -46,17 +46,10 @@ using namespace CryptoNote;
 
 namespace Tools {
 
-  const std::string DEFAULT_RPC_IP = "127.0.0.1";
-  const uint16_t DEFAULT_RPC_PORT = WALLET_RPC_DEFAULT_PORT;
-  const uint16_t DEFAULT_RPC_SSL_PORT = WALLET_RPC_DEFAULT_SSL_PORT;
-  const std::string DEFAULT_RPC_CHAIN_FILE = std::string(RPC_DEFAULT_CHAIN_FILE);
-  const std::string DEFAULT_RPC_KEY_FILE = std::string(RPC_DEFAULT_KEY_FILE);
-  const std::string DEFAULT_RPC_DH_FILE = std::string(RPC_DEFAULT_DH_FILE);
-
 const command_line::arg_descriptor<uint16_t>    wallet_rpc_server::arg_rpc_bind_port =
   { "rpc-bind-port", "Starts wallet as RPC server for wallet operations, sets bind port for server.", 0, true };
 const command_line::arg_descriptor<uint16_t>    wallet_rpc_server::arg_rpc_bind_ssl_port =
-  { "rpc-bind-ssl-port", "Starts wallet as RPC server for wallet operations, sets bind port ssl for server.", DEFAULT_RPC_SSL_PORT };
+  { "rpc-bind-ssl-port", "Starts wallet as RPC server for wallet operations, sets bind port ssl for server.", WALLET_RPC_DEFAULT_SSL_PORT };
 const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_rpc_bind_ip = 
   { "rpc-bind-ip"  , "Specify IP to bind RPC server to.", "127.0.0.1" };
 const command_line::arg_descriptor<bool>    wallet_rpc_server::arg_rpc_bind_ssl_enable =
@@ -66,11 +59,11 @@ const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_rpc_user 
 const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_rpc_password = 
   { "rpc-password" , "Password to use with the RPC server. If empty, no server authorization will be done.", "" };
 const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_chain_file =
-  { "rpc-chain-file" , "SSL chain file", DEFAULT_RPC_CHAIN_FILE };
+  { "rpc-chain-file" , "SSL chain file", RPC_DEFAULT_CHAIN_FILE };
 const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_key_file =
-  { "rpc-key-file" , "SSL key file", DEFAULT_RPC_KEY_FILE };
+  { "rpc-key-file" , "SSL key file", RPC_DEFAULT_KEY_FILE };
 const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_dh_file =
-  { "rpc-dh-file" , "SSL DH file", DEFAULT_RPC_DH_FILE };
+  { "rpc-dh-file" , "SSL DH file", RPC_DEFAULT_DH_FILE };
 
 void wallet_rpc_server::init_options(boost::program_options::options_description& desc)
 {
