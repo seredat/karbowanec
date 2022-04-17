@@ -74,7 +74,7 @@ public:
   int getTimer();
   void pushTimer(int timer);
 
-#ifdef __LP64__
+#ifdef __LP64__ && !defined(__aarch64__)
   static const int SIZEOF_PTHREAD_MUTEX_T = 56 + sizeof(long);
 #else
   static const int SIZEOF_PTHREAD_MUTEX_T = 40 + sizeof(long);
