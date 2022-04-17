@@ -22,7 +22,7 @@
 #define NEEDAMD64CONTEXT 1
 #define SET _setmcontext
 #define GET _getmcontext
-#elif defined(__aarch64__)
+#elif defined(__arm64__) || defined(__aarch64__)
 #define NEEDARM64CONTEXT 1
 #define SET _setmcontext
 #define GET _getmcontext
@@ -272,7 +272,7 @@ SET:
 
 #ifdef NEEDARM64CONTEXT
 
-#define REG_SZ		             (8)
+#define REG_SZ                   (8)
 #define MCONTEXT_GREGS           (184)
 #define SP_OFFSET                432
 #define PC_OFFSET                440
