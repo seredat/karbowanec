@@ -310,10 +310,10 @@ namespace CryptoNote {
 
     Logging::LoggerRef logger;
 
-    bool switch_to_alternative_blockchain(std::list<blocks_ext_by_hash::iterator>& alt_chain, bool discard_disconnected_chain);
+    bool switch_to_alternative_blockchain(const std::list<Crypto::Hash>& alt_chain, bool discard_disconnected_chain);
     bool handle_alternative_block(const Block& b, const Crypto::Hash& id, block_verification_context& bvc, bool sendNewAlternativeBlockMessage = true);
-    bool checkProofOfWork(Crypto::cn_context& context, const Block& block, difficulty_type currentDiffic, Crypto::Hash& proofOfWork, std::list<blocks_ext_by_hash::iterator>& alt_chain, bool no_blobs = false);
-    bool getBlockLongHash(Crypto::cn_context& context, const Block& b, Crypto::Hash& res, std::list<blocks_ext_by_hash::iterator>& alt_chain, bool no_blobs = false);
+    bool checkProofOfWork(Crypto::cn_context& context, const Block& block, difficulty_type currentDiffic, Crypto::Hash& proofOfWork, const std::list<Crypto::Hash>& alt_chain, bool no_blobs = false);
+    bool getBlockLongHash(Crypto::cn_context& context, const Block& b, Crypto::Hash& res, const std::list<Crypto::Hash>& alt_chain, bool no_blobs = false);
     bool prevalidate_miner_transaction(const Block& b, uint32_t height);
     bool validate_miner_transaction(const Block& b, uint32_t height, size_t cumulativeBlockSize, uint64_t alreadyGeneratedCoins, uint64_t fee, uint64_t& reward, int64_t& emissionChange);
     bool validate_block_signature(const Block& b, const Crypto::Hash& id, uint32_t height);
