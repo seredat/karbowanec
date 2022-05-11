@@ -853,7 +853,7 @@ bool RpcServer::on_get_transactions_details_by_hashes(const COMMAND_RPC_GET_TRAN
     if (txs.empty() || !missed_txs.empty()) {
       std::ostringstream ss;
       std::string separator;
-      for (auto h : missed_txs) {
+      for (const auto& h : missed_txs) {
         ss << separator << Common::podToHex(h);
         separator = ",";
       }
@@ -2074,14 +2074,12 @@ bool RpcServer::on_check_transaction_key(const COMMAND_RPC_CHECK_TRANSACTION_KEY
   std::list<Transaction> txs;
   m_core.getTransactions(tx_ids, txs, missed_txs, true);
 
-  if (1 == txs.size()) {
-    tx = txs.front();
+  if (!missed_txs.empty() || 1 != txs.size()) {
+    throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_WRONG_PARAM, "Couldn't find transaction " + req.transaction_id };
   }
-  else {
-    throw JsonRpc::JsonRpcError{
-      CORE_RPC_ERROR_CODE_WRONG_PARAM,
-      "Couldn't find transaction with hash: " + req.transaction_id + '.' };
-  }
+
+  tx = txs.front();
+
   CryptoNote::TransactionPrefix transaction = *static_cast<const TransactionPrefix*>(&tx);
 
   // obtain key derivation
@@ -2146,14 +2144,12 @@ bool RpcServer::on_check_transaction_with_view_key(const COMMAND_RPC_CHECK_TRANS
   std::list<Transaction> txs;
   m_core.getTransactions(tx_ids, txs, missed_txs, true);
 
-  if (1 == txs.size()) {
-    tx = txs.front();
+  if (!missed_txs.empty() || 1 != txs.size()) {
+    throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_WRONG_PARAM, "Couldn't find transaction " + req.transaction_id };
   }
-  else {
-    throw JsonRpc::JsonRpcError{
-      CORE_RPC_ERROR_CODE_WRONG_PARAM,
-      "Couldn't find transaction with hash: " + req.transaction_id + '.' };
-  }
+
+  tx = txs.front();
+
   CryptoNote::TransactionPrefix transaction = *static_cast<const TransactionPrefix*>(&tx);
   
   // get tx pub key
@@ -2236,14 +2232,12 @@ bool RpcServer::on_check_transaction_proof(const COMMAND_RPC_CHECK_TRANSACTION_P
   std::list<Transaction> txs;
   m_core.getTransactions(tx_ids, txs, missed_txs, true);
 
-  if (1 == txs.size()) {
-    tx = txs.front();
+  if (!missed_txs.empty() || 1 != txs.size()) {
+    throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_WRONG_PARAM, "Couldn't find transaction " + req.transaction_id };
   }
-  else {
-    throw JsonRpc::JsonRpcError{
-      CORE_RPC_ERROR_CODE_WRONG_PARAM,
-      "transaction wasn't found. Hash = " + req.transaction_id + '.' };
-  }
+
+  tx = txs.front();
+
   CryptoNote::TransactionPrefix transaction = *static_cast<const TransactionPrefix*>(&tx);
 
   Crypto::PublicKey R = getTransactionPublicKeyFromExtra(transaction.extra);
@@ -2257,7 +2251,6 @@ bool RpcServer::on_check_transaction_proof(const COMMAND_RPC_CHECK_TRANSACTION_P
   res.signature_valid = r;
 
   if (r) {
-
     // obtain key derivation by multiplying scalar 1 to the pubkey r*A included in the signature
     Crypto::KeyDerivation derivation;
     if (!Crypto::generate_key_derivation(rA, Crypto::EllipticCurveScalar2SecretKey(Crypto::I), derivation)) {
@@ -2345,13 +2338,13 @@ bool RpcServer::on_check_reserve_proof(const COMMAND_RPC_CHECK_RESERVE_PROOF::re
     for (const auto& h : transactionHashes) {
       uint32_t tx_height;
       if (!m_core.getTransactionHeight(h, tx_height)) {
-        throw JsonRpc::JsonRpcError(CORE_RPC_ERROR_CODE_WRONG_PARAM,
-          std::string("Couldn't find block index containing transaction ") + Common::podToHex(h) + std::string(" of reserve proof"));
+        throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_WRONG_PARAM,
+        "Couldn't find block index containing transaction " + Common::podToHex(h) + " of reserve proof" };
       }
 
       if (req.height < tx_height) {
-        throw JsonRpc::JsonRpcError(CORE_RPC_ERROR_CODE_WRONG_PARAM, std::string("Funds from transaction ")
-          + Common::podToHex(h) + std::string(" in block ") + std::to_string(tx_height) + std::string(" didn't exist at requested height"));
+        throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_WRONG_PARAM, "Funds from transaction "
+          + Common::podToHex(h) + " in block " + std::to_string(tx_height) + " didn't exist at requested height" };
       }
     }
   }
@@ -2360,7 +2353,7 @@ bool RpcServer::on_check_reserve_proof(const COMMAND_RPC_CHECK_RESERVE_PROOF::re
   std::list<Transaction> txs;
   m_core.getTransactions(transactionHashes, txs, missed_txs);
   if (!missed_txs.empty()) {
-    throw JsonRpc::JsonRpcError(CORE_RPC_ERROR_CODE_WRONG_PARAM, std::string("Couldn't find some transactions of reserve proof"));
+    throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_WRONG_PARAM, "Couldn't find some transactions of reserve proof" };
   }
   std::vector<Transaction> transactions;
   std::copy(txs.begin(), txs.end(), std::inserter(transactions, transactions.end()));
@@ -2461,7 +2454,7 @@ bool RpcServer::on_validate_address(const COMMAND_RPC_VALIDATE_ADDRESS::request&
 bool RpcServer::on_verify_message(const COMMAND_RPC_VERIFY_MESSAGE::request& req, COMMAND_RPC_VERIFY_MESSAGE::response& res) {
   AccountPublicAddress acc = boost::value_initialized<AccountPublicAddress>();
   if (!m_core.currency().parseAccountAddressString(req.address, acc)) {
-    throw JsonRpc::JsonRpcError(CORE_RPC_ERROR_CODE_WRONG_PARAM, std::string("Failed to parse address"));
+    throw JsonRpc::JsonRpcError{CORE_RPC_ERROR_CODE_WRONG_PARAM, "Failed to parse address" };
   }
 
   // could just've used this but detailed errors might be more handy
@@ -2471,11 +2464,11 @@ bool RpcServer::on_verify_message(const COMMAND_RPC_VERIFY_MESSAGE::request& req
   Crypto::Signature s;
   uint64_t prefix;
   if (!Tools::Base58::decode_addr(req.signature, prefix, decoded) || prefix != CryptoNote::parameters::CRYPTONOTE_KEYS_SIGNATURE_BASE58_PREFIX) {
-    throw JsonRpc::JsonRpcError(CORE_RPC_ERROR_CODE_WRONG_PARAM, std::string("Signature decoding error"));
+    throw JsonRpc::JsonRpcError{CORE_RPC_ERROR_CODE_WRONG_PARAM, "Signature decoding error" };
   }
 
   if (sizeof(s) != decoded.size()) {
-    throw JsonRpc::JsonRpcError(CORE_RPC_ERROR_CODE_WRONG_PARAM, std::string("Signature size wrong"));
+    throw JsonRpc::JsonRpcError{CORE_RPC_ERROR_CODE_WRONG_PARAM, "Signature size wrong" };
     return false;
   }
 
@@ -2495,11 +2488,11 @@ bool RpcServer::on_resolve_open_alias(const COMMAND_RPC_RESOLVE_OPEN_ALIAS::requ
 
     AccountPublicAddress ignore;
     if (!m_core.currency().parseAccountAddressString(res.address, ignore)) {
-          throw JsonRpc::JsonRpcError(CORE_RPC_ERROR_CODE_INTERNAL_ERROR, "Address \"" + res.address + "\" is invalid");
+      throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_INTERNAL_ERROR, "Address \"" + res.address + "\" is invalid" };
     }
   }
   catch (std::exception& e) {
-    throw JsonRpc::JsonRpcError(CORE_RPC_ERROR_CODE_WRONG_PARAM, "Couldn't resolve alias: " + std::string(e.what()));
+    throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_WRONG_PARAM, "Couldn't resolve alias: " + std::string(e.what()) };
     return true;
   }
 
