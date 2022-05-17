@@ -962,21 +962,26 @@ bool Blockchain::switch_to_alternative_blockchain(const std::list<Crypto::Hash>&
 
   //connecting new alternative chain
   for (auto alt_ch_iter = alt_chain.begin(); alt_ch_iter != alt_chain.end(); alt_ch_iter++) {
-    auto &ch_ent = *alt_ch_iter;
+    const auto& ch_ent_h = *alt_ch_iter;
     block_verification_context bvc = boost::value_initialized<block_verification_context>();
-    const Block& b = m_alternative_chains[ch_ent].bl;
+    const Block& b = m_alternative_chains[ch_ent_h].bl;
     bool r = pushBlock(b, get_block_hash(b), bvc);
     if (!r || !bvc.m_added_to_main_chain) {
       logger(INFO, BRIGHT_WHITE) << "Failed to switch to alternative blockchain";
       rollback_blockchain_switching(disconnected_chain, split_height);
-      logger(INFO, BRIGHT_WHITE) << "The block was inserted as invalid while connecting new alternative chain,  block_id: " << get_block_hash(b);
+      logger(INFO, BRIGHT_WHITE) << "The block was inserted as invalid while connecting new alternative chain,  block_id: " << ch_ent_h;
       m_orphanBlocksIndex.remove(b);
-      m_alternative_chains.erase(ch_ent);
-
-      for (auto& alt_ch_to_orph_iter = ++alt_ch_iter; alt_ch_to_orph_iter != alt_chain.end(); alt_ch_to_orph_iter++) {
-        const Block& bl = m_alternative_chains[*alt_ch_to_orph_iter].bl;
-        m_orphanBlocksIndex.remove(bl);
-        m_alternative_chains.erase(*alt_ch_to_orph_iter);
+      m_alternative_chains.erase(ch_ent_h);
+      try {
+        for (auto& alt_ch_to_orph_iter = ++alt_ch_iter; alt_ch_to_orph_iter != alt_chain.end(); alt_ch_to_orph_iter++) {
+          const auto& ch_ent_hh = *alt_ch_to_orph_iter;
+          const Block& bb = m_alternative_chains[ch_ent_hh].bl;
+          m_orphanBlocksIndex.remove(bb);
+          m_alternative_chains.erase(ch_ent_hh);
+        }
+      }
+      catch (std::exception& e) {
+        logger(ERROR) << "removing alt_chain entries while connecting new alternative chain failed: " << e.what();
       }
 
       return false;
