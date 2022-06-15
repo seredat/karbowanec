@@ -254,19 +254,6 @@ int main(int argc, char* argv[])
     RpcServerConfig rpcConfig;
     rpcConfig.init(vm);
 
-    std::string contact_str = rpcConfig.contactInfo;
-    if (!contact_str.empty() && contact_str.size() > 128) {
-      logger(ERROR, BRIGHT_RED) << "Too long contact info";
-      return 1;
-    }
-
-    // check this early
-    if ((rpcConfig.nodeFeeAddress.empty() && !rpcConfig.nodeFeeAmountStr.empty()) ||
-       (!rpcConfig.nodeFeeAddress.empty() && rpcConfig.nodeFeeAmountStr.empty())) {
-      logger(ERROR, BRIGHT_RED) << "Need to set both, fee-address and fee-amount";
-      return 1;
-    }
-
     //create objects and link them
     CryptoNote::CurrencyBuilder currencyBuilder(logManager);
     currencyBuilder.testnet(testnet_mode);
@@ -330,7 +317,7 @@ int main(int argc, char* argv[])
 
     CryptoNote::CryptoNoteProtocolHandler cprotocol(currency, dispatcher, m_core, nullptr, logManager);
     CryptoNote::NodeServer p2psrv(dispatcher, cprotocol, logManager);
-    CryptoNote::RpcServer rpcServer(dispatcher, logManager, m_core, p2psrv, cprotocol);
+    CryptoNote::RpcServer rpcServer(rpcConfig, dispatcher, logManager, m_core, p2psrv, cprotocol);
 
     cprotocol.set_p2p_endpoint(&p2psrv);
     m_core.set_cryptonote_protocol(&cprotocol);
@@ -401,36 +388,6 @@ int main(int argc, char* argv[])
     if (server_ssl_enable) ssl_info += ", SSL on address " + rpcConfig.getBindAddressSSL();
     logger(INFO) << "Starting core rpc server on address " << rpcConfig.getBindAddress() << ssl_info;
     rpcServer.start(rpcConfig.getBindIP(), rpcConfig.getBindPort(), rpcConfig.getBindPortSSL(), server_ssl_enable);
-    rpcServer.restrictRpc(rpcConfig.restrictedRPC);
-    rpcServer.enableCors(rpcConfig.enableCors);
-    if (!rpcConfig.nodeFeeAddress.empty() && !rpcConfig.nodeFeeAmountStr.empty()) {
-      AccountPublicAddress acc = boost::value_initialized<AccountPublicAddress>();
-      if (!currency.parseAccountAddressString(rpcConfig.nodeFeeAddress, acc)) {
-        logger(ERROR, BRIGHT_RED) << "Bad fee address: " << rpcConfig.nodeFeeAddress;
-        return 1;
-      }
-      rpcServer.setFeeAddress(rpcConfig.nodeFeeAddress, acc);
-
-      uint64_t fee;
-      if (!Common::Format::parseAmount(rpcConfig.nodeFeeAmountStr, fee)) {
-        logger(ERROR, BRIGHT_RED) << "Couldn't parse fee amount";
-        return 1;
-      }
-      if (fee > CryptoNote::parameters::COIN) {
-        logger(ERROR, BRIGHT_RED) << "Maximum allowed fee is " 
-          << Common::Format::formatAmount(CryptoNote::parameters::COIN);
-        return 1;
-      }
-
-      rpcServer.setFeeAmount(fee);
-    }
-    
-    if (!rpcConfig.nodeFeeViewKey.empty()) {
-      rpcServer.setViewKey(rpcConfig.nodeFeeViewKey);
-    }
-    if (!rpcConfig.contactInfo.empty()) {
-      rpcServer.setContactInfo(rpcConfig.contactInfo);
-    }
     logger(INFO) << "Core rpc server started ok";
 
 
