@@ -32,6 +32,7 @@
 #include "Common/Base58.h"
 #include "Common/DnsTools.h"
 #include "Common/Math.h"
+#include "Common/FormatTools.h"
 #include "Common/StringTools.h"
 #include "CryptoNoteCore/TransactionUtils.h"
 #include "CryptoNoteCore/CryptoNoteTools.h"
@@ -54,7 +55,6 @@ const uint64_t BLOCK_LIST_MAX_COUNT = 1000;
 
 namespace CryptoNote {
 
-
     namespace {
         template <typename T>
         static bool print_as_json(const T& obj) {
@@ -67,53 +67,53 @@ namespace {
 
 template <typename Command>
 RpcServer::HandlerFunction binMethod(bool (RpcServer::*handler)(typename Command::request const&, typename Command::response&)) {
-  return [handler](RpcServer* obj, const HttpRequest& request, HttpResponse& response) {
+  return [handler](RpcServer* obj, const httplib::Request& request, httplib::Response& response) {
 
     boost::value_initialized<typename Command::request> req;
     boost::value_initialized<typename Command::response> res;
 
-    if (!loadFromBinaryKeyValue(static_cast<typename Command::request&>(req), request.getBody())) {
+    if (!loadFromBinaryKeyValue(static_cast<typename Command::request&>(req), request.body)) {
       return false;
     }
 
     bool result = (obj->*handler)(req, res);
-    response.setBody(storeToBinaryKeyValue(res.data()));
+    response.set_content(storeToBinaryKeyValue(res.data()), "application/octet-stream");
     return result;
   };
 }
 
 template <typename Command>
 RpcServer::HandlerFunction jsonMethod(bool (RpcServer::*handler)(typename Command::request const&, typename Command::response&)) {
-  return [handler](RpcServer* obj, const HttpRequest& request, HttpResponse& response) {
+  return [handler](RpcServer* obj, const httplib::Request& request, httplib::Response& response) {
 
     boost::value_initialized<typename Command::request> req;
     boost::value_initialized<typename Command::response> res;
 
-    if (!loadFromJson(static_cast<typename Command::request&>(req), request.getBody())) {
+    if (!loadFromJson(static_cast<typename Command::request&>(req), request.body)) {
       return false;
     }
 
     bool result = (obj->*handler)(req, res);
     std::string cors_domain = obj->getCorsDomain();
     if (!cors_domain.empty()) {
-      response.addHeader("Access-Control-Allow-Origin", cors_domain);
-      response.addHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-      response.addHeader("Access-Control-Allow-Methods", "POST, GET");
+      response.set_header("Access-Control-Allow-Origin", cors_domain);
+      response.set_header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+      response.set_header("Access-Control-Allow-Methods", "POST, GET");
     }
-    response.addHeader("Content-Type", "application/json");
-    response.setBody(storeToJson(res.data()));
+    response.set_header("Content-Type", "application/json");
+    response.set_content(storeToJson(res.data()), "application/json");
     return result;
   };
 }
 
 template <typename Command>
 RpcServer::HandlerFunction httpMethod(bool (RpcServer::*handler)(typename Command::request const&, typename Command::response&)) {
-  return [handler](RpcServer* obj, const HttpRequest& request, HttpResponse& response) {
+  return [handler](RpcServer* obj, const httplib::Request& request, httplib::Response& response) {
 
     boost::value_initialized<typename Command::request> req;
     boost::value_initialized<typename Command::response> res;
 
-    if (!loadFromJson(static_cast<typename Command::request&>(req), request.getBody())) {
+    if (!loadFromJson(static_cast<typename Command::request&>(req), request.body)) {
       return false;
     }
 
@@ -121,16 +121,16 @@ RpcServer::HandlerFunction httpMethod(bool (RpcServer::*handler)(typename Comman
 
     std::string cors_domain = obj->getCorsDomain();
     if (!cors_domain.empty()) {
-      response.addHeader("Access-Control-Allow-Origin", cors_domain);
-      response.addHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-      response.addHeader("Access-Control-Allow-Methods", "POST, GET");
+      response.set_header("Access-Control-Allow-Origin", cors_domain);
+      response.set_header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+      response.set_header("Access-Control-Allow-Methods", "POST, GET");
     }
-    response.addHeader("Content-Type", "text/html; charset=UTF-8");
-    response.addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-    response.addHeader("Expires", "0");
-    response.setStatus(HttpResponse::HTTP_STATUS::STATUS_200);
+    response.set_header("Content-Type", "text/html; charset=UTF-8");
+    response.set_header("Cache-Control", "no-cache, no-store, must-revalidate");
+    response.set_header("Expires", "0");
+    response.status = 200;
 
-    response.setBody(res);
+    response.set_content(res, "text/html");
 
     return result;
   };
@@ -200,10 +200,11 @@ RpcServer::RpcServer(
   System::Dispatcher& dispatcher,
   Logging::ILogger& log,
   CryptoNote::Core& core,
-  NodeServer& p2p, ICryptoNoteProtocolQuery& protocolQuery)
-  :
-  HttpServer(dispatcher, log),
+  NodeServer& p2p, ICryptoNoteProtocolQuery& protocolQuery,
+  std::string cert_path, std::string key_path
+) :
   m_config(config),
+  m_dispatcher(dispatcher),
   logger(log, "RpcServer"),
   m_core(core),
   m_p2p(p2p),
@@ -214,7 +215,10 @@ RpcServer::RpcServer(
   m_restricted_rpc(m_config.isRestricted()),
   m_cors_domain(m_config.getCors()),
   m_fee_address(""),
-  m_fee_amount(0)
+  m_fee_amount(0),
+  m_cert_path(cert_path),
+  m_key_path(key_path),
+  https(m_cert_path.c_str(), m_key_path.c_str())
 {
   if (!m_config.getNodeFeeAddress().empty() && m_config.getNodeFeeAmount() != 0) {
     m_fee_address = m_config.getNodeFeeAddress();
@@ -229,17 +233,83 @@ RpcServer::RpcServer(
     }
     m_view_key = *(struct Crypto::SecretKey*)&private_view_key_hash;
   }
+
+  if (!m_config.getContactInfo().empty()) {
+    m_contact_info = m_config.getContactInfo();
+  }
+
+  https.Get(".*", [this](const httplib::Request& req, httplib::Response& res) {
+    processRequest(req, res);
+  });
+
+  https.Post(".*", [this](const httplib::Request& req, httplib::Response& res) {
+    processRequest(req, res);
+  });
+
+  http.Get(".*", [this](const httplib::Request& req, httplib::Response& res) {
+    processRequest(req, res);
+  });
+
+  http.Post(".*", [this](const httplib::Request& req, httplib::Response& res) {
+    processRequest(req, res);
+  });
 }
 
-void RpcServer::processRequest(const HttpRequest& request, HttpResponse& response) {
-  logger(Logging::TRACE) << "RPC request came: " << request.getMethod() << std::endl;
-  
+RpcServer::~RpcServer() {
+  stop();
+}
+
+void RpcServer::start(const std::string address, const uint16_t port) {
+  if (m_config.isEnabledSSL()) {
+    uint16_t ssl_port = m_config.getBindPortSSL(); // make sure to use separate port for SSL server
+    m_workers.emplace_back(std::unique_ptr<System::RemoteContext<void>>(
+      new System::RemoteContext<void>(m_dispatcher, std::bind(&RpcServer::listen_ssl, this, address, ssl_port)))
+    );
+  }
+
+  m_workers.emplace_back(std::unique_ptr<System::RemoteContext<void>>(
+    new System::RemoteContext<void>(m_dispatcher, std::bind(&RpcServer::listen, this, address, port)))
+  );
+}
+
+void RpcServer::stop() {
+  if (m_config.isEnabledSSL()) {
+    https.stop();
+  }
+
+  http.stop();
+
+  m_workers.clear();
+}
+
+void RpcServer::listen(const std::string address, const uint16_t port) {
+  if (!http.listen(address.c_str(), port)) {
+    logger(Logging::ERROR) << "Could not bind service to " << address << ":" << port
+      << "\nIs another service using this address and port?\n";
+  }
+}
+
+void RpcServer::listen_ssl(const std::string address, const uint16_t port) {
+  if (!https.listen(address.c_str(), port)) {
+    logger(Logging::ERROR) << "Could not bind service to " << address << ":" << port
+      << "\nIs another service using this address and port?\n";
+  }
+}
+
+int RpcServer::getRpcConnectionsCount() {
+  //return http.get_connections_count() + https.get_connections_count();
+  return 0;
+}
+
+void RpcServer::processRequest(const httplib::Request& request, httplib::Response& response) {
+  logger(Logging::TRACE) << "Incoming RPC request to endpoint " << request.path;
+
   try {
-
-    auto url = request.getUrl();
-
+    auto url = request.path;
     auto it = s_handlers.find(url);
+
     if (it == s_handlers.end()) {
+
       if (Common::starts_with(url, "/api/")) {
 
         std::string block_height_method = "/api/block/height/";
@@ -254,8 +324,8 @@ void RpcServer::processRequest(const HttpRequest& request, HttpResponse& respons
           uint32_t height = Common::integer_cast<uint32_t>(height_str);
           auto it = s_handlers.find("/get_block_details_by_height");
           if (!it->second.allowBusyCore && !isCoreReady()) {
-            response.setStatus(HttpResponse::STATUS_500);
-            response.setBody("Core is busy");
+            response.status = 500;
+            response.set_content("Core is busy", "text/html");
             return;
           }
           COMMAND_RPC_GET_BLOCK_DETAILS_BY_HEIGHT::request req;
@@ -263,22 +333,24 @@ void RpcServer::processRequest(const HttpRequest& request, HttpResponse& respons
           COMMAND_RPC_GET_BLOCK_DETAILS_BY_HEIGHT::response rsp;
           bool r = on_get_block_details_by_height(req, rsp);
           if (r) {
-            response.addHeader("Content-Type", "application/json");
-            response.setStatus(HttpResponse::HTTP_STATUS::STATUS_200);
-            response.setBody(storeToJson(rsp));
-          } else {
-            response.setStatus(HttpResponse::STATUS_500);
-            response.setBody("Internal error");
+            response.set_header("Content-Type", "application/json");
+            response.status = 200;
+            response.set_content(storeToJson(rsp), "application/json");
+          }
+          else {
+            response.status = 500;
+            response.set_content("Internal error", "text/html");
           }
           return;
 
-        } else if (Common::starts_with(url, block_hash_method)) {
+        }
+        else if (Common::starts_with(url, block_hash_method)) {
 
           std::string hash_str = url.substr(block_hash_method.size());
           auto it = s_handlers.find("/get_block_details_by_hash");
           if (!it->second.allowBusyCore && !isCoreReady()) {
-            response.setStatus(HttpResponse::STATUS_500);
-            response.setBody("Core is busy");
+            response.status = 500;
+            response.set_content("Core is busy", "text/html");
             return;
           }
           COMMAND_RPC_GET_BLOCK_DETAILS_BY_HASH::request req;
@@ -286,22 +358,23 @@ void RpcServer::processRequest(const HttpRequest& request, HttpResponse& respons
           COMMAND_RPC_GET_BLOCK_DETAILS_BY_HASH::response rsp;
           bool r = on_get_block_details_by_hash(req, rsp);
           if (r) {
-            response.addHeader("Content-Type", "application/json");
-            response.setStatus(HttpResponse::HTTP_STATUS::STATUS_200);
-            response.setBody(storeToJson(rsp));
-          } else {
-            response.setStatus(HttpResponse::STATUS_500);
-            response.setBody("Internal error");
+            response.set_header("Content-Type", "application/json");
+            response.status = 200;
+            response.set_content(storeToJson(rsp), "application/json");
+          }
+          else {
+            response.status = 500;
+            response.set_content("Internal error", "text/html");
           }
           return;
 
-        } else if (Common::starts_with(url, tx_hash_method)) {
-
+        }
+        else if (Common::starts_with(url, tx_hash_method)) {
           std::string hash_str = url.substr(tx_hash_method.size());
           auto it = s_handlers.find("/get_transaction_details_by_hash");
           if (!it->second.allowBusyCore && !isCoreReady()) {
-            response.setStatus(HttpResponse::STATUS_500);
-            response.setBody("Core is busy");
+            response.status = 500;
+            response.set_content("Core is busy", "text/html");
             return;
           }
           COMMAND_RPC_GET_TRANSACTION_DETAILS_BY_HASH::request req;
@@ -309,23 +382,24 @@ void RpcServer::processRequest(const HttpRequest& request, HttpResponse& respons
           COMMAND_RPC_GET_TRANSACTION_DETAILS_BY_HASH::response rsp;
           bool r = on_get_transaction_details_by_hash(req, rsp);
           if (r) {
-            response.addHeader("Content-Type", "application/json");
-            response.setStatus(HttpResponse::HTTP_STATUS::STATUS_200);
-            response.setBody(storeToJson(rsp));
+            response.set_header("Content-Type", "application/json");
+            response.status = 200;
+            response.set_content(storeToJson(rsp), "application/json");
           }
           else {
-            response.setStatus(HttpResponse::STATUS_500);
-            response.setBody("Internal error");
+            response.status = 500;
+            response.set_content("Internal error", "text/html");
           }
           return;
 
-        } else if (Common::starts_with(url, payment_id_method)) {
+        }
+        else if (Common::starts_with(url, payment_id_method)) {
 
           std::string pid_str = url.substr(payment_id_method.size());
           auto it = s_handlers.find("/get_transaction_hashes_by_payment_id");
           if (!it->second.allowBusyCore && !isCoreReady()) {
-            response.setStatus(HttpResponse::STATUS_500);
-            response.setBody("Core is busy");
+            response.status = 500;
+            response.set_content("Core is busy", "text/html");
             return;
           }
           COMMAND_RPC_GET_TRANSACTION_HASHES_BY_PAYMENT_ID::request req;
@@ -333,23 +407,24 @@ void RpcServer::processRequest(const HttpRequest& request, HttpResponse& respons
           COMMAND_RPC_GET_TRANSACTION_HASHES_BY_PAYMENT_ID::response rsp;
           bool r = on_get_transaction_hashes_by_paymentid(req, rsp);
           if (r) {
-            response.addHeader("Content-Type", "application/json");
-            response.setStatus(HttpResponse::HTTP_STATUS::STATUS_200);
-            response.setBody(storeToJson(rsp));
+            response.set_header("Content-Type", "application/json");
+            response.status = 200;
+            response.set_content(storeToJson(rsp), "application/json");
           }
           else {
-            response.setStatus(HttpResponse::STATUS_500);
-            response.setBody("Internal error");
+            response.status = 500;
+            response.set_content("Internal error", "text/html");
           }
           return;
 
-        } else if (Common::starts_with(url, tx_mempool_method)) {
+        }
+        else if (Common::starts_with(url, tx_mempool_method)) {
 
           auto it = s_handlers.find("/gettransactionsinpool");
           if (!it->second.allowBusyCore && !isCoreReady())
           {
-            response.setStatus(HttpResponse::STATUS_500);
-            response.setBody("Core is busy");
+            response.status = 500;
+            response.set_content("Core is busy", "text/html");
             return;
           }
 
@@ -357,31 +432,27 @@ void RpcServer::processRequest(const HttpRequest& request, HttpResponse& respons
           COMMAND_RPC_GET_TRANSACTIONS_POOL::response rsp;
           bool r = on_get_transactions_pool(req, rsp);
           if (r) {
-            response.addHeader("Content-Type", "application/json");
-            response.setStatus(HttpResponse::HTTP_STATUS::STATUS_200);
-            response.setBody(storeToJson(rsp));
+            response.set_header("Content-Type", "application/json");
+            response.status = 200;
+            response.set_content(storeToJson(rsp), "application/json");
           }
           else {
-            response.setStatus(HttpResponse::STATUS_500);
-            response.setBody("Internal error");
+            response.status = 500;
+            response.set_content("Internal error", "text/html");
           }
 
           return;
 
         }
+      }
 
-        response.setStatus(HttpResponse::STATUS_404);
-        return;
-      }
-      else {
-        response.setStatus(HttpResponse::STATUS_404);
-        return;
-      }
+      response.status = 404;
+      return;
     }
 
     if (!it->second.allowBusyCore && !isCoreReady()) {
-      response.setStatus(HttpResponse::STATUS_500);
-      response.setBody("Core is busy");
+      response.status = 500;
+      response.set_content("Core is busy", "text/html");
       return;
     }
 
@@ -389,25 +460,25 @@ void RpcServer::processRequest(const HttpRequest& request, HttpResponse& respons
 
   }
   catch (const JsonRpc::JsonRpcError& err) {
-    response.addHeader("Content-Type", "application/json");
-    response.setStatus(HttpResponse::STATUS_500);
-    response.setBody(storeToJsonValue(err).toString());
+    response.set_header("Content-Type", "application/json");
+    response.status = 500;
+    response.set_content(storeToJsonValue(err).toString(), "application/json");
   }
   catch (const std::exception& e) {
-    response.setStatus(HttpResponse::STATUS_500);
-    response.setBody(e.what());
+    response.status = 500;
+    response.set_content(e.what(), "text/html");
   }
 }
 
-bool RpcServer::processJsonRpcRequest(const HttpRequest& request, HttpResponse& response) {
+bool RpcServer::processJsonRpcRequest(const httplib::Request& request, httplib::Response& response) {
 
   using namespace JsonRpc;
 
-  response.addHeader("Content-Type", "application/json");
+  response.set_header("Content-Type", "application/json");
   if (!m_cors_domain.empty()) {
-    response.addHeader("Access-Control-Allow-Origin", m_cors_domain);
-    response.addHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-    response.addHeader("Access-Control-Allow-Methods", "POST, GET");
+    response.set_header("Access-Control-Allow-Origin", m_cors_domain);
+    response.set_header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+    response.set_header("Access-Control-Allow-Methods", "POST, GET");
   }  
 
   JsonRpcRequest jsonRequest;
@@ -415,7 +486,7 @@ bool RpcServer::processJsonRpcRequest(const HttpRequest& request, HttpResponse& 
 
   try {
     //logger(Logging::TRACE) << "JSON-RPC request: " << request.getBody();
-    jsonRequest.parseRequest(request.getBody());
+    jsonRequest.parseRequest(request.body);
     jsonResponse.setId(jsonRequest.getId()); // copy id
 
     static std::unordered_map<std::string, RpcServer::RpcHandler<JsonMemberMethod>> jsonRpcHandlers = {
@@ -475,7 +546,7 @@ bool RpcServer::processJsonRpcRequest(const HttpRequest& request, HttpResponse& 
     jsonResponse.setError(JsonRpcError(JsonRpc::errInternalError, e.what()));
   }
 
-  response.setBody(jsonResponse.getBody());
+  response.set_content(jsonResponse.getBody(), "application/json");
   //logger(Logging::TRACE) << "JSON-RPC response: " << jsonResponse.getBody();
   return true;
 }
@@ -1269,7 +1340,7 @@ bool RpcServer::on_get_index(const COMMAND_HTTP::request& req, COMMAND_HTTP::res
       "<li>" + "Transactions in pool: " + std::to_string(tx_pool_count) + "</li>" +
       "<li>" + "Connections:" +
         "<ul>" +
-          "<li>" + "RPC: " + std::to_string(get_connections_count()) + "</li>" +
+          "<li>" + "RPC: " + std::to_string(getRpcConnectionsCount()) + "</li>" +
           "<li>" + "OUT: " + std::to_string(outConn) + "</li>" +
           "<li>" + "INC: " + std::to_string(incConn) + "</li>" +
         "</ul>" +
@@ -1313,7 +1384,7 @@ bool RpcServer::on_get_info(const COMMAND_RPC_GET_INFO::request& req, COMMAND_RP
   uint64_t total_conn = m_p2p.get_connections_count();
   res.outgoing_connections_count = m_p2p.get_outgoing_connections_count();
   res.incoming_connections_count = total_conn - res.outgoing_connections_count;
-  res.rpc_connections_count = get_connections_count();
+  res.rpc_connections_count = getRpcConnectionsCount();
   res.white_peerlist_size = m_p2p.getPeerlistManager().get_white_peers_count();
   res.grey_peerlist_size = m_p2p.getPeerlistManager().get_gray_peers_count();
   res.last_known_block_index = std::max(static_cast<uint32_t>(1), m_protocolQuery.getObservedHeight()) - 1;
@@ -1567,10 +1638,6 @@ bool RpcServer::on_stop_daemon(const COMMAND_RPC_STOP_DAEMON::request& req, COMM
 }
 
 bool RpcServer::on_get_fee_address(const COMMAND_RPC_GET_FEE_ADDRESS::request& req, COMMAND_RPC_GET_FEE_ADDRESS::response& res) {
-  if (m_fee_address.empty()) {
-    res.status = CORE_RPC_STATUS_OK;
-    return false; 
-  }
   res.fee_address = m_fee_address;
   res.fee_amount = m_fee_amount;
   res.status = CORE_RPC_STATUS_OK;

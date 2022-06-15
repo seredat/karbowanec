@@ -75,22 +75,19 @@
 #include "NodeRpcProxy/NodeRpcProxy.h"
 #include "Rpc/CoreRpcServerCommandsDefinitions.h"
 #include "Rpc/HttpClient.h"
-
+#include <Logging/LoggerManager.h>
+#include "Mnemonics/electrum-words.h"
 #include "Wallet/WalletRpcServer.h"
 #include "WalletLegacy/WalletLegacy.h"
 #include "Wallet/LegacyKeysImporter.h"
 #include "WalletLegacy/WalletHelper.h"
+#include "ITransfersContainer.h"
 
 #include "version.h"
-#include "Mnemonics/electrum-words.h"
-
-#include <Logging/LoggerManager.h>
 
 #if defined(WIN32)
 #include <Windows.h>
 #endif
-
-#include "ITransfersContainer.h"
 
 using namespace CryptoNote;
 using namespace Logging;
@@ -203,17 +200,15 @@ void seedLoader(const char *seed_file, std::string& seed) {
   }
 }
 
-inline std::string interpret_rpc_response(bool ok, const std::string& status) {
+inline std::string interpret_rpc_response(const std::string& status) {
   std::string err;
-  if (ok) {
-    if (status == CORE_RPC_STATUS_BUSY) {
-      err = "daemon is busy. Please try later";
-    } else if (status != CORE_RPC_STATUS_OK) {
-      err = status;
-    }
-  } else {
-    err = "possible lost connection to daemon";
+  if (500 == std::stoi(status)) {
+    err = "daemon is busy. Please try later";
   }
+  else if (200 != std::stoi(status)) {
+    err = status;
+  }
+
   return err;
 }
 
@@ -693,6 +688,11 @@ simple_wallet::simple_wallet(System::Dispatcher& dispatcher, const CryptoNote::C
   m_consoleHandler.setHandler("verify_message", std::bind(&simple_wallet::verify_message, this, std::placeholders::_1), "Verify a signature of the message");
   m_consoleHandler.setHandler("help", std::bind(&simple_wallet::help, this, std::placeholders::_1), "Show this help");
   m_consoleHandler.setHandler("exit", std::bind(&simple_wallet::exit, this, std::placeholders::_1), "Close wallet");
+
+  std::stringstream userAgent;
+  userAgent << "NodeRpcProxy/" << PROJECT_VERSION_LONG;
+  m_requestHeaders = { {"User-Agent", userAgent.str()}, { "Connection", "keep-alive" } };
+
 }
 //----------------------------------------------------------------------------------------------------
 
@@ -1805,25 +1805,43 @@ bool simple_wallet::start_mining(const std::vector<std::string>& args) {
 
   std::string rpc_url = this->m_daemon_path + "start_mining";
 
+  std::shared_ptr<httplib::Client> m_httpClient = nullptr;
+
   try {
-    HttpClient httpClient(m_dispatcher, m_daemon_host, m_daemon_port, m_daemon_ssl);
+    
+    if (m_daemon_ssl) {
+      m_httpClient = std::make_shared<httplib::SSLClient>(m_daemon_host.c_str(), m_daemon_port);
+    }
+    else {
+      m_httpClient = std::make_shared<httplib::Client>(m_daemon_host.c_str(), m_daemon_port);
+    }
 
-    if (!m_daemon_cert.empty()) httpClient.setRootCert(m_daemon_cert);
-    if (m_daemon_no_verify) httpClient.disableVerify();
+    //if (!m_daemon_cert.empty()) httpClient.setRootCert(m_daemon_cert);
+    //if (m_daemon_no_verify) httpClient.disableVerify();
+    
+    const auto rsp = m_httpClient->Post(rpc_url.c_str(), m_requestHeaders, storeToJson(req), "application/json");
 
-    invokeJsonCommand(httpClient, rpc_url, req, res);
+    JsonRpc::JsonRpcResponse jsRes;
 
-    std::string err = interpret_rpc_response(true, res.status);
+    if (rsp && rsp->status == 200) {
+      jsRes.parse(rsp->body);
+      if (jsRes.getResult(res)) {
+
+      }
+    }
+
+    std::string err = interpret_rpc_response(std::to_string(rsp->status));
+
     if (err.empty())
       success_msg_writer() << "Mining started in daemon";
     else
       fail_msg_writer() << "Mining has not started due to an error: " << err;
-
   } catch (const ConnectException&) {
     printConnectionError();
   } catch (const std::exception& e) {
     fail_msg_writer() << "Failed to invoke RPC method: " << e.what();
   }
+  m_httpClient = nullptr;
 
   return true;
 }
@@ -1835,15 +1853,33 @@ bool simple_wallet::stop_mining(const std::vector<std::string>& args)
 
   std::string rpc_url = this->m_daemon_path + "stop_mining";
 
+  std::shared_ptr<httplib::Client> m_httpClient = nullptr;
+
   try {
-    HttpClient httpClient(m_dispatcher, m_daemon_host, m_daemon_port, m_daemon_ssl);
+    
+    if (m_daemon_ssl) {
+      m_httpClient = std::make_shared<httplib::SSLClient>(m_daemon_host.c_str(), m_daemon_port);
+    }
+    else {
+      m_httpClient = std::make_shared<httplib::Client>(m_daemon_host.c_str(), m_daemon_port);
+    }
 
-    if (!m_daemon_cert.empty()) httpClient.setRootCert(m_daemon_cert);
-    if (m_daemon_no_verify) httpClient.disableVerify();
+    //if (!m_daemon_cert.empty()) httpClient.setRootCert(m_daemon_cert);
+    //if (m_daemon_no_verify) httpClient.disableVerify();
 
-    invokeJsonCommand(httpClient, rpc_url, req, res);
+    const auto rsp = m_httpClient->Post(rpc_url.c_str(), m_requestHeaders, storeToJson(req), "application/json");
 
-    std::string err = interpret_rpc_response(true, res.status);
+    JsonRpc::JsonRpcResponse jsRes;
+
+    if (rsp && rsp->status == 200) {
+      jsRes.parse(rsp->body);
+      if (jsRes.getResult(res)) {
+
+      }
+    }
+
+    std::string err = interpret_rpc_response(std::to_string(rsp->status));
+
     if (err.empty())
       success_msg_writer() << "Mining stopped in daemon";
     else
@@ -1853,6 +1889,7 @@ bool simple_wallet::stop_mining(const std::vector<std::string>& args)
   } catch (const std::exception& e) {
     fail_msg_writer() << "Failed to invoke RPC method: " << e.what();
   }
+  m_httpClient = nullptr;
 
   return true;
 }
@@ -1865,7 +1902,7 @@ void simple_wallet::initCompleted(std::error_code result) {
 //----------------------------------------------------------------------------------------------------
 void simple_wallet::connectionStatusUpdated(bool connected) {
   if (connected) {
-    logger(INFO, GREEN) << "Wallet connected to daemon.";
+    logger(TRACE, GREEN) << "Wallet connected to daemon.";
   } else {
     printConnectionError();
   }

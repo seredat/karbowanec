@@ -21,9 +21,11 @@
 
 #include "HttpServer.h"
 
+#include <thread>
 #include <functional>
 #include <unordered_map>
 
+#include "HTTP/httplib.h"
 #include <Logging/LoggerRef.h>
 #include "ITransaction.h"
 #include "CoreRpcServerCommandsDefinitions.h"
@@ -31,6 +33,8 @@
 #include "CryptoNoteCore/Core.h"
 #include "Common/Math.h"
 #include "Rpc/RpcServerConfig.h"
+#include "System/Dispatcher.h"
+#include <System/RemoteContext.h>
 
 namespace CryptoNote {
 
@@ -39,7 +43,7 @@ class NodeServer;
 class BlockchainExplorer;
 class ICryptoNoteProtocolQuery;
 
-class RpcServer : public HttpServer {
+class RpcServer {
 public:
   RpcServer(
     RpcServerConfig& config,
@@ -47,11 +51,18 @@ public:
     Logging::ILogger& log,
     Core& core,
     NodeServer& p2p,
-    ICryptoNoteProtocolQuery& protocolQuery
+    ICryptoNoteProtocolQuery& protocolQuery,
+    std::string cert_path = "",
+    std::string key_path = ""
   );
 
-  typedef std::function<bool(RpcServer*, const HttpRequest& request, HttpResponse& response)> HandlerFunction;
-  bool checkIncomingTransactionForFee(const BinaryArray& tx_blob);
+  ~RpcServer();
+  
+  void start(const std::string address, const uint16_t port);
+  void stop();
+  void listen(const std::string address, const uint16_t port);
+  void listen_ssl(const std::string address, const uint16_t port);
+  typedef std::function<bool(RpcServer*, const httplib::Request& req, httplib::Response& res)> HandlerFunction;
   std::string getCorsDomain();
 
 private:
@@ -62,12 +73,18 @@ private:
     const bool allowBusyCore;
   };
 
-  typedef void (RpcServer::*HandlerPtr)(const HttpRequest& request, HttpResponse& response);
+  typedef void (RpcServer::* HandlerPtr)(const httplib::Request& request, httplib::Response& response);
   static std::unordered_map<std::string, RpcHandler<HandlerFunction>> s_handlers;
 
-  virtual void processRequest(const HttpRequest& request, HttpResponse& response) override;
-  bool processJsonRpcRequest(const HttpRequest& request, HttpResponse& response);
+  void processRequest(const httplib::Request& request, httplib::Response& response);
+  bool processJsonRpcRequest(const httplib::Request& request, httplib::Response& response);
+  
   bool isCoreReady();
+
+  bool checkIncomingTransactionForFee(const BinaryArray& tx_blob);
+  
+  int getRpcConnectionsCount();
+
 
   // binary handlers
   bool on_get_blocks(const COMMAND_RPC_GET_BLOCKS_FAST::request& req, COMMAND_RPC_GET_BLOCKS_FAST::response& res);
@@ -138,11 +155,15 @@ private:
   void fill_block_header_response(const Block& blk, bool orphan_status, uint32_t height, const Crypto::Hash& hash, block_header_response& responce);
 
   RpcServerConfig m_config;
+  System::Dispatcher& m_dispatcher;
   Logging::LoggerRef logger;
   CryptoNote::Core& m_core;
   CryptoNote::NodeServer& m_p2p;
   CryptoNote::BlockchainExplorerDataBuilder blockchainExplorerDataBuilder;
   const ICryptoNoteProtocolQuery& m_protocolQuery;
+  httplib::SSLServer https;
+  httplib::Server http;
+
   bool m_restricted_rpc;
   std::string m_cors_domain;
   std::string m_fee_address;
@@ -150,6 +171,10 @@ private:
   std::string m_contact_info;
   Crypto::SecretKey m_view_key;
   CryptoNote::AccountPublicAddress m_fee_acc;
+  std::string m_cert_path;
+  std::string m_key_path;
+
+  std::vector<std::unique_ptr<System::RemoteContext<void>>> m_workers;
 };
 
 }

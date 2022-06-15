@@ -317,25 +317,22 @@ int main(int argc, char* argv[])
 
     CryptoNote::CryptoNoteProtocolHandler cprotocol(currency, dispatcher, m_core, nullptr, logManager);
     CryptoNote::NodeServer p2psrv(dispatcher, cprotocol, logManager);
-    CryptoNote::RpcServer rpcServer(rpcConfig, dispatcher, logManager, m_core, p2psrv, cprotocol);
-
-    cprotocol.set_p2p_endpoint(&p2psrv);
-    m_core.set_cryptonote_protocol(&cprotocol);
-    DaemonCommandsHandler dch(m_core, p2psrv, logManager, cprotocol, &rpcServer);
 
     boost::filesystem::path data_dir_path(data_dir);
     boost::filesystem::path chain_file_path(rpcConfig.getChainFile());
     boost::filesystem::path key_file_path(rpcConfig.getKeyFile());
-    boost::filesystem::path dh_file_path(rpcConfig.getDhFile());
     if (!chain_file_path.has_parent_path()) {
-      chain_file_path = data_dir_path / chain_file_path;
+         chain_file_path = data_dir_path / chain_file_path;
     }
     if (!key_file_path.has_parent_path()) {
-      key_file_path = data_dir_path / key_file_path;
+         key_file_path = data_dir_path / key_file_path;
     }
-    if (!dh_file_path.has_parent_path()) {
-      dh_file_path = data_dir_path / dh_file_path;
-    }
+
+    CryptoNote::RpcServer rpcServer(rpcConfig, dispatcher, logManager, m_core, p2psrv, cprotocol, chain_file_path.string(), key_file_path.string());
+
+    cprotocol.set_p2p_endpoint(&p2psrv);
+    m_core.set_cryptonote_protocol(&cprotocol);
+    DaemonCommandsHandler dch(m_core, p2psrv, logManager, cprotocol, &rpcServer);
 
     // initialize objects
     logger(INFO) << "Initializing p2p server...";
@@ -373,11 +370,7 @@ int main(int argc, char* argv[])
     bool server_ssl_enable = false;
     if (rpcConfig.isEnabledSSL()) {
       if (boost::filesystem::exists(chain_file_path, ec) &&
-        boost::filesystem::exists(key_file_path, ec) &&
-        boost::filesystem::exists(dh_file_path, ec)) {
-        rpcServer.setCerts(boost::filesystem::canonical(chain_file_path).string(),
-          boost::filesystem::canonical(key_file_path).string(),
-          boost::filesystem::canonical(dh_file_path).string());
+        boost::filesystem::exists(key_file_path, ec)) {
         server_ssl_enable = true;
       }
       else {
@@ -387,7 +380,9 @@ int main(int argc, char* argv[])
     std::string ssl_info = "";
     if (server_ssl_enable) ssl_info += ", SSL on address " + rpcConfig.getBindAddressSSL();
     logger(INFO) << "Starting core rpc server on address " << rpcConfig.getBindAddress() << ssl_info;
-    rpcServer.start(rpcConfig.getBindIP(), rpcConfig.getBindPort(), rpcConfig.getBindPortSSL(), server_ssl_enable);
+
+    rpcServer.start(rpcConfig.getBindIP(), rpcConfig.getBindPort());
+
     logger(INFO) << "Core rpc server started ok";
 
 

@@ -42,6 +42,8 @@
 #include "IWalletLegacy.h"
 #include "Common/PasswordContainer.h"
 
+#include "HTTP/httplib.h"
+
 #include "Common/ConsoleHandler.h"
 #include "CryptoNoteCore/CryptoNoteBasicImpl.h"
 #include "CryptoNoteCore/Currency.h"
@@ -54,6 +56,9 @@
 
 #include <System/Dispatcher.h>
 #include <System/Ipv4Address.h>
+
+using namespace Logging;
+#undef ERROR
 
 namespace{
 	Tools::PasswordContainer pwd_container;
@@ -223,6 +228,8 @@ namespace CryptoNote
     std::unique_ptr<CryptoNote::NodeRpcProxy> m_node;
     std::unique_ptr<CryptoNote::IWalletLegacy> m_wallet;
     refresh_progress_reporter_t m_refresh_progress_reporter;
+
+    httplib::Headers m_requestHeaders;
 
     bool m_walletSynchronized;
     bool m_trackingWallet;

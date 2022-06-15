@@ -25,6 +25,7 @@
 #include <thread>
 #include <unordered_set>
 
+#include "HTTP/httplib.h"
 #include "../CryptoNoteConfig.h"
 #include "Common/ObserverManager.h"
 #include "INode.h"
@@ -37,8 +38,6 @@ namespace System {
 }
 
 namespace CryptoNote {
-
-class HttpClient;
 
 class INodeRpcProxyObserver {
 public:
@@ -174,7 +173,10 @@ private:
   Tools::ObserverManager<CryptoNote::INodeRpcProxyObserver> m_rpcProxyObserverManager;
 
   unsigned int m_rpcTimeout;
-  HttpClient* m_httpClient = nullptr;
+  
+  std::shared_ptr<httplib::Client> m_httpClient = nullptr;
+
+  httplib::Headers m_requestHeaders;
   System::Event* m_httpEvent = nullptr;
 
   uint64_t m_pullInterval;

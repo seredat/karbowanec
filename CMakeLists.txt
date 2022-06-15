@@ -537,6 +537,7 @@ if(OPENSSL_FOUND)
   endif()
 
   include_directories(SYSTEM ${OPENSSL_INCLUDE_DIR})
+  add_definitions(-DCPPHTTPLIB_OPENSSL_SUPPORT)
   message(STATUS "OpenSSL Found: ${OPENSSL_INCLUDE_DIR}")
   message(STATUS "OpenSSL Libraries: ${OPENSSL_LIBRARIES}")
 else()
