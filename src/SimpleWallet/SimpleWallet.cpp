@@ -1806,31 +1806,35 @@ bool simple_wallet::start_mining(const std::vector<std::string>& args) {
   std::string rpc_url = this->m_daemon_path + "start_mining";
 
   std::shared_ptr<httplib::Client> m_httpClient = nullptr;
+  std::shared_ptr<httplib::SSLClient> m_httpsClient = nullptr;
+
+  JsonRpc::JsonRpcResponse jsRes;
+  std::string err;
 
   try {
     
     if (m_daemon_ssl) {
-      m_httpClient = std::make_shared<httplib::SSLClient>(m_daemon_host.c_str(), m_daemon_port);
+      m_httpsClient = std::make_shared<httplib::SSLClient>(m_daemon_host.c_str(), m_daemon_port);
+      const auto rsp = m_httpsClient->Post(rpc_url.c_str(), m_requestHeaders, storeToJson(req), "application/json");
+      if (rsp && rsp->status == 200) {
+        jsRes.parse(rsp->body);
+        if (jsRes.getResult(res)) {
+
+        }
+      }
+      err = interpret_rpc_response(std::to_string(rsp->status));
     }
     else {
       m_httpClient = std::make_shared<httplib::Client>(m_daemon_host.c_str(), m_daemon_port);
-    }
+      const auto rsp = m_httpClient->Post(rpc_url.c_str(), m_requestHeaders, storeToJson(req), "application/json");
+      if (rsp && rsp->status == 200) {
+        jsRes.parse(rsp->body);
+        if (jsRes.getResult(res)) {
 
-    //if (!m_daemon_cert.empty()) httpClient.setRootCert(m_daemon_cert);
-    //if (m_daemon_no_verify) httpClient.disableVerify();
-    
-    const auto rsp = m_httpClient->Post(rpc_url.c_str(), m_requestHeaders, storeToJson(req), "application/json");
-
-    JsonRpc::JsonRpcResponse jsRes;
-
-    if (rsp && rsp->status == 200) {
-      jsRes.parse(rsp->body);
-      if (jsRes.getResult(res)) {
-
+        }
       }
+      err = interpret_rpc_response(std::to_string(rsp->status));
     }
-
-    std::string err = interpret_rpc_response(std::to_string(rsp->status));
 
     if (err.empty())
       success_msg_writer() << "Mining started in daemon";
@@ -1842,6 +1846,7 @@ bool simple_wallet::start_mining(const std::vector<std::string>& args) {
     fail_msg_writer() << "Failed to invoke RPC method: " << e.what();
   }
   m_httpClient = nullptr;
+  m_httpsClient = nullptr;
 
   return true;
 }
@@ -1854,31 +1859,35 @@ bool simple_wallet::stop_mining(const std::vector<std::string>& args)
   std::string rpc_url = this->m_daemon_path + "stop_mining";
 
   std::shared_ptr<httplib::Client> m_httpClient = nullptr;
+  std::shared_ptr<httplib::SSLClient> m_httpsClient = nullptr;
+
+  JsonRpc::JsonRpcResponse jsRes;
+  std::string err;
 
   try {
     
     if (m_daemon_ssl) {
-      m_httpClient = std::make_shared<httplib::SSLClient>(m_daemon_host.c_str(), m_daemon_port);
+      m_httpsClient = std::make_shared<httplib::SSLClient>(m_daemon_host.c_str(), m_daemon_port);
+      const auto rsp = m_httpsClient->Post(rpc_url.c_str(), m_requestHeaders, storeToJson(req), "application/json");
+      if (rsp && rsp->status == 200) {
+        jsRes.parse(rsp->body);
+        if (jsRes.getResult(res)) {
+
+        }
+      }
+      err = interpret_rpc_response(std::to_string(rsp->status));
     }
     else {
       m_httpClient = std::make_shared<httplib::Client>(m_daemon_host.c_str(), m_daemon_port);
-    }
+      const auto rsp = m_httpClient->Post(rpc_url.c_str(), m_requestHeaders, storeToJson(req), "application/json");
+      if (rsp && rsp->status == 200) {
+        jsRes.parse(rsp->body);
+        if (jsRes.getResult(res)) {
 
-    //if (!m_daemon_cert.empty()) httpClient.setRootCert(m_daemon_cert);
-    //if (m_daemon_no_verify) httpClient.disableVerify();
-
-    const auto rsp = m_httpClient->Post(rpc_url.c_str(), m_requestHeaders, storeToJson(req), "application/json");
-
-    JsonRpc::JsonRpcResponse jsRes;
-
-    if (rsp && rsp->status == 200) {
-      jsRes.parse(rsp->body);
-      if (jsRes.getResult(res)) {
-
+        }
       }
+      err = interpret_rpc_response(std::to_string(rsp->status));
     }
-
-    std::string err = interpret_rpc_response(std::to_string(rsp->status));
 
     if (err.empty())
       success_msg_writer() << "Mining stopped in daemon";
@@ -1890,6 +1899,7 @@ bool simple_wallet::stop_mining(const std::vector<std::string>& args)
     fail_msg_writer() << "Failed to invoke RPC method: " << e.what();
   }
   m_httpClient = nullptr;
+  m_httpsClient = nullptr;
 
   return true;
 }

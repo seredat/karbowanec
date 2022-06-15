@@ -175,6 +175,7 @@ private:
   unsigned int m_rpcTimeout;
   
   std::shared_ptr<httplib::Client> m_httpClient = nullptr;
+  std::shared_ptr<httplib::SSLClient> m_httpsClient = nullptr;
 
   httplib::Headers m_requestHeaders;
   System::Event* m_httpEvent = nullptr;
