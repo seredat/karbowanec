@@ -1,11 +1,8 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.8)
 if(WIN32)
  option(CMAKE_USE_WIN32_THREADS_INIT "using WIN32 threads" ON)
 endif()
 set(VERSION "0.1")
-
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
@@ -16,6 +13,11 @@ string(TOLOWER ${CMAKE_BUILD_TYPE} CMAKE_BUILD_TYPE_LOWER)
 # Required for finding Threads on ARM
 enable_language(C)
 enable_language(CXX)
+
+# Enable c++17
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 # ARCH defines the target architecture, either by an explicit identifier or
 # one of the following two keywords. By default, ARCH a value of 'native':
@@ -274,7 +276,7 @@ else()
     set(STATIC_ASSERT_FLAG "-Dstatic_assert=_Static_assert")
   endif()
   
-  try_compile(STATIC_ASSERT_CPP_RES "${CMAKE_CURRENT_BINARY_DIR}/static-assert" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/test-static-assert.cpp" COMPILE_DEFINITIONS "-std=c++11")
+  try_compile(STATIC_ASSERT_CPP_RES "${CMAKE_CURRENT_BINARY_DIR}/static-assert" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/test-static-assert.cpp" COMPILE_DEFINITIONS "-std=c++17")
   if(STATIC_ASSERT_CPP_RES)
     set(STATIC_ASSERT_CPP_FLAG "")
   else()
@@ -311,7 +313,7 @@ else()
   endif()
   
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c11 -D_GNU_SOURCE ${MINGW_FLAG} ${STATIC_ASSERT_FLAG} ${WARNINGS} ${C_WARNINGS} ${ARCH_FLAG} ${PIC_FLAG}")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -D_GNU_SOURCE ${MINGW_FLAG} ${STATIC_ASSERT_CPP_FLAG} ${WARNINGS} ${CXX_WARNINGS} ${ARCH_FLAG} ${PIC_FLAG}")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -D_GNU_SOURCE ${MINGW_FLAG} ${STATIC_ASSERT_CPP_FLAG} ${WARNINGS} ${CXX_WARNINGS} ${ARCH_FLAG} ${PIC_FLAG}")
 
   # With GCC 6.1.1 the compiled binary malfunctions due to aliasing. Until that
   # is fixed in the code (Issue #847), force compiler to be conservative.
