@@ -18,13 +18,13 @@
 
 #include "NodeRpcProxy.h"
 #include "NodeErrors.h"
+#include "version.h"
 
 #include <system_error>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/lexical_cast.hpp>
 
-#include "version.h"
 #include <HTTP/HttpRequest.h>
 #include <HTTP/HttpResponse.h>
 #include <System/ContextGroup.h>

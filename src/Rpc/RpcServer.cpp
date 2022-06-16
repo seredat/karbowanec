@@ -100,7 +100,6 @@ RpcServer::HandlerFunction jsonMethod(bool (RpcServer::*handler)(typename Comman
       response.set_header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
       response.set_header("Access-Control-Allow-Methods", "POST, GET");
     }
-    response.set_header("Content-Type", "application/json");
     response.set_content(storeToJson(res.data()), "application/json");
     return result;
   };
@@ -125,12 +124,11 @@ RpcServer::HandlerFunction httpMethod(bool (RpcServer::*handler)(typename Comman
       response.set_header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
       response.set_header("Access-Control-Allow-Methods", "POST, GET");
     }
-    response.set_header("Content-Type", "text/html; charset=UTF-8");
     response.set_header("Cache-Control", "no-cache, no-store, must-revalidate");
     response.set_header("Expires", "0");
     response.status = 200;
 
-    response.set_content(res, "text/html");
+    response.set_content(res, "text/html; charset=UTF-8");
 
     return result;
   };
@@ -335,7 +333,6 @@ void RpcServer::processRequest(const httplib::Request& request, httplib::Respons
           COMMAND_RPC_GET_BLOCK_DETAILS_BY_HEIGHT::response rsp;
           bool r = on_get_block_details_by_height(req, rsp);
           if (r) {
-            response.set_header("Content-Type", "application/json");
             response.status = 200;
             response.set_content(storeToJson(rsp), "application/json");
           }
@@ -360,7 +357,6 @@ void RpcServer::processRequest(const httplib::Request& request, httplib::Respons
           COMMAND_RPC_GET_BLOCK_DETAILS_BY_HASH::response rsp;
           bool r = on_get_block_details_by_hash(req, rsp);
           if (r) {
-            response.set_header("Content-Type", "application/json");
             response.status = 200;
             response.set_content(storeToJson(rsp), "application/json");
           }
@@ -384,7 +380,6 @@ void RpcServer::processRequest(const httplib::Request& request, httplib::Respons
           COMMAND_RPC_GET_TRANSACTION_DETAILS_BY_HASH::response rsp;
           bool r = on_get_transaction_details_by_hash(req, rsp);
           if (r) {
-            response.set_header("Content-Type", "application/json");
             response.status = 200;
             response.set_content(storeToJson(rsp), "application/json");
           }
@@ -409,7 +404,6 @@ void RpcServer::processRequest(const httplib::Request& request, httplib::Respons
           COMMAND_RPC_GET_TRANSACTION_HASHES_BY_PAYMENT_ID::response rsp;
           bool r = on_get_transaction_hashes_by_paymentid(req, rsp);
           if (r) {
-            response.set_header("Content-Type", "application/json");
             response.status = 200;
             response.set_content(storeToJson(rsp), "application/json");
           }
@@ -434,7 +428,6 @@ void RpcServer::processRequest(const httplib::Request& request, httplib::Respons
           COMMAND_RPC_GET_TRANSACTIONS_POOL::response rsp;
           bool r = on_get_transactions_pool(req, rsp);
           if (r) {
-            response.set_header("Content-Type", "application/json");
             response.status = 200;
             response.set_content(storeToJson(rsp), "application/json");
           }
@@ -462,7 +455,6 @@ void RpcServer::processRequest(const httplib::Request& request, httplib::Respons
 
   }
   catch (const JsonRpc::JsonRpcError& err) {
-    response.set_header("Content-Type", "application/json");
     response.status = 500;
     response.set_content(storeToJsonValue(err).toString(), "application/json");
   }
