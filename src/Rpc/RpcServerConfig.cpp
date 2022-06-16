@@ -72,11 +72,11 @@ namespace CryptoNote {
   uint16_t RpcServerConfig::getBindPort() const { return bindPort; }
   uint16_t RpcServerConfig::getBindPortSSL() const { return bindPortSSL; }
   std::string RpcServerConfig::getBindIP() const { return bindIp; }
+  std::string RpcServerConfig::getBindAddress() const { return bindIp + ":" + std::to_string(bindPort); }
+  std::string RpcServerConfig::getBindAddressSSL() const { return bindIp + ":" + std::to_string(bindPortSSL); }
   std::string RpcServerConfig::getDhFile() const { return dhFile; }
   std::string RpcServerConfig::getChainFile() const { return chainFile; }
   std::string RpcServerConfig::getKeyFile() const { return keyFile; }
-  std::string RpcServerConfig::getBindAddress() const { return bindIp + ":" + std::to_string(bindPort); }
-  std::string RpcServerConfig::getBindAddressSSL() const { return bindIp + ":" + std::to_string(bindPortSSL); }
   std::string RpcServerConfig::getCors() const { return enableCors; }
   std::string RpcServerConfig::getNodeFeeAddress() const { return nodeFeeAddress; }
   uint64_t RpcServerConfig::getNodeFeeAmount() const { return nodeFeeAmount; }

@@ -217,6 +217,7 @@ RpcServer::RpcServer(
   m_fee_amount(0),
   https(m_config.getChainFile().c_str(), m_config.getKeyFile().c_str())
 {
+
   if (!m_config.getNodeFeeAddress().empty() && m_config.getNodeFeeAmount() != 0) {
     m_fee_address = m_config.getNodeFeeAddress();
     m_fee_amount = m_config.getNodeFeeAmount();
@@ -257,17 +258,17 @@ RpcServer::~RpcServer() {
 }
 
 void RpcServer::start() {
-  std::string address = m_config.getBindAddress();
+  std::string address = m_config.getBindIP();
   if (m_config.isEnabledSSL()) {
     uint16_t ssl_port = m_config.getBindPortSSL(); // make sure to use separate port for SSL server
-    logger(Logging::INFO, Logging::BRIGHT_MAGENTA) << "bind https to port " << ssl_port << ENDL;
+    logger(Logging::DEBUGGING, Logging::BRIGHT_MAGENTA) << "bind https to port " << ssl_port << ENDL;
     m_workers.emplace_back(std::unique_ptr<System::RemoteContext<void>>(
       new System::RemoteContext<void>(m_dispatcher, std::bind(&RpcServer::listen_ssl, this, address, ssl_port)))
     );
   }
 
   uint16_t port = m_config.getBindPort();
-  logger(Logging::INFO, Logging::BRIGHT_MAGENTA) << "bind http to port " << port << ENDL;
+  logger(Logging::DEBUGGING, Logging::BRIGHT_MAGENTA) << "bind http to port " << port << ENDL;
   m_workers.emplace_back(std::unique_ptr<System::RemoteContext<void>>(
     new System::RemoteContext<void>(m_dispatcher, std::bind(&RpcServer::listen, this, address, port)))
   );
