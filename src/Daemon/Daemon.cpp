@@ -252,6 +252,9 @@ int main(int argc, char* argv[])
     MinerConfig minerConfig;
     minerConfig.init(vm);
     RpcServerConfig rpcConfig;
+
+    //rpcConfig.setDataDir(data_dir_path.string());
+
     rpcConfig.init(vm);
 
     //create objects and link them
@@ -321,11 +324,24 @@ int main(int argc, char* argv[])
     boost::filesystem::path data_dir_path(data_dir);
     boost::filesystem::path chain_file_path(rpcConfig.getChainFile());
     boost::filesystem::path key_file_path(rpcConfig.getKeyFile());
+
+    // default certs location
     if (!chain_file_path.has_parent_path()) {
          chain_file_path = data_dir_path / chain_file_path;
     }
     if (!key_file_path.has_parent_path()) {
          key_file_path = data_dir_path / key_file_path;
+    }
+
+    if (rpcConfig.isEnabledSSL()) {
+      if (boost::filesystem::exists(chain_file_path, ec) &&
+        boost::filesystem::exists(key_file_path, ec)) {
+        // disable ssl in rpcConfig
+        // todo pass data_dir_path to rpcConfig and check there for default certs location
+      }
+      else {
+        logger(ERROR, BRIGHT_RED) << "Start RPC SSL server was canceled because certificate file(s) could not be found" << std::endl;
+      }
     }
 
     CryptoNote::RpcServer rpcServer(rpcConfig, dispatcher, logManager, m_core, p2psrv, cprotocol, chain_file_path.string(), key_file_path.string());
@@ -367,21 +383,7 @@ int main(int argc, char* argv[])
       dch.start_handling();
     }
 
-    bool server_ssl_enable = false;
-    if (rpcConfig.isEnabledSSL()) {
-      if (boost::filesystem::exists(chain_file_path, ec) &&
-        boost::filesystem::exists(key_file_path, ec)) {
-        server_ssl_enable = true;
-      }
-      else {
-        logger(ERROR, BRIGHT_RED) << "Start RPC SSL server was canceled because certificate file(s) could not be found" << std::endl;
-      }
-    }
-    std::string ssl_info = "";
-    if (server_ssl_enable) ssl_info += ", SSL on address " + rpcConfig.getBindAddressSSL();
-    logger(INFO) << "Starting core rpc server on address " << rpcConfig.getBindAddress() << ssl_info;
-
-    rpcServer.start(rpcConfig.getBindIP(), rpcConfig.getBindPort());
+    rpcServer.start();
 
     logger(INFO) << "Core rpc server started ok";
 

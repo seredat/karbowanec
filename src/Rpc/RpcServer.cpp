@@ -259,14 +259,18 @@ RpcServer::~RpcServer() {
   stop();
 }
 
-void RpcServer::start(const std::string address, const uint16_t port) {
+void RpcServer::start() {
+  std::string address = m_config.getBindAddress();
   if (m_config.isEnabledSSL()) {
     uint16_t ssl_port = m_config.getBindPortSSL(); // make sure to use separate port for SSL server
+    logger(Logging::INFO, Logging::BRIGHT_MAGENTA) << "bind https to port " << ssl_port << ENDL;
     m_workers.emplace_back(std::unique_ptr<System::RemoteContext<void>>(
       new System::RemoteContext<void>(m_dispatcher, std::bind(&RpcServer::listen_ssl, this, address, ssl_port)))
     );
   }
 
+  uint16_t port = m_config.getBindPort();
+  logger(Logging::INFO, Logging::BRIGHT_MAGENTA) << "bind http to port " << port << ENDL;
   m_workers.emplace_back(std::unique_ptr<System::RemoteContext<void>>(
     new System::RemoteContext<void>(m_dispatcher, std::bind(&RpcServer::listen, this, address, port)))
   );
@@ -283,14 +287,14 @@ void RpcServer::stop() {
 }
 
 void RpcServer::listen(const std::string address, const uint16_t port) {
-  if (!http.listen(address.c_str(), port)) {
+  if (!http.listen(address, port)) {
     logger(Logging::ERROR) << "Could not bind service to " << address << ":" << port
       << "\nIs another service using this address and port?\n";
   }
 }
 
 void RpcServer::listen_ssl(const std::string address, const uint16_t port) {
-  if (!https.listen(address.c_str(), port)) {
+  if (!https.listen(address, port)) {
     logger(Logging::ERROR) << "Could not bind service to " << address << ":" << port
       << "\nIs another service using this address and port?\n";
   }

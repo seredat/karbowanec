@@ -58,10 +58,8 @@ public:
 
   ~RpcServer();
   
-  void start(const std::string address, const uint16_t port);
+  void start();
   void stop();
-  void listen(const std::string address, const uint16_t port);
-  void listen_ssl(const std::string address, const uint16_t port);
   typedef std::function<bool(RpcServer*, const httplib::Request& req, httplib::Response& res)> HandlerFunction;
   std::string getCorsDomain();
 
@@ -79,13 +77,6 @@ private:
   void processRequest(const httplib::Request& request, httplib::Response& response);
   bool processJsonRpcRequest(const httplib::Request& request, httplib::Response& response);
   
-  bool isCoreReady();
-
-  bool checkIncomingTransactionForFee(const BinaryArray& tx_blob);
-  
-  int getRpcConnectionsCount();
-
-
   // binary handlers
   bool on_get_blocks(const COMMAND_RPC_GET_BLOCKS_FAST::request& req, COMMAND_RPC_GET_BLOCKS_FAST::response& res);
   bool on_query_blocks(const COMMAND_RPC_QUERY_BLOCKS::request& req, COMMAND_RPC_QUERY_BLOCKS::response& res);
@@ -153,6 +144,12 @@ private:
   bool on_check_payment(const COMMAND_RPC_CHECK_PAYMENT_BY_PAYMENT_ID::request& req, COMMAND_RPC_CHECK_PAYMENT_BY_PAYMENT_ID::response& rsp);
 
   void fill_block_header_response(const Block& blk, bool orphan_status, uint32_t height, const Crypto::Hash& hash, block_header_response& responce);
+  void listen(const std::string address, const uint16_t port);
+  void listen_ssl(const std::string address, const uint16_t port);
+  int getRpcConnectionsCount();
+  bool isCoreReady();
+  bool checkIncomingTransactionForFee(const BinaryArray& tx_blob);
+
 
   RpcServerConfig m_config;
   System::Dispatcher& m_dispatcher;
