@@ -200,8 +200,7 @@ RpcServer::RpcServer(
   System::Dispatcher& dispatcher,
   Logging::ILogger& log,
   CryptoNote::Core& core,
-  NodeServer& p2p, ICryptoNoteProtocolQuery& protocolQuery,
-  std::string cert_path, std::string key_path
+  NodeServer& p2p, ICryptoNoteProtocolQuery& protocolQuery
 ) :
   m_config(config),
   m_dispatcher(dispatcher),
@@ -216,9 +215,7 @@ RpcServer::RpcServer(
   m_cors_domain(m_config.getCors()),
   m_fee_address(""),
   m_fee_amount(0),
-  m_cert_path(cert_path),
-  m_key_path(key_path),
-  https(m_cert_path.c_str(), m_key_path.c_str())
+  https(m_config.getChainFile().c_str(), m_config.getKeyFile().c_str())
 {
   if (!m_config.getNodeFeeAddress().empty() && m_config.getNodeFeeAmount() != 0) {
     m_fee_address = m_config.getNodeFeeAddress();
@@ -287,14 +284,14 @@ void RpcServer::stop() {
 }
 
 void RpcServer::listen(const std::string address, const uint16_t port) {
-  if (!http.listen(address, port)) {
+  if (!http.listen(address.c_str(), port)) {
     logger(Logging::ERROR) << "Could not bind service to " << address << ":" << port
       << "\nIs another service using this address and port?\n";
   }
 }
 
 void RpcServer::listen_ssl(const std::string address, const uint16_t port) {
-  if (!https.listen(address, port)) {
+  if (!https.listen(address.c_str(), port)) {
     logger(Logging::ERROR) << "Could not bind service to " << address << ":" << port
       << "\nIs another service using this address and port?\n";
   }

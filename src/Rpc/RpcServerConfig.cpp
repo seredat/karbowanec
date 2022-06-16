@@ -16,6 +16,8 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with Karbo.  If not, see <http://www.gnu.org/licenses/>.
 
+#include <boost/filesystem.hpp>
+
 #include "RpcServerConfig.h"
 #include "Common/CommandLine.h"
 #include "CryptoNoteConfig.h"
@@ -50,7 +52,8 @@ namespace CryptoNote {
   }
 
 
-  RpcServerConfig::RpcServerConfig() : 
+  RpcServerConfig::RpcServerConfig() :
+    m_data_dir(""),
     bindIp(DEFAULT_RPC_IP),
     bindPort(DEFAULT_RPC_PORT),
     enableCors(""),
@@ -60,7 +63,8 @@ namespace CryptoNote {
     nodeFeeAddress(""),
     nodeFeeAmountStr(""),
     nodeFeeViewKey(""),
-    bindPortSSL(RPC_DEFAULT_SSL_PORT) {
+    bindPortSSL(RPC_DEFAULT_SSL_PORT)
+  {
   }
 
   bool RpcServerConfig::isEnabledSSL() const { return enableSSL; }
@@ -98,11 +102,6 @@ namespace CryptoNote {
   void RpcServerConfig::init(const boost::program_options::variables_map& vm)  {
     bindIp = command_line::get_arg(vm, arg_rpc_bind_ip);
     bindPort = command_line::get_arg(vm, arg_rpc_bind_port);
-    enableSSL = command_line::get_arg(vm, arg_rpc_bind_ssl_enable);
-    bindPortSSL = command_line::get_arg(vm, arg_rpc_bind_ssl_port);
-    chainFile = command_line::get_arg(vm, arg_chain_file);
-    keyFile = command_line::get_arg(vm, arg_key_file);
-    dhFile = command_line::get_arg(vm, arg_dh_file);
     enableCors = command_line::get_arg(vm, arg_enable_cors);
     restrictedRPC = command_line::get_arg(vm, arg_restricted_rpc);
     
@@ -141,6 +140,40 @@ namespace CryptoNote {
     }
 
     nodeFeeViewKey = command_line::get_arg(vm, arg_set_view_key);
+
+    enableSSL = command_line::get_arg(vm, arg_rpc_bind_ssl_enable);
+    bindPortSSL = command_line::get_arg(vm, arg_rpc_bind_ssl_port);
+    chainFile = command_line::get_arg(vm, arg_chain_file);
+    keyFile = command_line::get_arg(vm, arg_key_file);
+    dhFile = command_line::get_arg(vm, arg_dh_file);
+
+    boost::filesystem::path chain_file_path(chainFile);
+    boost::filesystem::path key_file_path(keyFile);
+    boost::filesystem::path dh_file_path(dhFile);
+    
+    // default certs location, we need full path to pass to http(s) server
+    if (!chain_file_path.has_parent_path()) {
+      chain_file_path = m_data_dir / chain_file_path;
+      chainFile = chain_file_path.string();
+    }
+    if (!key_file_path.has_parent_path()) {
+      key_file_path = m_data_dir / key_file_path;
+      keyFile = key_file_path.string();
+    }
+    if (!dh_file_path.has_parent_path()) {
+      dh_file_path = m_data_dir / dh_file_path;
+      dhFile = dh_file_path.string();
+    }
+
+    boost::system::error_code ec;
+    if (isEnabledSSL() && (!boost::filesystem::exists(chain_file_path, ec) ||
+      !boost::filesystem::exists(key_file_path, ec))) {
+      throw std::runtime_error("SSL certificate file(s) could not be found");
+      enableSSL = false;
+    }
   }
 
+  void RpcServerConfig::setDataDir(std::string dataDir) {
+    m_data_dir = dataDir;
+  }
 }

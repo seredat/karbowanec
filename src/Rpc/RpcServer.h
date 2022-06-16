@@ -51,9 +51,7 @@ public:
     Logging::ILogger& log,
     Core& core,
     NodeServer& p2p,
-    ICryptoNoteProtocolQuery& protocolQuery,
-    std::string cert_path = "",
-    std::string key_path = ""
+    ICryptoNoteProtocolQuery& protocolQuery
   );
 
   ~RpcServer();
@@ -168,8 +166,6 @@ private:
   std::string m_contact_info;
   Crypto::SecretKey m_view_key;
   CryptoNote::AccountPublicAddress m_fee_acc;
-  std::string m_cert_path;
-  std::string m_key_path;
 
   std::vector<std::unique_ptr<System::RemoteContext<void>>> m_workers;
 };

@@ -29,6 +29,7 @@ public:
 
   static void initOptions(boost::program_options::options_description& desc);
   void init(const boost::program_options::variables_map& options);
+  void setDataDir(std::string dataDir);
 
   bool isEnabledSSL() const;
   bool isRestricted() const;
@@ -47,6 +48,8 @@ public:
   std::string getContactInfo() const;
 
 private:
+  std::string m_data_dir;
+
   bool        restrictedRPC;
   bool        enableSSL;
   uint16_t    bindPort;

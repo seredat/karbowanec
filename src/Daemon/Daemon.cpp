@@ -252,9 +252,8 @@ int main(int argc, char* argv[])
     MinerConfig minerConfig;
     minerConfig.init(vm);
     RpcServerConfig rpcConfig;
-
-    //rpcConfig.setDataDir(data_dir_path.string());
-
+    boost::filesystem::path data_dir_path(data_dir);
+    rpcConfig.setDataDir(data_dir_path.string());
     rpcConfig.init(vm);
 
     //create objects and link them
@@ -320,31 +319,7 @@ int main(int argc, char* argv[])
 
     CryptoNote::CryptoNoteProtocolHandler cprotocol(currency, dispatcher, m_core, nullptr, logManager);
     CryptoNote::NodeServer p2psrv(dispatcher, cprotocol, logManager);
-
-    boost::filesystem::path data_dir_path(data_dir);
-    boost::filesystem::path chain_file_path(rpcConfig.getChainFile());
-    boost::filesystem::path key_file_path(rpcConfig.getKeyFile());
-
-    // default certs location
-    if (!chain_file_path.has_parent_path()) {
-         chain_file_path = data_dir_path / chain_file_path;
-    }
-    if (!key_file_path.has_parent_path()) {
-         key_file_path = data_dir_path / key_file_path;
-    }
-
-    if (rpcConfig.isEnabledSSL()) {
-      if (boost::filesystem::exists(chain_file_path, ec) &&
-        boost::filesystem::exists(key_file_path, ec)) {
-        // disable ssl in rpcConfig
-        // todo pass data_dir_path to rpcConfig and check there for default certs location
-      }
-      else {
-        logger(ERROR, BRIGHT_RED) << "Start RPC SSL server was canceled because certificate file(s) could not be found" << std::endl;
-      }
-    }
-
-    CryptoNote::RpcServer rpcServer(rpcConfig, dispatcher, logManager, m_core, p2psrv, cprotocol, chain_file_path.string(), key_file_path.string());
+    CryptoNote::RpcServer rpcServer(rpcConfig, dispatcher, logManager, m_core, p2psrv, cprotocol);
 
     cprotocol.set_p2p_endpoint(&p2psrv);
     m_core.set_cryptonote_protocol(&cprotocol);
