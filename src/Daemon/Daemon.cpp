@@ -237,8 +237,6 @@ int main(int argc, char* argv[])
       ":..::::..::..:::::..::..:::::..::........::::.......:::\n\n",
     Common::Console::Color::BrightYellow);
 
-    logger(INFO) << "Module folder: " << argv[0];
-
     bool testnet_mode = command_line::get_arg(vm, arg_testnet_on);
     if (testnet_mode) {
       logger(INFO) << "Starting in testnet mode!";
