@@ -1871,9 +1871,7 @@ bool simple_wallet::stop_mining(const std::vector<std::string>& args)
       const auto rsp = m_httpsClient->Post(rpc_url.c_str(), m_requestHeaders, storeToJson(req), "application/json");
       if (rsp && rsp->status == 200) {
         jsRes.parse(rsp->body);
-        if (jsRes.getResult(res)) {
-
-        }
+        jsRes.getResult(res);
       }
       err = interpret_rpc_response(std::to_string(rsp->status));
     }
@@ -1882,9 +1880,7 @@ bool simple_wallet::stop_mining(const std::vector<std::string>& args)
       const auto rsp = m_httpClient->Post(rpc_url.c_str(), m_requestHeaders, storeToJson(req), "application/json");
       if (rsp && rsp->status == 200) {
         jsRes.parse(rsp->body);
-        if (jsRes.getResult(res)) {
-
-        }
+        jsRes.getResult(res);
       }
       err = interpret_rpc_response(std::to_string(rsp->status));
     }

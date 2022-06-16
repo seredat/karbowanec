@@ -991,14 +991,9 @@ void NodeRpcProxy::scheduleRequest(std::function<std::error_code()>&& procedure,
 template <typename Request, typename Response>
 std::error_code NodeRpcProxy::binaryCommand(const std::string& comm, const Request& req, Response& res) {
   std::error_code ec;
-
   std::string rpc_url = this->m_daemon_path + comm;
-
-
-
   try {
     EventLock eventLock(*m_httpEvent);
-
     if (m_daemon_ssl) {
       const auto rsp = m_httpsClient->Post(rpc_url.c_str(), m_requestHeaders, storeToBinaryKeyValue(req), "application/octet-stream");
       if (rsp && rsp->status == 200) {
@@ -1006,21 +1001,17 @@ std::error_code NodeRpcProxy::binaryCommand(const std::string& comm, const Reque
           throw std::runtime_error("Failed to parse binary response");
         }
       }
-
       ec = interpretResponseStatus(std::to_string(rsp->status));
     }
     else {
       const auto rsp = m_httpClient->Post(rpc_url.c_str(), m_requestHeaders, storeToBinaryKeyValue(req), "application/octet-stream");
-
       if (rsp && rsp->status == 200) {
         if (!loadFromBinaryKeyValue(res, rsp->body)) {
           throw std::runtime_error("Failed to parse binary response");
         }
       }
-
       ec = interpretResponseStatus(std::to_string(rsp->status));
     }
-
   } catch (const ConnectException&) {
     ec = make_error_code(error::CONNECT_ERROR);
   } catch (const std::exception&) {
@@ -1033,12 +1024,9 @@ std::error_code NodeRpcProxy::binaryCommand(const std::string& comm, const Reque
 template <typename Request, typename Response>
 std::error_code NodeRpcProxy::jsonCommand(const std::string& comm, const Request& req, Response& res) {
   std::error_code ec;
-
   std::string rpc_url = this->m_daemon_path + comm;
-
   try {
     EventLock eventLock(*m_httpEvent);
-
     if (m_daemon_ssl) {
       const auto rsp = m_httpsClient->Get(rpc_url.c_str());
       if (rsp && rsp->status == 200) {
@@ -1046,21 +1034,17 @@ std::error_code NodeRpcProxy::jsonCommand(const std::string& comm, const Request
           throw std::runtime_error("Failed to parse JSON response");
         }
       }
-
       ec = interpretResponseStatus(std::to_string(rsp->status));
     }
     else {
       const auto rsp = m_httpClient->Get(rpc_url.c_str());
-
       if (rsp && rsp->status == 200) {
         if (!loadFromJson(res, rsp->body)) {
           throw std::runtime_error("Failed to parse JSON response");
         }
       }
-
       ec = interpretResponseStatus(std::to_string(rsp->status));
     }
-
   } catch (const ConnectException&) {
     ec = make_error_code(error::CONNECT_ERROR);
   } catch (const std::exception&) {
@@ -1073,22 +1057,15 @@ std::error_code NodeRpcProxy::jsonCommand(const std::string& comm, const Request
 template <typename Request, typename Response>
 std::error_code NodeRpcProxy::jsonRpcCommand(const std::string& method, const Request& req, Response& res) {
   std::error_code ec = make_error_code(error::INTERNAL_NODE_ERROR);
-
+  std::string rpc_url = this->m_daemon_path + "json_rpc";
   try {
     EventLock eventLock(*m_httpEvent);
-
     JsonRpc::JsonRpcRequest jsReq;
-
     jsReq.setMethod(method);
     jsReq.setParams(req);
-
-    std::string rpc_url = this->m_daemon_path + "json_rpc";
-
     JsonRpc::JsonRpcResponse jsRes;
-
     if (m_daemon_ssl) {
       const auto rsp = m_httpsClient->Post(rpc_url.c_str(), m_requestHeaders, jsReq.getBody(), "application/json");
-      
       if (rsp && rsp->status == 200) {
         jsRes.parse(rsp->body);
         if (jsRes.getResult(res)) {
@@ -1098,7 +1075,6 @@ std::error_code NodeRpcProxy::jsonRpcCommand(const std::string& method, const Re
     }
     else {
       const auto rsp = m_httpClient->Post(rpc_url.c_str(), m_requestHeaders, jsReq.getBody(), "application/json");
-
       if (rsp && rsp->status == 200) {
         jsRes.parse(rsp->body);
         if (jsRes.getResult(res)) {
