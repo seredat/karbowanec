@@ -299,7 +299,7 @@ namespace CryptoNote
     if (!mining)
     {
       logger(TRACE) << "Not mining - nothing to stop";
-      return true;
+      return false;
     }
 
     send_stop_signal();
