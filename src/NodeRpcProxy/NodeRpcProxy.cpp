@@ -18,7 +18,6 @@
 
 #include "NodeRpcProxy.h"
 #include "NodeErrors.h"
-#include "version.h"
 
 #include <system_error>
 #include <boost/uuid/uuid.hpp>
@@ -93,7 +92,7 @@ NodeRpcProxy::NodeRpcProxy(const std::string& nodeHost, unsigned short nodePort,
     m_greyPeerlistSize(0)
 {
   std::stringstream userAgent;
-  userAgent << "NodeRpcProxy/" << PROJECT_VERSION_LONG;
+  userAgent << "NodeRpcProxy";
   m_requestHeaders = { {"User-Agent", userAgent.str()}, { "Connection", "keep-alive" } };
   resetInternalState();
 }
