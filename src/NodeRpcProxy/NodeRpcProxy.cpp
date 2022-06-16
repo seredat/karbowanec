@@ -329,7 +329,11 @@ void NodeRpcProxy::updateBlockchainStatus() {
       m_alreadyGeneratedCoins.store(alreadyGenCoins, std::memory_order_relaxed);
     }
 
-    m_connected = true;
+  }
+
+  bool open = m_daemon_ssl ? m_httpsClient->is_socket_open() : m_httpClient->is_socket_open();
+  if (m_connected != open) {
+    m_connected = open;
     m_rpcProxyObserverManager.notify(&INodeRpcProxyObserver::connectionStatusUpdated, m_connected);
   }
 }
@@ -977,10 +981,11 @@ void NodeRpcProxy::scheduleRequest(std::function<std::error_code()>&& procedure,
           callback(std::make_error_code(std::errc::operation_canceled));
         } else {
           std::error_code ec = procedure();
-          //if (m_connected != m_httpClient->isConnected()) {
-          //  m_connected = m_httpClient->isConnected();
-          //  m_rpcProxyObserverManager.notify(&INodeRpcProxyObserver::connectionStatusUpdated, m_connected);
-          //}
+          bool open = m_daemon_ssl ? m_httpsClient->is_socket_open() : m_httpClient->is_socket_open();
+          if (m_connected != open) {
+            m_connected = open;
+            m_rpcProxyObserverManager.notify(&INodeRpcProxyObserver::connectionStatusUpdated, m_connected);
+          }
           callback(m_stop ? std::make_error_code(std::errc::operation_canceled) : ec);
         }
       }, std::move(procedure), std::move(callback)));
