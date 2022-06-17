@@ -995,21 +995,25 @@ std::error_code NodeRpcProxy::binaryCommand(const std::string& comm, const Reque
     EventLock eventLock(*m_httpEvent);
     if (m_daemon_ssl) {
       const auto rsp = m_httpsClient->Post(rpc_url.c_str(), m_requestHeaders, storeToBinaryKeyValue(req), "application/octet-stream");
-      if (rsp && rsp->status == 200) {
-        if (!loadFromBinaryKeyValue(res, rsp->body)) {
-          throw std::runtime_error("Failed to parse binary response");
+      if (rsp) {
+        if (rsp->status == 200) {
+          if (!loadFromBinaryKeyValue(res, rsp->body)) {
+            throw std::runtime_error("Failed to parse binary response");
+          }
         }
+        ec = interpretResponseStatus(std::to_string(rsp->status));
       }
-      ec = interpretResponseStatus(std::to_string(rsp->status));
     }
     else {
       const auto rsp = m_httpClient->Post(rpc_url.c_str(), m_requestHeaders, storeToBinaryKeyValue(req), "application/octet-stream");
-      if (rsp && rsp->status == 200) {
-        if (!loadFromBinaryKeyValue(res, rsp->body)) {
-          throw std::runtime_error("Failed to parse binary response");
+      if (rsp) {
+        if (rsp->status == 200) {
+          if (!loadFromBinaryKeyValue(res, rsp->body)) {
+            throw std::runtime_error("Failed to parse binary response");
+          }
         }
+        ec = interpretResponseStatus(std::to_string(rsp->status));
       }
-      ec = interpretResponseStatus(std::to_string(rsp->status));
     }
   } catch (const ConnectException&) {
     ec = make_error_code(error::CONNECT_ERROR);
@@ -1028,21 +1032,25 @@ std::error_code NodeRpcProxy::jsonCommand(const std::string& comm, const Request
     EventLock eventLock(*m_httpEvent);
     if (m_daemon_ssl) {
       const auto rsp = m_httpsClient->Get(rpc_url.c_str());
-      if (rsp && rsp->status == 200) {
-        if (!loadFromJson(res, rsp->body)) {
-          throw std::runtime_error("Failed to parse JSON response");
+      if (rsp) {
+        if (rsp->status == 200) {
+          if (!loadFromJson(res, rsp->body)) {
+            throw std::runtime_error("Failed to parse JSON response");
+          }
         }
+        ec = interpretResponseStatus(std::to_string(rsp->status));
       }
-      ec = interpretResponseStatus(std::to_string(rsp->status));
     }
     else {
       const auto rsp = m_httpClient->Get(rpc_url.c_str());
-      if (rsp && rsp->status == 200) {
-        if (!loadFromJson(res, rsp->body)) {
-          throw std::runtime_error("Failed to parse JSON response");
+      if (rsp) {
+        if (rsp->status == 200) {
+          if (!loadFromJson(res, rsp->body)) {
+            throw std::runtime_error("Failed to parse JSON response");
+          }
         }
+        ec = interpretResponseStatus(std::to_string(rsp->status));
       }
-      ec = interpretResponseStatus(std::to_string(rsp->status));
     }
   } catch (const ConnectException&) {
     ec = make_error_code(error::CONNECT_ERROR);
@@ -1065,20 +1073,26 @@ std::error_code NodeRpcProxy::jsonRpcCommand(const std::string& method, const Re
     JsonRpc::JsonRpcResponse jsRes;
     if (m_daemon_ssl) {
       const auto rsp = m_httpsClient->Post(rpc_url.c_str(), m_requestHeaders, jsReq.getBody(), "application/json");
-      if (rsp && rsp->status == 200) {
-        jsRes.parse(rsp->body);
-        if (jsRes.getResult(res)) {
-          ec = interpretResponseStatus(std::to_string(rsp->status));
+      if (rsp) {
+        if (rsp->status == 200) {
+          jsRes.parse(rsp->body);
+          if (jsRes.getResult(res)) {
+            
+          }
         }
+        ec = interpretResponseStatus(std::to_string(rsp->status));
       }
     }
     else {
       const auto rsp = m_httpClient->Post(rpc_url.c_str(), m_requestHeaders, jsReq.getBody(), "application/json");
-      if (rsp && rsp->status == 200) {
-        jsRes.parse(rsp->body);
-        if (jsRes.getResult(res)) {
-          ec = interpretResponseStatus(std::to_string(rsp->status));
+      if (rsp) {
+        if (rsp->status == 200) {
+          jsRes.parse(rsp->body);
+          if (jsRes.getResult(res)) {
+
+          }
         }
+        ec = interpretResponseStatus(std::to_string(rsp->status));
       }
     }
   } catch (const ConnectException&) {

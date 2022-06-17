@@ -202,10 +202,10 @@ void seedLoader(const char *seed_file, std::string& seed) {
 
 inline std::string interpret_rpc_response(const std::string& status) {
   std::string err;
-  if (500 == std::stoi(status)) {
+  if (status == CORE_RPC_STATUS_BUSY) {
     err = "daemon is busy. Please try later";
   }
-  else if (200 != std::stoi(status)) {
+  else if (status != CORE_RPC_STATUS_OK) {
     err = status;
   }
 
@@ -1829,32 +1829,32 @@ bool simple_wallet::start_mining(const std::vector<std::string>& args) {
   std::shared_ptr<httplib::Client> m_httpClient = nullptr;
   std::shared_ptr<httplib::SSLClient> m_httpsClient = nullptr;
 
-  JsonRpc::JsonRpcResponse jsRes;
   std::string err;
 
   try {
-    
     if (m_daemon_ssl) {
       m_httpsClient = std::make_shared<httplib::SSLClient>(m_daemon_host.c_str(), m_daemon_port);
       const auto rsp = m_httpsClient->Post(rpc_url.c_str(), m_requestHeaders, storeToJson(req), "application/json");
-      if (rsp && rsp->status == 200) {
-        jsRes.parse(rsp->body);
-        if (jsRes.getResult(res)) {
-
+      if (rsp) {
+        if (rsp->status == 200) {
+          if (!loadFromJson(res, rsp->body)) {
+            err = "Failed to parse JSON response";
+          }
         }
+        err = interpret_rpc_response(std::to_string(rsp->status));
       }
-      err = interpret_rpc_response(std::to_string(rsp->status));
     }
     else {
       m_httpClient = std::make_shared<httplib::Client>(m_daemon_host.c_str(), m_daemon_port);
       const auto rsp = m_httpClient->Post(rpc_url.c_str(), m_requestHeaders, storeToJson(req), "application/json");
-      if (rsp && rsp->status == 200) {
-        jsRes.parse(rsp->body);
-        if (jsRes.getResult(res)) {
-
+      if (rsp) {
+        if (rsp->status == 200) {
+          if (!loadFromJson(res, rsp->body)) {
+            err = "Failed to parse JSON response";
+          }
         }
+        err = interpret_rpc_response(std::to_string(rsp->status));
       }
-      err = interpret_rpc_response(std::to_string(rsp->status));
     }
 
     if (err.empty())
@@ -1882,28 +1882,32 @@ bool simple_wallet::stop_mining(const std::vector<std::string>& args)
   std::shared_ptr<httplib::Client> m_httpClient = nullptr;
   std::shared_ptr<httplib::SSLClient> m_httpsClient = nullptr;
 
-  JsonRpc::JsonRpcResponse jsRes;
   std::string err;
 
   try {
-    
     if (m_daemon_ssl) {
       m_httpsClient = std::make_shared<httplib::SSLClient>(m_daemon_host.c_str(), m_daemon_port);
       const auto rsp = m_httpsClient->Post(rpc_url.c_str(), m_requestHeaders, storeToJson(req), "application/json");
-      if (rsp && rsp->status == 200) {
-        jsRes.parse(rsp->body);
-        jsRes.getResult(res);
+      if (rsp) {
+        if (rsp->status == 200) {
+          if (!loadFromJson(res, rsp->body)) {
+            err = "Failed to parse JSON response";
+          }
+        }
+        err = interpret_rpc_response(std::to_string(rsp->status));
       }
-      err = interpret_rpc_response(std::to_string(rsp->status));
     }
     else {
       m_httpClient = std::make_shared<httplib::Client>(m_daemon_host.c_str(), m_daemon_port);
       const auto rsp = m_httpClient->Post(rpc_url.c_str(), m_requestHeaders, storeToJson(req), "application/json");
-      if (rsp && rsp->status == 200) {
-        jsRes.parse(rsp->body);
-        jsRes.getResult(res);
+      if (rsp) {
+        if (rsp->status == 200) {
+          if (!loadFromJson(res, rsp->body)) {
+            err = "Failed to parse JSON response";
+          }
+        }
+        err = interpret_rpc_response(std::to_string(rsp->status));
       }
-      err = interpret_rpc_response(std::to_string(rsp->status));
     }
 
     if (err.empty())
