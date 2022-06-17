@@ -635,7 +635,7 @@ bool simple_wallet::help(const std::vector<std::string> &args/* = std::vector<st
 }
 
 bool simple_wallet::exit(const std::vector<std::string> &args) {
-  m_consoleHandler.requestStop();
+  stop();
   return true;
 }
 
@@ -2417,6 +2417,7 @@ bool simple_wallet::run() {
 }
 //----------------------------------------------------------------------------------------------------
 void simple_wallet::stop() {
+  success_msg_writer() << "Closing. Please wait...";
   m_consoleHandler.requestStop();
 }
 //----------------------------------------------------------------------------------------------------
