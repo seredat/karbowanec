@@ -72,6 +72,7 @@ NodeRpcProxy::NodeRpcProxy(const std::string& nodeHost, unsigned short nodePort,
     m_nodePort(nodePort),
     m_daemon_path(daemon_path),
     m_connected(false),
+    m_initial(true),
     m_daemon_ssl(daemon_ssl),
     m_daemon_cert(""),
     m_daemon_no_verify(false),
@@ -349,6 +350,8 @@ void NodeRpcProxy::updateBlockchainStatus() {
       m_rpcProxyObserverManager.notify(&INodeRpcProxyObserver::connectionStatusUpdated, m_connected);
     }
   }
+
+  m_initial = false;
 }
 
 void NodeRpcProxy::updatePeerCount(size_t peerCount) {
