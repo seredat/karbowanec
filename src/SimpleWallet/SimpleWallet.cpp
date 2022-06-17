@@ -2714,7 +2714,7 @@ int main(int argc, char* argv[]) {
     CryptoNote::simple_wallet wal(dispatcher, currency, logManager);
     
     if (!wal.init(vm)) {
-      logger(ERROR, BRIGHT_RED) << "Failed to initialize wallet"; 
+      //logger(ERROR, BRIGHT_RED) << "Failed to initialize wallet"; 
       return 1; 
     }
 
