@@ -1608,9 +1608,10 @@ bool RpcServer::on_stop_mining(const COMMAND_RPC_STOP_MINING::request& req, COMM
   }
 
   if (!m_core.get_miner().stop()) {
-    res.status = "Failed, mining not stopped";
+    res.status = "Not mining - nothing to stop";
     return true;
   }
+
   res.status = CORE_RPC_STATUS_OK;
   return true;
 }

@@ -905,14 +905,35 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     if (c == 'E' || c == 'e')
       return false;
 
-    std::cout << "Specify wallet file name (e.g., wallet.bin).\n";
     std::string userInput;
     bool validInput = true;
+
     do
     {
       std::cout << "Wallet file name: ";
       std::getline(std::cin, userInput);
       boost::algorithm::trim(userInput);
+
+      if (c == 'o' || c == 'O') {
+        std::string walletFileName = userInput;
+        if (walletFileName.size() == 0) {
+          validInput = false;
+          continue;
+        }
+
+        if (Common::GetExtension(walletFileName) != ".wallet") {
+          walletFileName = walletFileName + ".wallet";
+        }
+
+        boost::system::error_code ignore;
+        if (!boost::filesystem::exists(walletFileName, ignore)) {
+          std::cout << userInput << " does not exists. Did you type correct file name?" << std::endl;
+          validInput = false;
+        }
+        else {
+          validInput = true;
+        }
+      }
 
       if (c != 'o' && c != 'O')
       {
