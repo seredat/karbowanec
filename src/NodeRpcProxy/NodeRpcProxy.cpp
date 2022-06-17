@@ -1008,6 +1008,9 @@ std::error_code NodeRpcProxy::binaryCommand(const std::string& comm, const Reque
         }
         ec = interpretResponseStatus(std::to_string(rsp->status));
       }
+      else {
+        ec = make_error_code(error::CONNECT_ERROR);
+      }
     }
     else {
       const auto rsp = m_httpClient->Post(rpc_url.c_str(), m_requestHeaders, storeToBinaryKeyValue(req), "application/octet-stream");
@@ -1018,6 +1021,9 @@ std::error_code NodeRpcProxy::binaryCommand(const std::string& comm, const Reque
           }
         }
         ec = interpretResponseStatus(std::to_string(rsp->status));
+      }
+      else {
+        ec = make_error_code(error::CONNECT_ERROR);
       }
     }
   } catch (const ConnectException&) {
@@ -1045,6 +1051,9 @@ std::error_code NodeRpcProxy::jsonCommand(const std::string& comm, const Request
         }
         ec = interpretResponseStatus(std::to_string(rsp->status));
       }
+      else {
+        ec = make_error_code(error::CONNECT_ERROR);
+      }
     }
     else {
       const auto rsp = m_httpClient->Get(rpc_url.c_str());
@@ -1055,6 +1064,9 @@ std::error_code NodeRpcProxy::jsonCommand(const std::string& comm, const Request
           }
         }
         ec = interpretResponseStatus(std::to_string(rsp->status));
+      }
+      else {
+        ec = make_error_code(error::CONNECT_ERROR);
       }
     }
   } catch (const ConnectException&) {
@@ -1087,6 +1099,9 @@ std::error_code NodeRpcProxy::jsonRpcCommand(const std::string& method, const Re
         }
         ec = interpretResponseStatus(std::to_string(rsp->status));
       }
+      else {
+        ec = make_error_code(error::CONNECT_ERROR);
+      }
     }
     else {
       const auto rsp = m_httpClient->Post(rpc_url.c_str(), m_requestHeaders, jsReq.getBody(), "application/json");
@@ -1098,6 +1113,9 @@ std::error_code NodeRpcProxy::jsonRpcCommand(const std::string& method, const Re
           }
         }
         ec = interpretResponseStatus(std::to_string(rsp->status));
+      }
+      else {
+        ec = make_error_code(error::CONNECT_ERROR);
       }
     }
   } catch (const ConnectException&) {
