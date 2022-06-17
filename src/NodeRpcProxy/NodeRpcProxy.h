@@ -127,7 +127,6 @@ private:
   bool updatePoolStatus();
   void updatePeerCount(size_t peerCount);
   void updatePoolState(const std::vector<std::unique_ptr<ITransactionReader>>& addedTxs, const std::vector<Crypto::Hash>& deletedTxsIds);
-  void getFeeAddress();
 
   std::error_code doRelayTransaction(const CryptoNote::Transaction& transaction);
   std::error_code doGetRandomOutsByAmounts(std::vector<uint64_t>& amounts, uint64_t outsCount,
