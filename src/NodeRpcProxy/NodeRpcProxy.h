@@ -202,6 +202,7 @@ private:
   std::unordered_set<Crypto::Hash> m_knownTxs;
 
   bool m_connected;
+  bool m_initial;
   std::string m_fee_address;
   uint64_t m_fee_amount = 0;
   std::string m_daemon_cert;
