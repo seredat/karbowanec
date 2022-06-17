@@ -630,6 +630,7 @@ bool simple_wallet::help(const std::vector<std::string> &args/* = std::vector<st
 }
 
 bool simple_wallet::exit(const std::vector<std::string> &args) {
+  m_node->shutdown();
   m_consoleHandler.requestStop();
   return true;
 }
@@ -1843,6 +1844,9 @@ bool simple_wallet::start_mining(const std::vector<std::string>& args) {
         }
         err = interpret_rpc_response(std::to_string(rsp->status));
       }
+      else {
+        err = "No response...";
+      }
     }
     else {
       m_httpClient = std::make_shared<httplib::Client>(m_daemon_host.c_str(), m_daemon_port);
@@ -1854,6 +1858,9 @@ bool simple_wallet::start_mining(const std::vector<std::string>& args) {
           }
         }
         err = interpret_rpc_response(std::to_string(rsp->status));
+      }
+      else {
+        err = "No response...";
       }
     }
 
@@ -1896,6 +1903,9 @@ bool simple_wallet::stop_mining(const std::vector<std::string>& args)
         }
         err = interpret_rpc_response(std::to_string(rsp->status));
       }
+      else {
+        err = "No response...";
+      }
     }
     else {
       m_httpClient = std::make_shared<httplib::Client>(m_daemon_host.c_str(), m_daemon_port);
@@ -1907,6 +1917,9 @@ bool simple_wallet::stop_mining(const std::vector<std::string>& args)
           }
         }
         err = interpret_rpc_response(std::to_string(rsp->status));
+      }
+      else {
+        err = "No response...";
       }
     }
 
