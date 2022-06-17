@@ -296,7 +296,7 @@ void NodeRpcProxy::updateBlockchainStatus() {
   CryptoNote::COMMAND_RPC_GET_FEE_ADDRESS::request ireq = AUTO_VAL_INIT(ireq);
   CryptoNote::COMMAND_RPC_GET_FEE_ADDRESS::response iresp = AUTO_VAL_INIT(iresp);
 
-  std::error_code ec = jsonCommand("feeaddress", ireq, iresp);
+  ec = jsonCommand("feeaddress", ireq, iresp);
 
   if (!ec) {
     m_fee_address = iresp.fee_address;
