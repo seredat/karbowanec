@@ -344,7 +344,7 @@ void NodeRpcProxy::updateBlockchainStatus() {
     m_connected = true;
     m_rpcProxyObserverManager.notify(&INodeRpcProxyObserver::connectionStatusUpdated, m_connected);
   }
-  else if (!(!ec) && m_connected) {
+  else if (m_connected) {
     m_connected = false;
     m_rpcProxyObserverManager.notify(&INodeRpcProxyObserver::connectionStatusUpdated, m_connected);
   }
@@ -985,7 +985,7 @@ void NodeRpcProxy::scheduleRequest(std::function<std::error_code()>&& procedure,
           m_connected = true;
           m_rpcProxyObserverManager.notify(&INodeRpcProxyObserver::connectionStatusUpdated, m_connected);
         }
-        if (!(!ec) && m_connected) {
+        else if (m_connected) {
           m_connected = false;
           m_rpcProxyObserverManager.notify(&INodeRpcProxyObserver::connectionStatusUpdated, m_connected);
         }
