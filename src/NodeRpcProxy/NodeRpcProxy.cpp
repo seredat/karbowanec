@@ -338,17 +338,15 @@ void NodeRpcProxy::updateBlockchainStatus() {
     if (Common::Format::parseAmount(boost::lexical_cast<std::string>(getInfoResp.already_generated_coins), alreadyGenCoins)) {
       m_alreadyGeneratedCoins.store(alreadyGenCoins, std::memory_order_relaxed);
     }
-
-    if (!m_connected) {
-      m_connected = true;
-      m_rpcProxyObserverManager.notify(&INodeRpcProxyObserver::connectionStatusUpdated, m_connected);
-    }
   }
-  else {
-    if (m_connected) {
-      m_connected = false;
-      m_rpcProxyObserverManager.notify(&INodeRpcProxyObserver::connectionStatusUpdated, m_connected);
-    }
+
+  if (!ec && !m_connected) {
+    m_connected = true;
+    m_rpcProxyObserverManager.notify(&INodeRpcProxyObserver::connectionStatusUpdated, m_connected);
+  }
+  else if (!(!ec) && m_connected) {
+    m_connected = false;
+    m_rpcProxyObserverManager.notify(&INodeRpcProxyObserver::connectionStatusUpdated, m_connected);
   }
 
   m_initial = false;
@@ -978,24 +976,24 @@ void NodeRpcProxy::scheduleRequest(std::function<std::error_code()>&& procedure,
   assert(m_dispatcher != nullptr && m_context_group != nullptr);
   m_dispatcher->remoteSpawn(Wrapper([this](std::function<std::error_code()>& procedure, Callback& callback) {
     m_context_group->spawn(Wrapper([this](std::function<std::error_code()>& procedure, const Callback& callback) {
-        if (m_stop) {
-          callback(std::make_error_code(std::errc::operation_canceled));
-        } else {
-          std::error_code ec = procedure();
+      if (m_stop) {
+        callback(std::make_error_code(std::errc::operation_canceled));
+      } else {
+        std::error_code ec = procedure();
 
-          /*if (!!ec && !m_connected) {
-            m_connected = true;
-            m_rpcProxyObserverManager.notify(&INodeRpcProxyObserver::connectionStatusUpdated, m_connected);
-          }
-          else if (!!ec && m_connected) {
-            m_connected = false;
-            m_rpcProxyObserverManager.notify(&INodeRpcProxyObserver::connectionStatusUpdated, m_connected);
-          }*/
-
-          callback(m_stop ? std::make_error_code(std::errc::operation_canceled) : ec);
+        if (!ec && !m_connected) {
+          m_connected = true;
+          m_rpcProxyObserverManager.notify(&INodeRpcProxyObserver::connectionStatusUpdated, m_connected);
         }
-      }, std::move(procedure), std::move(callback)));
-    }, std::move(procedure), callback));
+        if (!(!ec) && m_connected) {
+          m_connected = false;
+          m_rpcProxyObserverManager.notify(&INodeRpcProxyObserver::connectionStatusUpdated, m_connected);
+        }
+
+        callback(m_stop ? std::make_error_code(std::errc::operation_canceled) : ec);
+      }
+    }, std::move(procedure), std::move(callback)));
+  }, std::move(procedure), callback));
 }
 
 template <typename Request, typename Response>
