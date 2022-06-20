@@ -630,7 +630,6 @@ bool simple_wallet::help(const std::vector<std::string> &args/* = std::vector<st
 }
 
 bool simple_wallet::exit(const std::vector<std::string> &args) {
-  m_node->shutdown();
   stop();
   return true;
 }
