@@ -43,6 +43,94 @@ class NodeServer;
 class BlockchainExplorer;
 class ICryptoNoteProtocolQuery;
 
+class RpcTaskQueue : public httplib::TaskQueue {
+public:
+  RpcTaskQueue() = default;
+  virtual ~RpcTaskQueue() = default;
+
+  virtual void enqueue(std::function<void()> fn) = 0;
+  virtual void shutdown() = 0;
+
+  virtual size_t connecions_count() = 0;
+
+  virtual void on_idle() {}
+};
+
+class RpcThreadPool : public RpcTaskQueue {
+public:
+  explicit RpcThreadPool(size_t n) : shutdown_(false) {
+    while (n) {
+      threads_.emplace_back(worker(*this));
+      n--;
+    }
+  }
+
+  RpcThreadPool(const RpcThreadPool &) = delete;
+  ~RpcThreadPool() override = default;
+
+  void enqueue(std::function<void()> fn) override {
+    std::unique_lock<std::mutex> lock(mutex_);
+    jobs_.push_back(std::move(fn));
+    cond_.notify_one();
+  }
+
+  void shutdown() override {
+    // Stop all worker threads...
+    {
+      std::unique_lock<std::mutex> lock(mutex_);
+      shutdown_ = true;
+    }
+
+    cond_.notify_all();
+
+    // Join...
+    for (auto &t : threads_) {
+      t.join();
+    }
+  }
+
+  size_t connecions_count() override {
+    return jobs_.size();
+  }
+
+private:
+  struct worker {
+    explicit worker(RpcThreadPool &pool) : pool_(pool) {}
+
+    void operator()() {
+      for (;;) {
+        std::function<void()> fn;
+        {
+          std::unique_lock<std::mutex> lock(pool_.mutex_);
+
+          pool_.cond_.wait(
+              lock, [&] { return !pool_.jobs_.empty() || pool_.shutdown_; });
+
+          if (pool_.shutdown_ && pool_.jobs_.empty()) { break; }
+
+          fn = pool_.jobs_.front();
+          pool_.jobs_.pop_front();
+        }
+
+        assert(true == static_cast<bool>(fn));
+        fn();
+      }
+    }
+
+    RpcThreadPool &pool_;
+  };
+  friend struct worker;
+
+  std::vector<std::thread> threads_;
+  std::list<std::function<void()>> jobs_;
+
+  bool shutdown_;
+
+  std::condition_variable cond_;
+  std::mutex mutex_;
+};
+
+
 class RpcServer {
 public:
   RpcServer(
@@ -144,7 +232,7 @@ private:
   void fill_block_header_response(const Block& blk, bool orphan_status, uint32_t height, const Crypto::Hash& hash, block_header_response& responce);
   void listen(const std::string address, const uint16_t port);
   void listen_ssl(const std::string address, const uint16_t port);
-  int getRpcConnectionsCount();
+  size_t getRpcConnectionsCount();
   bool isCoreReady();
   bool checkIncomingTransactionForFee(const BinaryArray& tx_blob);
 
@@ -168,6 +256,10 @@ private:
   CryptoNote::AccountPublicAddress m_fee_acc;
 
   std::vector<std::unique_ptr<System::RemoteContext<void>>> m_workers;
+
+  RpcThreadPool* m_http_queue;
+  RpcThreadPool* m_https_queue;
+
 };
 
 }
