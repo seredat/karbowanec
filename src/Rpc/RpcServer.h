@@ -72,6 +72,7 @@ public:
     std::unique_lock<std::mutex> lock(mutex_);
     jobs_.push_back(std::move(fn));
     cond_.notify_one();
+    count_++;
   }
 
   void shutdown() override {
@@ -90,7 +91,7 @@ public:
   }
 
   size_t connecions_count() override {
-    return jobs_.size();
+    return count_;
   }
 
 private:
@@ -110,10 +111,16 @@ private:
 
           fn = pool_.jobs_.front();
           pool_.jobs_.pop_front();
+
         }
 
         assert(true == static_cast<bool>(fn));
         fn();
+
+        {
+          std::unique_lock<std::mutex> lock(pool_.mutex_);
+          pool_.count_--;
+        }
       }
     }
 
@@ -123,6 +130,8 @@ private:
 
   std::vector<std::thread> threads_;
   std::list<std::function<void()>> jobs_;
+
+  size_t count_ = 0;
 
   bool shutdown_;
 
