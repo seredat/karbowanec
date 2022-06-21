@@ -234,13 +234,13 @@ RpcServer::RpcServer(
     m_contact_info = m_config.getContactInfo();
   }
 
-  m_http_queue = new RpcThreadPool(std::thread::hardware_concurrency() - 1);
+  m_http_queue = new RpcThreadPool(std::max<size_t>(8, std::thread::hardware_concurrency() > 0 ? std::thread::hardware_concurrency() - 1 : 0));
 
   http.new_task_queue = [this] {
     return m_http_queue;
   };
 
-  m_https_queue = new RpcThreadPool(std::thread::hardware_concurrency() - 1);
+  m_https_queue = new RpcThreadPool(std::max<size_t>(8, std::thread::hardware_concurrency() > 0 ? std::thread::hardware_concurrency() - 1 : 0));
 
   https.new_task_queue = [this] {
     return m_https_queue;
