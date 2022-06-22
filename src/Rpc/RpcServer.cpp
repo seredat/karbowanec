@@ -234,6 +234,18 @@ RpcServer::RpcServer(
     m_contact_info = m_config.getContactInfo();
   }
 
+  m_http_queue = new RpcThreadPool(std::max<size_t>(8, std::thread::hardware_concurrency() > 0 ? std::thread::hardware_concurrency() - 1 : 0));
+
+  http.new_task_queue = [this] {
+    return m_http_queue;
+  };
+
+  m_https_queue = new RpcThreadPool(std::max<size_t>(8, std::thread::hardware_concurrency() > 0 ? std::thread::hardware_concurrency() - 1 : 0));
+
+  https.new_task_queue = [this] {
+    return m_https_queue;
+  };
+
   https.Get(".*", [this](const httplib::Request& req, httplib::Response& res) {
     processRequest(req, res);
   });
@@ -296,9 +308,8 @@ void RpcServer::listen_ssl(const std::string address, const uint16_t port) {
   }
 }
 
-int RpcServer::getRpcConnectionsCount() {
-  //return http.get_connections_count() + https.get_connections_count();
-  return 0;
+size_t RpcServer::getRpcConnectionsCount() {
+  return m_http_queue->connecions_count() + m_https_queue->connecions_count();
 }
 
 void RpcServer::processRequest(const httplib::Request& request, httplib::Response& response) {
