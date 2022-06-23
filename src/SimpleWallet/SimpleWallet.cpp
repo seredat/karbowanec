@@ -108,6 +108,7 @@ const command_line::arg_descriptor<std::string> arg_wallet_file = { "wallet-file
 const command_line::arg_descriptor<std::string> arg_generate_new_wallet = { "generate-new-wallet", "Generate new wallet and save it to <arg>", "" };
 const command_line::arg_descriptor<std::string> arg_daemon_address = { "daemon-address", "Use daemon instance at <host>:<port>", "" };
 const command_line::arg_descriptor<std::string> arg_daemon_host = { "daemon-host", "Use daemon instance at host <arg> instead of localhost", "" };
+const command_line::arg_descriptor<uint16_t> arg_daemon_port = { "daemon-port", "Use daemon instance at port <arg> instead of default", 0 };
 const command_line::arg_descriptor<std::string> arg_daemon_cert = { "daemon-cert", "Custom cert file for performing verification", "" };
 const command_line::arg_descriptor<bool> arg_daemon_no_verify = { "daemon-no-verify", "Disable verification procedure", false };
 const command_line::arg_descriptor<std::string> arg_password = { "password", "Wallet password", "", true };
@@ -119,7 +120,6 @@ const command_line::arg_descriptor<std::string> arg_view_secret_key = { "view-ke
 const command_line::arg_descriptor<std::string> arg_spend_secret_key = { "spend-key", "Specify spend secret key for wallet recovery", "" };
 const command_line::arg_descriptor<bool> arg_restore_wallet = { "restore", "Recover wallet using electrum-style mnemonic or raw keys", false };
 const command_line::arg_descriptor<bool> arg_non_deterministic = { "non-deterministic", "Creates non-deterministic (independent) view and spend keys", false };
-const command_line::arg_descriptor<uint16_t> arg_daemon_port = { "daemon-port", "Use daemon instance at port <arg> instead of default", 0 };
 const command_line::arg_descriptor<std::string> arg_log_file = {"log-file", "Set the log file location", ""};
 const command_line::arg_descriptor<uint32_t> arg_log_level = { "log-level", "Set the log verbosity level", INFO, true };
 const command_line::arg_descriptor<bool> arg_testnet = { "testnet", "Used to deploy test nets. The daemon must be launched with --testnet flag", false };
@@ -1825,56 +1825,37 @@ bool simple_wallet::start_mining(const std::vector<std::string>& args) {
   COMMAND_RPC_START_MINING::response res;
 
   std::string rpc_url = this->m_daemon_path + "start_mining";
-
-  std::shared_ptr<httplib::Client> m_httpClient = nullptr;
-  std::shared_ptr<httplib::SSLClient> m_httpsClient = nullptr;
-
   std::string err;
 
   try {
-    if (m_daemon_ssl) {
-      m_httpsClient = std::make_shared<httplib::SSLClient>(m_daemon_host.c_str(), m_daemon_port);
-      const auto rsp = m_httpsClient->Post(rpc_url.c_str(), m_requestHeaders, storeToJson(req), "application/json");
-      if (rsp) {
-        if (rsp->status == 200) {
-          if (!loadFromJson(res, rsp->body)) {
-            err = "Failed to parse JSON response";
-          }
+    httplib::Client cli(m_daemon_address);
+    if (m_daemon_ssl && m_daemon_no_verify) {
+      cli.enable_server_certificate_verification(!m_daemon_no_verify);
+    }
+    const auto rsp = cli.Post(rpc_url.c_str(), m_requestHeaders, storeToJson(req), "application/json");
+    if (rsp) {
+      if (rsp->status == 200) {
+        if (!loadFromJson(res, rsp->body)) {
+          err = "Failed to parse JSON response";
         }
-        err = interpret_rpc_response(res.status);
       }
-      else {
-        err = "No response...";
-      }
+      err = interpret_rpc_response(res.status);
     }
     else {
-      m_httpClient = std::make_shared<httplib::Client>(m_daemon_host.c_str(), m_daemon_port);
-      const auto rsp = m_httpClient->Post(rpc_url.c_str(), m_requestHeaders, storeToJson(req), "application/json");
-      if (rsp) {
-        if (rsp->status == 200) {
-          if (!loadFromJson(res, rsp->body)) {
-            err = "Failed to parse JSON response";
-          }
-        }
-        err = interpret_rpc_response(res.status);
-      }
-      else {
-        err = "No response...";
-      }
+      err = "No response...";
     }
 
-    if (err.empty())
+    if (err.empty()) {
       success_msg_writer() << "Mining started in daemon";
-    else
+    }
+    else {
       fail_msg_writer() << "Mining has not started due to an error: " << err;
+    }
   } catch (const ConnectException&) {
     printConnectionError();
   } catch (const std::exception& e) {
     fail_msg_writer() << "Failed to invoke RPC method: " << e.what();
   }
-  m_httpClient = nullptr;
-  m_httpsClient = nullptr;
-
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -1884,56 +1865,37 @@ bool simple_wallet::stop_mining(const std::vector<std::string>& args)
   COMMAND_RPC_STOP_MINING::response res;
 
   std::string rpc_url = this->m_daemon_path + "stop_mining";
-
-  std::shared_ptr<httplib::Client> m_httpClient = nullptr;
-  std::shared_ptr<httplib::SSLClient> m_httpsClient = nullptr;
-
   std::string err;
 
   try {
-    if (m_daemon_ssl) {
-      m_httpsClient = std::make_shared<httplib::SSLClient>(m_daemon_host.c_str(), m_daemon_port);
-      const auto rsp = m_httpsClient->Post(rpc_url.c_str(), m_requestHeaders, storeToJson(req), "application/json");
-      if (rsp) {
-        if (rsp->status == 200) {
-          if (!loadFromJson(res, rsp->body)) {
-            err = "Failed to parse JSON response";
-          }
+    httplib::Client cli(m_daemon_address);
+    if (m_daemon_ssl && m_daemon_no_verify) {
+      cli.enable_server_certificate_verification(!m_daemon_no_verify);
+    }
+    const auto rsp = cli.Post(rpc_url.c_str(), m_requestHeaders, storeToJson(req), "application/json");
+    if (rsp) {
+      if (rsp->status == 200) {
+        if (!loadFromJson(res, rsp->body)) {
+          err = "Failed to parse JSON response";
         }
-        err = interpret_rpc_response(res.status);
       }
-      else {
-        err = "No response...";
-      }
+      err = interpret_rpc_response(res.status);
     }
     else {
-      m_httpClient = std::make_shared<httplib::Client>(m_daemon_host.c_str(), m_daemon_port);
-      const auto rsp = m_httpClient->Post(rpc_url.c_str(), m_requestHeaders, storeToJson(req), "application/json");
-      if (rsp) {
-        if (rsp->status == 200) {
-          if (!loadFromJson(res, rsp->body)) {
-            err = "Failed to parse JSON response";
-          }
-        }
-        err = interpret_rpc_response(res.status);
-      }
-      else {
-        err = "No response...";
-      }
+      err = "No response...";
     }
 
-    if (err.empty())
+    if (err.empty()) {
       success_msg_writer() << "Mining stopped in daemon";
-    else
+    }
+    else {
       fail_msg_writer() << "Mining has not stopped: " << err;
+    }
   } catch (const ConnectException&) {
     printConnectionError();
   } catch (const std::exception& e) {
     fail_msg_writer() << "Failed to invoke RPC method: " << e.what();
   }
-  m_httpClient = nullptr;
-  m_httpsClient = nullptr;
-
   return true;
 }
 //----------------------------------------------------------------------------------------------------
