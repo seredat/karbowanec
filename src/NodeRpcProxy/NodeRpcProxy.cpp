@@ -185,10 +185,12 @@ void NodeRpcProxy::workerThread(const INode::Callback& initialized_callback) {
     ContextGroup contextGroup(dispatcher);
     m_context_group = &contextGroup;
     if (m_daemon_ssl) {
-        m_httpsClient = std::make_shared<httplib::SSLClient>(m_nodeHost.c_str(), m_nodePort);
+      m_httpsClient = std::make_shared<httplib::SSLClient>(m_nodeHost.c_str(), m_nodePort);
+      if (m_daemon_no_verify)
+        m_httpsClient->enable_server_certificate_verification(!m_daemon_no_verify);
     }
     else {
-        m_httpClient = std::make_shared<httplib::Client>(m_nodeHost.c_str(), m_nodePort);
+      m_httpClient = std::make_shared<httplib::Client>(m_nodeHost.c_str(), m_nodePort);
     }
     
     Event httpEvent(dispatcher);
