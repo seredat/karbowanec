@@ -1604,7 +1604,7 @@ bool RpcServer::on_start_mining(const COMMAND_RPC_START_MINING::request& req, CO
   Crypto::secret_key_to_public_key(keys.viewSecretKey, keys.address.viewPublicKey);
 
   if (!m_core.get_miner().start(keys, static_cast<size_t>(req.threads_count))) {
-    res.status = "Failed, mining not started";
+    res.status = "Mining did not start (most likely it's already mining)";
     return true;
   }
 
