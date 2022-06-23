@@ -1841,7 +1841,7 @@ bool simple_wallet::start_mining(const std::vector<std::string>& args) {
             err = "Failed to parse JSON response";
           }
         }
-        err = interpret_rpc_response(std::to_string(rsp->status));
+        err = interpret_rpc_response(res.status);
       }
       else {
         err = "No response...";
@@ -1856,7 +1856,7 @@ bool simple_wallet::start_mining(const std::vector<std::string>& args) {
             err = "Failed to parse JSON response";
           }
         }
-        err = interpret_rpc_response(std::to_string(rsp->status));
+        err = interpret_rpc_response(res.status);
       }
       else {
         err = "No response...";
@@ -1900,7 +1900,7 @@ bool simple_wallet::stop_mining(const std::vector<std::string>& args)
             err = "Failed to parse JSON response";
           }
         }
-        err = interpret_rpc_response(std::to_string(rsp->status));
+        err = interpret_rpc_response(res.status);
       }
       else {
         err = "No response...";
@@ -1915,7 +1915,7 @@ bool simple_wallet::stop_mining(const std::vector<std::string>& args)
             err = "Failed to parse JSON response";
           }
         }
-        err = interpret_rpc_response(std::to_string(rsp->status));
+        err = interpret_rpc_response(res.status);
       }
       else {
         err = "No response...";
