@@ -101,9 +101,6 @@ namespace po = boost::program_options;
 #define EXTENDED_LOGS_FILE "wallet_details.log"
 #undef ERROR
 
-std::string m_remote_node_fee_address = std::string();
-uint64_t    m_remote_node_fee_amount = 0;
-
 namespace {
 
 const command_line::arg_descriptor<std::string> arg_config_file = { "config-file", "Specify configuration file", "" };
@@ -354,12 +351,12 @@ struct TransferCommand {
             aliases[aliasUrl].emplace_back(WalletLegacyTransfer{ "", static_cast<int64_t>(de.amount) });
           }
 #endif
-          if (!m_remote_node_fee_address.empty()) {
-            destination.address = m_remote_node_fee_address;
-            int64_t remote_node_fee = m_remote_node_fee_amount == 0 ? static_cast<int64_t>(de.amount * 0.0025) : m_remote_node_fee_amount;
-            if (remote_node_fee > (int64_t)CryptoNote::parameters::COIN)
-              remote_node_fee = (int64_t)CryptoNote::parameters::COIN;
-            destination.amount = remote_node_fee;
+          std::string remote_node_fee_address = m_node.feeAddress();
+          if (!remote_node_fee_address.empty()) {
+            destination.address = m_node.feeAddress().empty();
+            int64_t remote_node_fee_amount = (int64_t)m_node.feeAmount();
+            destination.amount = std::min<int64_t>((remote_node_fee_amount == 0 ? static_cast<int64_t>(de.amount * 0.0025) : remote_node_fee_amount),
+              (int64_t)CryptoNote::parameters::MAXIMUM_FEE);
             dsts.push_back(destination);
           }
         }
@@ -1054,15 +1051,14 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     return false;
   }
 
-  m_remote_node_fee_address = m_node->feeAddress();
-  m_remote_node_fee_amount = m_node->feeAmount();
-
-  if (!m_remote_node_fee_address.empty()) {
+  std::string remote_node_fee_address = m_node->feeAddress();
+  if (!remote_node_fee_address.empty()) {
+    uint64_t remote_node_fee_amount = m_node->feeAmount();
     std::stringstream feemsg;
     feemsg << std::endl << "You have connected to a node that charges "
            << "a fee to send transactions." << std::endl << std::endl
            << "The node's fee for sending transactions is "
-           << (m_remote_node_fee_amount == 0 ? "0.25% of transaction amount, but no more than " + m_currency.formatAmount(CryptoNote::parameters::COIN) : m_currency.formatAmount(m_remote_node_fee_amount))
+           << (remote_node_fee_amount == 0 ? "0.25% of transaction amount, but no more than " + m_currency.formatAmount(CryptoNote::parameters::MAXIMUM_FEE) : m_currency.formatAmount(remote_node_fee_amount))
            << " KRB" << std::endl << std::endl 
            << "If you don't want to pay the node fee, please run your own node."
            << std::endl;
