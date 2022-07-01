@@ -101,9 +101,6 @@ namespace po = boost::program_options;
 #define EXTENDED_LOGS_FILE "wallet_details.log"
 #undef ERROR
 
-std::string m_remote_node_fee_address = std::string();
-uint64_t    m_remote_node_fee_amount = 0;
-
 namespace {
 
 const command_line::arg_descriptor<std::string> arg_config_file = { "config-file", "Specify configuration file", "" };
@@ -354,12 +351,12 @@ struct TransferCommand {
             aliases[aliasUrl].emplace_back(WalletLegacyTransfer{ "", static_cast<int64_t>(de.amount) });
           }
 #endif
-          if (!m_remote_node_fee_address.empty()) {
-            destination.address = m_remote_node_fee_address;
-            int64_t remote_node_fee = m_remote_node_fee_amount == 0 ? static_cast<int64_t>(de.amount * 0.0025) : m_remote_node_fee_amount;
-            if (remote_node_fee > (int64_t)CryptoNote::parameters::COIN)
-              remote_node_fee = (int64_t)CryptoNote::parameters::COIN;
-            destination.amount = remote_node_fee;
+          std::string remote_node_fee_address = m_node.feeAddress();
+          if (!remote_node_fee_address.empty()) {
+            destination.address = m_node.feeAddress().empty();
+            int64_t remote_node_fee_amount = (int64_t)m_node.feeAmount();
+            destination.amount = std::min<int64_t>((remote_node_fee_amount == 0 ? static_cast<int64_t>(de.amount * 0.0025) : remote_node_fee_amount),
+              (int64_t)CryptoNote::parameters::MAXIMUM_FEE);
             dsts.push_back(destination);
           }
         }
@@ -655,7 +652,8 @@ simple_wallet::simple_wallet(System::Dispatcher& dispatcher, const CryptoNote::C
   m_initResultPromise(nullptr),
   m_walletSynchronized(false),
   m_trackingWallet(false),
-  m_do_not_relay_tx(false)
+  m_do_not_relay_tx(false),
+  m_initial_remote_fee_mess(false)
 {
   m_consoleHandler.setHandler("start_mining", std::bind(&simple_wallet::start_mining, this, std::placeholders::_1), "start_mining [<number_of_threads>] - Start mining in daemon");
   m_consoleHandler.setHandler("stop_mining", std::bind(&simple_wallet::stop_mining, this, std::placeholders::_1), "Stop mining in daemon");
@@ -840,10 +838,10 @@ bool simple_wallet::get_reserve_proof(const std::vector<std::string> &args)
 
   try {
     const std::string sig_str = m_wallet->getReserveProof(reserve, args.size() == 2 ? args[1] : "");
-    
+
     //logger(INFO, BRIGHT_WHITE) << "\n\n" << sig_str << "\n\n" << std::endl;
 
-    const std::string filename = "reserve_proof_" + args[0] + "KRB.txt";
+    const std::string filename = "reserve_proof_" + args[0] + CryptoNote::CRYPTONOTE_TICKER + ".txt";
     boost::system::error_code ec;
     if (boost::filesystem::exists(filename, ec)) {
       boost::filesystem::remove(filename, ec);
@@ -1052,21 +1050,6 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
   if (error) {
     fail_msg_writer() << "failed to init NodeRPCProxy: " << error.message();
     return false;
-  }
-
-  m_remote_node_fee_address = m_node->feeAddress();
-  m_remote_node_fee_amount = m_node->feeAmount();
-
-  if (!m_remote_node_fee_address.empty()) {
-    std::stringstream feemsg;
-    feemsg << std::endl << "You have connected to a node that charges "
-           << "a fee to send transactions." << std::endl << std::endl
-           << "The node's fee for sending transactions is "
-           << (m_remote_node_fee_amount == 0 ? "0.25% of transaction amount, but no more than " + m_currency.formatAmount(CryptoNote::parameters::COIN) : m_currency.formatAmount(m_remote_node_fee_amount))
-           << " KRB" << std::endl << std::endl 
-           << "If you don't want to pay the node fee, please run your own node."
-           << std::endl;
-    std::cout << WarningMsg(feemsg.str()) << std::endl;
   }
 
   if (m_restore_wallet && m_wallet_file_arg.empty()) {
@@ -1887,6 +1870,24 @@ void simple_wallet::initCompleted(std::error_code result) {
 void simple_wallet::connectionStatusUpdated(bool connected) {
   if (connected) {
     logger(INFO, GREEN) << "Wallet connected to daemon.";
+
+    if (!m_initial_remote_fee_mess) {
+      std::string remote_node_fee_address = m_node->feeAddress();
+      if (!remote_node_fee_address.empty()) {
+        uint64_t remote_node_fee_amount = m_node->feeAmount();
+        std::stringstream feemsg;
+        feemsg << std::endl << "You have connected to a node that charges "
+          << "a fee to send transactions." << std::endl
+          << "The node's fee for sending transactions is "
+          << (remote_node_fee_amount == 0 ? "0.25% of transaction amount, but no more than "
+            + m_currency.formatAmount(CryptoNote::parameters::MAXIMUM_FEE) : m_currency.formatAmount(remote_node_fee_amount))
+          << " " << CryptoNote::CRYPTONOTE_TICKER << "." << std::endl
+          << "If you don't want to pay the node fee, please run your own node."
+          << std::endl;
+        std::cout << InformationMsg(feemsg.str()) << std::endl;
+      }
+      m_initial_remote_fee_mess = true;
+    }
   } else {
     printConnectionError();
   }
