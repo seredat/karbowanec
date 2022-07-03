@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
-// Copyright (c) 2016-2020, The Karbo developers
+// Copyright (c) 2016-2022, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -38,7 +38,6 @@
 #include <CryptoNoteCore/CryptoNoteFormatUtils.h>
 #include <CryptoNoteCore/CryptoNoteTools.h>
 #include <Rpc/CoreRpcServerCommandsDefinitions.h>
-#include <Rpc/HttpClient.h>
 #include <Rpc/JsonRpc.h>
 #include <Serialization/SerializationTools.h>
 
@@ -1046,8 +1045,6 @@ std::error_code NodeRpcProxy::binaryCommand(const std::string& comm, const Reque
         }
       }
     }
-  } catch (const ConnectException&) {
-    ec = make_error_code(error::CONNECT_ERROR);
   } catch (const std::exception&) {
     ec = make_error_code(error::NETWORK_ERROR);
   }
@@ -1099,8 +1096,6 @@ std::error_code NodeRpcProxy::jsonCommand(const std::string& comm, const Request
         }
       }
     }
-  } catch (const ConnectException&) {
-    ec = make_error_code(error::CONNECT_ERROR);
   } catch (const std::exception&) {
     ec = make_error_code(error::NETWORK_ERROR);
   }
@@ -1158,8 +1153,6 @@ std::error_code NodeRpcProxy::jsonRpcCommand(const std::string& method, const Re
         }
       }
     }
-  } catch (const ConnectException&) {
-    ec = make_error_code(error::CONNECT_ERROR);
   } catch (const std::exception&) {
     ec = make_error_code(error::NETWORK_ERROR);
   }

@@ -63,7 +63,7 @@
 #include "Common/CommandLine.h"
 #include "Common/SignalHandler.h"
 #include "Common/StringTools.h"
-#include <Common/Base58.h>
+#include "Common/Base58.h"
 #include "Common/PathTools.h"
 #include "Common/DnsTools.h"
 #include "Common/UrlTools.h"
@@ -74,8 +74,8 @@
 #include "CryptoNoteProtocol/CryptoNoteProtocolHandler.h"
 #include "NodeRpcProxy/NodeRpcProxy.h"
 #include "Rpc/CoreRpcServerCommandsDefinitions.h"
-#include "Rpc/HttpClient.h"
-#include <Logging/LoggerManager.h>
+#include "Rpc/JsonRpc.h"
+#include "Logging/LoggerManager.h"
 #include "Mnemonics/electrum-words.h"
 #include "Wallet/WalletRpcServer.h"
 #include "WalletLegacy/WalletLegacy.h"
@@ -1834,8 +1834,6 @@ bool simple_wallet::start_mining(const std::vector<std::string>& args) {
     else {
       fail_msg_writer() << "Mining has not started due to an error: " << err;
     }
-  } catch (const ConnectException&) {
-    printConnectionError();
   } catch (const std::exception& e) {
     fail_msg_writer() << "Failed to invoke RPC method: " << e.what();
   }
@@ -1874,8 +1872,6 @@ bool simple_wallet::stop_mining(const std::vector<std::string>& args)
     else {
       fail_msg_writer() << "Mining has not stopped: " << err;
     }
-  } catch (const ConnectException&) {
-    printConnectionError();
   } catch (const std::exception& e) {
     fail_msg_writer() << "Failed to invoke RPC method: " << e.what();
   }

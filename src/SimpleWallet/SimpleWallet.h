@@ -35,27 +35,22 @@
 #include <future>
 #include <memory>
 #include <mutex>
-
 #include <boost/program_options/variables_map.hpp>
 
 #include "android.h"
 #include "IWalletLegacy.h"
 #include "Common/PasswordContainer.h"
-
 #include "HTTP/httplib.h"
-
 #include "Common/ConsoleHandler.h"
 #include "CryptoNoteCore/CryptoNoteBasicImpl.h"
 #include "CryptoNoteCore/Currency.h"
 #include "NodeRpcProxy/NodeRpcProxy.h"
 #include "WalletLegacy/WalletHelper.h"
 #include "WalletLegacy/WalletLegacy.h"
-
-#include <Logging/LoggerRef.h>
-#include <Logging/LoggerManager.h>
-
-#include <System/Dispatcher.h>
-#include <System/Ipv4Address.h>
+#include "Logging/LoggerRef.h"
+#include "Logging/LoggerManager.h"
+#include "System/Dispatcher.h"
+#include "System/Ipv4Address.h"
 
 using namespace Logging;
 #undef ERROR

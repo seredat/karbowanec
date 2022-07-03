@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
-// Copyright (c) 2016-2020, The Karbo developers
+// Copyright (c) 2016-2022, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -23,7 +23,8 @@
 #include <functional>
 
 #include "CoreRpcServerCommandsDefinitions.h"
-#include <Common/JsonValue.h>
+#include "Common/JsonValue.h"
+#include "HTTP/httplib.h"
 #include "Serialization/ISerializer.h"
 #include "Serialization/SerializationTools.h"
 
@@ -186,10 +187,10 @@ private:
 };
 
 
-void invokeJsonRpcCommand(HttpClient& httpClient, JsonRpcRequest& req, JsonRpcResponse& res, const std::string& user = "", const std::string& password = "");
+void invokeJsonRpcCommand(httplib::Client& httpClient, JsonRpcRequest& req, JsonRpcResponse& res, const std::string& user = "", const std::string& password = "");
 
 template <typename Request, typename Response>
-void invokeJsonRpcCommand(HttpClient& httpClient, const std::string& method, const Request& req, Response& res, const std::string& user = "", const std::string& password = "") {
+void invokeJsonRpcCommand(httplib::Client& httpClient, const std::string& method, const Request& req, Response& res, const std::string& user = "", const std::string& password = "") {
   JsonRpcRequest jsReq;
   JsonRpcResponse jsRes;
 

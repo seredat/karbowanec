@@ -19,8 +19,6 @@
 
 #pragma once
 
-#include "HttpServer.h"
-
 #include <thread>
 #include <functional>
 #include <unordered_map>
@@ -34,6 +32,7 @@
 #include "CryptoNoteCore/Core.h"
 #include "Common/Math.h"
 #include "Rpc/RpcServerConfig.h"
+#include "Rpc/JsonRpc.h"
 #include "System/Dispatcher.h"
 #include "System/RemoteContext.h"
 

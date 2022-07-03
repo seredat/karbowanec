@@ -17,7 +17,7 @@
 // along with Karbo.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "JsonRpc.h"
-#include "HttpClient.h"
+#include "HTTP/httplib.h"
 #include "CryptoNoteCore/TransactionPool.h"
 
 namespace CryptoNote {
@@ -40,24 +40,20 @@ JsonRpcError::JsonRpcError(int c) : code(c) {
 JsonRpcError::JsonRpcError(int c, const std::string& msg) : code(c), message(msg) {
 }
 
-void invokeJsonRpcCommand(HttpClient& httpClient, JsonRpcRequest& jsReq, JsonRpcResponse& jsRes, const std::string& user, const std::string& password) {
-  HttpRequest httpReq;
-  HttpResponse httpRes;
+void invokeJsonRpcCommand(httplib::Client& httpClient, JsonRpcRequest& jsReq, JsonRpcResponse& jsRes, const std::string& user, const std::string& password) {
+  httplib::Response httpRes;
 
   if (!user.empty() || !password.empty()) {
-    httpReq.addHeader("Authorization", "Basic " + base64::encode(Common::asBinaryArray(user + ":" + password)));
-  }
-  httpReq.addHeader("Content-Type", "application/json");
-  httpReq.setUrl("/json_rpc");
-  httpReq.setBody(jsReq.getBody());
-
-  httpClient.request(httpReq, httpRes);
-
-  if (httpRes.getStatus() != HttpResponse::STATUS_200) {
-    throw std::runtime_error("JSON-RPC call failed, HTTP status = " + std::to_string(httpRes.getStatus()));
+    httpClient.set_basic_auth(user.c_str(), password.c_str());
   }
 
-  jsRes.parse(httpRes.getBody());
+  httpClient.Post("/json_rpc", storeToJson(jsReq.getBody()), "application/json");
+
+  if (httpRes.status != 200) {
+    throw std::runtime_error("JSON-RPC call failed, HTTP status = " + std::to_string(httpRes.status));
+  }
+
+  jsRes.parse(httpRes.body);
 
   JsonRpcError err;
   if (jsRes.getError(err)) {
