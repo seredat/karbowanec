@@ -216,6 +216,7 @@ namespace CryptoNote
     bool m_daemon_no_verify;
     bool m_do_not_relay_tx;
     bool m_dump_keys_file;
+    bool m_initial_remote_fee_mess;
     
     std::unique_ptr<std::promise<std::error_code>> m_initResultPromise;
 
