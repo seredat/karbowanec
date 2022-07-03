@@ -88,8 +88,6 @@ target_link_libraries(PaymentGateService PaymentGate JsonRpcServer InProcessNode
                       CryptoNoteProtocol P2P BlockchainExplorer Common upnpc-static ${Boost_LIBRARIES})
 target_link_libraries(AddressGenerator CryptoNoteCore Logging Serialization Crypto Mnemonics Common System ${Boost_LIBRARIES})
 
-target_link_libraries(P2P System)
-
 if (OPENSSL_FOUND)
     target_link_libraries(Daemon ${OPENSSL_LIBRARIES})
     target_link_libraries(SimpleWallet ${OPENSSL_LIBRARIES})
