@@ -1,7 +1,7 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2014-2017, XDN Project developers
 // Copyright (c) 2018, The TurtleCoin Developers
-// Copyright (c) 2016-2020 The Karbo developers
+// Copyright (c) 2016-2022 The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -24,6 +24,7 @@
 #include <boost/filesystem.hpp>
 
 #include "Common/SignalHandler.h"
+#include "Common/UrlTools.h"
 #include "InProcessNode/InProcessNode.h"
 #include "Logging/LoggerRef.h"
 #include "PaymentGate/PaymentServiceJsonRpcServer.h"
@@ -280,12 +281,22 @@ void PaymentGateService::runRpcProxy(Logging::LoggerRef& log) {
   log(Logging::INFO) << "Starting Payment Gate with remote node";
   CryptoNote::Currency currency = currencyBuilder.currency();
 
+  std::string _daemon_address = config.remoteNodeConfig.m_daemon_host + ":" + std::to_string(config.remoteNodeConfig.m_daemon_port), _daemon_host, _daemon_path;
+  uint16_t _daemon_port;
+  bool _daemon_ssl;
+
+  if (!Common::parseUrlAddress(_daemon_address, _daemon_host, _daemon_port, _daemon_path, _daemon_ssl))
+  {
+    Logging::LoggerRef(logger, "run")(Logging::ERROR, Logging::BRIGHT_RED) << "Failed to parse daemon address: " << _daemon_address;
+    return;
+  }
+  
   std::unique_ptr<CryptoNote::INode> node(
     PaymentService::NodeFactory::createNode(
       config.remoteNodeConfig.m_daemon_host,
       config.remoteNodeConfig.m_daemon_port,
-      "/", // TODO: need to add implementation after merge
-      false));
+      _daemon_path,
+      _daemon_ssl));
 
   if (config.gateConfiguration.generateNewContainer) {
     generateNewWallet(currency, getWalletConfig(), logger, *dispatcher, *node);
