@@ -157,8 +157,8 @@ private:
   CryptoNote::NodeServer& m_p2p;
   CryptoNote::BlockchainExplorerDataBuilder blockchainExplorerDataBuilder;
   const ICryptoNoteProtocolQuery& m_protocolQuery;
-  httplib::SSLServer https;
-  httplib::Server http;
+  httplib::SSLServer* https;
+  httplib::Server* http;
 
   bool m_restricted_rpc;
   std::string m_cors_domain;
