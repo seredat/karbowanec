@@ -27,7 +27,7 @@
 
 #include "HTTP/httplib.h"
 #include "HTTP/TaskQueue.h"
-#include <Logging/LoggerRef.h>
+#include "Logging/LoggerRef.h"
 #include "ITransaction.h"
 #include "CoreRpcServerCommandsDefinitions.h"
 #include "BlockchainExplorer/BlockchainExplorerDataBuilder.h"
@@ -35,7 +35,7 @@
 #include "Common/Math.h"
 #include "Rpc/RpcServerConfig.h"
 #include "System/Dispatcher.h"
-#include <System/RemoteContext.h>
+#include "System/RemoteContext.h"
 
 namespace CryptoNote {
 

@@ -1,7 +1,7 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2014-2016, XDN developers
 // Copyright (c) 2014-2016, The Monero Project
-// Copyright (c) 2016-2018, Karbo developers
+// Copyright (c) 2016-2022, Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -23,15 +23,19 @@
 #include <future>
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/variables_map.hpp>
+
 #include "Common/CommandLine.h"
+#include "HTTP/httplib.h"
+#include "Rpc/JsonRpc.h"
 #include "Logging/LoggerRef.h"
-#include "Rpc/HttpServer.h"
 #include "WalletRpcServerCommandsDefinitions.h"
 #include "WalletLegacy/WalletLegacy.h"
+#include "System/Dispatcher.h"
+#include "System/RemoteContext.h"
 
-namespace Tools {
-
-class wallet_rpc_server : CryptoNote::HttpServer
+namespace Tools
+{
+class wallet_rpc_server
 {
 public:
   wallet_rpc_server(
@@ -42,15 +46,16 @@ public:
     CryptoNote::Currency& currency,
     const std::string& walletFilename);
 
+  ~wallet_rpc_server();
+
   static const command_line::arg_descriptor<uint16_t>    arg_rpc_bind_port;
   static const command_line::arg_descriptor<uint16_t>    arg_rpc_bind_ssl_port;
-  static const command_line::arg_descriptor<bool>    arg_rpc_bind_ssl_enable;
+  static const command_line::arg_descriptor<bool>        arg_rpc_bind_ssl_enable;
   static const command_line::arg_descriptor<std::string> arg_rpc_bind_ip;
   static const command_line::arg_descriptor<std::string> arg_rpc_user;
   static const command_line::arg_descriptor<std::string> arg_rpc_password;
   static const command_line::arg_descriptor<std::string> arg_chain_file;
   static const command_line::arg_descriptor<std::string> arg_key_file;
-  static const command_line::arg_descriptor<std::string> arg_dh_file;
 
   static void init_options(boost::program_options::options_description& desc);
   bool init(const boost::program_options::variables_map& vm);
@@ -58,9 +63,10 @@ public:
     
   bool run();
   void send_stop_signal();
+  void stop();
 
 private:
-  virtual void processRequest(const CryptoNote::HttpRequest& request, CryptoNote::HttpResponse& response) override;
+  void processRequest(const httplib::Request& request, httplib::Response& response);
 
   //json_rpc
   bool on_get_balance(const wallet_rpc::COMMAND_RPC_GET_BALANCE::request& req, wallet_rpc::COMMAND_RPC_GET_BALANCE::response& res);
@@ -89,9 +95,18 @@ private:
   bool handle_command_line(const boost::program_options::variables_map& vm);
 
 private:
-  Logging::LoggerRef logger;
+  CryptoNote::Currency& m_currency;
   CryptoNote::IWalletLegacy& m_wallet;
   CryptoNote::INode& m_node;
+  httplib::Server* http;
+  httplib::SSLServer* https;
+  Logging::LoggerRef logger;
+  System::Dispatcher& m_dispatcher;
+  System::Event m_stopComplete;
+  std::vector<std::unique_ptr<System::RemoteContext<void>>> m_workers;
+
+  void listen(const std::string address, const uint16_t port);
+  void listen_ssl(const std::string address, const uint16_t port);
 
   bool m_enable_ssl;
   bool m_run_ssl;
@@ -102,11 +117,6 @@ private:
   std::string m_rpcPassword;
   std::string m_chain_file;
   std::string m_key_file;
-  std::string m_dh_file;
-  CryptoNote::Currency& m_currency;
   const std::string m_walletFilename;
-
-  System::Dispatcher& m_dispatcher;
-  System::Event m_stopComplete;
 };
 } //Tools
