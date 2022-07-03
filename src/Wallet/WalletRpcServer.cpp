@@ -23,6 +23,7 @@
 #include <boost/filesystem.hpp>
 #include "WalletRpcServer.h"
 #include "crypto/hash.h"
+#include <Common/base64.hpp>
 #include "Common/CommandLine.h"
 #include "Common/StringTools.h"
 #include "CryptoNoteCore/CryptoNoteFormatUtils.h"
@@ -215,6 +216,10 @@ bool wallet_rpc_server::init(const boost::program_options::variables_map& vm)
     });
   }
 
+  if (!m_rpcUser.empty() || !m_rpcPassword.empty()) {
+    m_credentials = base64::encode(Common::asBinaryArray(m_rpcUser + ":" + m_rpcPassword));
+  }
+
   return true;
 }
 
@@ -229,6 +234,15 @@ void wallet_rpc_server::getServerConf(std::string &bind_address, std::string &bi
 void wallet_rpc_server::processRequest(const httplib::Request& request, httplib::Response& response)
 {
   using namespace CryptoNote::JsonRpc;
+
+  if (!authenticate(request)) {
+    logger(WARNING) << "Authorization required";
+    response.status = 401;
+    response.set_header("WWW-Authenticate", "Basic realm=\"RPC\"");
+    response.set_content("Authorization required", "text/plain; charset=UTF-8");
+
+    return;
+  }
 
   JsonRpcRequest jsonRequest;
   JsonRpcResponse jsonResponse;
@@ -289,6 +303,27 @@ bool wallet_rpc_server::on_get_balance(const wallet_rpc::COMMAND_RPC_GET_BALANCE
 {
   res.locked_amount    = m_wallet.pendingBalance();
   res.available_balance = m_wallet.actualBalance();
+  return true;
+}
+
+//------------------------------------------------------------------------------------------------------------------------------
+
+bool wallet_rpc_server::authenticate(const httplib::Request& request) const {
+  if (!m_credentials.empty()) {
+    auto headerIt = request.headers.find("authorization");
+    if (headerIt == request.headers.end()) {
+      return false;
+    }
+
+    if (headerIt->second.substr(0, 6) != "Basic ") {
+      return false;
+    }
+
+    if (headerIt->second.substr(6) != m_credentials) {
+      return false;
+    }
+  }
+
   return true;
 }
 

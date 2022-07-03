@@ -93,8 +93,10 @@ private:
   bool on_reset(const wallet_rpc::COMMAND_RPC_RESET::request& req, wallet_rpc::COMMAND_RPC_RESET::response& res);
 
   bool handle_command_line(const boost::program_options::variables_map& vm);
+  void listen(const std::string address, const uint16_t port);
+  void listen_ssl(const std::string address, const uint16_t port);
+  bool authenticate(const httplib::Request& request) const;
 
-private:
   CryptoNote::Currency& m_currency;
   CryptoNote::IWalletLegacy& m_wallet;
   CryptoNote::INode& m_node;
@@ -105,9 +107,6 @@ private:
   System::Event m_stopComplete;
   std::vector<std::unique_ptr<System::RemoteContext<void>>> m_workers;
 
-  void listen(const std::string address, const uint16_t port);
-  void listen_ssl(const std::string address, const uint16_t port);
-
   bool m_enable_ssl;
   bool m_run_ssl;
   uint16_t m_port;
@@ -117,6 +116,7 @@ private:
   std::string m_rpcPassword;
   std::string m_chain_file;
   std::string m_key_file;
+  std::string m_credentials;
   const std::string m_walletFilename;
 };
 } //Tools
