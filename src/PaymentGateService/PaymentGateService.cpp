@@ -161,7 +161,7 @@ void PaymentGateService::run() {
 
   //check the container exists before starting service
   const std::string walletFileName = config.gateConfiguration.containerFile;
-  if (!boost::filesystem::exists(walletFileName)) {
+  if (!config.gateConfiguration.generateNewContainer && !boost::filesystem::exists(walletFileName)) {
     log(Logging::ERROR) << "A wallet with the filename "
       << walletFileName << " doesn't exist! "
       << "Ensure you entered your wallet name correctly.";
