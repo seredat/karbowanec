@@ -84,11 +84,9 @@ target_link_libraries(Daemon Rpc Http P2P CryptoNoteCore Logging Serialization C
 target_link_libraries(SimpleWallet Wallet Transfers NodeRpcProxy Rpc Http CryptoNoteCore Logging Serialization Crypto System Checkpoints Mnemonics Common ${Boost_LIBRARIES})
 target_link_libraries(GreenWallet Wallet Transfers NodeRpcProxy Rpc Http CryptoNoteCore Logging Serialization Crypto System Checkpoints Mnemonics Common ${Boost_LIBRARIES})
 target_link_libraries(Optimizer PaymentGate Rpc Http CryptoNoteCore Logging Serialization Crypto System Common ${Boost_LIBRARIES})
-target_link_libraries(PaymentGateService PaymentGate JsonRpcServer InProcessNode Wallet Transfers NodeRpcProxy Rpc Http CryptoNoteCore Logging Serialization Crypto System Checkpoints
-                      CryptoNoteProtocol P2P BlockchainExplorer Common upnpc-static ${Boost_LIBRARIES})
+target_link_libraries(PaymentGateService PaymentGate JsonRpcServer InProcessNode Wallet Transfers NodeRpcProxy Rpc Http P2P CryptoNoteCore Logging Serialization Crypto System Checkpoints
+                      CryptoNoteProtocol BlockchainExplorer Common upnpc-static ${Boost_LIBRARIES})
 target_link_libraries(AddressGenerator CryptoNoteCore Logging Serialization Crypto Mnemonics Common System ${Boost_LIBRARIES})
-
-target_link_libraries(P2P System)
 
 if (OPENSSL_FOUND)
     target_link_libraries(Daemon ${OPENSSL_LIBRARIES})
