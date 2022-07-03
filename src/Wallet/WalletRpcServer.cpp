@@ -23,7 +23,7 @@
 #include <boost/filesystem.hpp>
 #include "WalletRpcServer.h"
 #include "crypto/hash.h"
-#include <Common/base64.hpp>
+#include "Common/base64.hpp"
 #include "Common/CommandLine.h"
 #include "Common/StringTools.h"
 #include "CryptoNoteCore/CryptoNoteFormatUtils.h"

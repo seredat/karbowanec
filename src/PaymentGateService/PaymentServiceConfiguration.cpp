@@ -56,7 +56,6 @@ Configuration::Configuration() {
   m_enable_ssl = false;
   m_chain_file = "";
   m_key_file = "";
-  m_dh_file = "";
   scanHeight = 0;
 }
 
@@ -70,7 +69,6 @@ void Configuration::initOptions(po::options_description& desc) {
       ("rpc-ssl-enable", po::bool_switch(), "Enable SSL for RPC service")
       ("rpc-chain-file", po::value<std::string>()->default_value(std::string(CryptoNote::RPC_DEFAULT_CHAIN_FILE)), "SSL chain file")
       ("rpc-key-file", po::value<std::string>()->default_value(std::string(CryptoNote::RPC_DEFAULT_KEY_FILE)), "SSL key file")
-      ("rpc-dh-file", po::value<std::string>()->default_value(std::string(CryptoNote::RPC_DEFAULT_DH_FILE)), "SSL DH file")
       ("container-file,w", po::value<std::string>(), "container file")
       ("container-password,p", po::value<std::string>(), "container password")
       ("change-password", po::value<std::string>(), "change container password and exit")
@@ -162,10 +160,6 @@ void Configuration::init(const po::variables_map& options) {
 
   if (options.count("rpc-key-file") != 0 && (!options["rpc-key-file"].defaulted() || m_key_file.empty())) {
     m_key_file = options["rpc-key-file"].as<std::string>();
-  }
-
-  if (options.count("rpc-dh-file") != 0 && (!options["rpc-dh-file"].defaulted() || m_dh_file.empty())) {
-    m_dh_file = options["rpc-dh-file"].as<std::string>();
   }
 
   if (options.count("container-file") != 0) {

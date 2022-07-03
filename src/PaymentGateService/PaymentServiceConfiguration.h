@@ -53,7 +53,6 @@ struct Configuration {
   bool m_enable_ssl;
   std::string m_chain_file;
   std::string m_key_file;
-  std::string m_dh_file;
 
   std::string containerFile;
   std::string containerPassword;
