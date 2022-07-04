@@ -469,30 +469,38 @@ void RpcServer::processRequest(const httplib::Request& request, httplib::Respons
 
         if (Common::starts_with(url, block_method)) {
           std::string hash_str = url.substr(block_method.size());
-          if (hash_str.size() < 64) { // assume it's height
-            //on_get_explorer_block_by_height
+          if (hash_str.size() < 64) {
+            // assume it's height
+            uint32_t height = static_cast<uint32_t>(std::stoul(hash_str));
+            if (m_core.getCurrentBlockchainHeight() <= height) {
+              throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_TOO_BIG_HEIGHT,
+                std::string("To big height: ") + std::to_string(height) +
+                ", current blockchain height = " + std::to_string(m_core.getCurrentBlockchainHeight() - 1) };
+            }
+            Crypto::Hash block_hash = m_core.getBlockIdByHeight(height);
+            hash_str = Common::podToHex(block_hash);
+          }
 
+          COMMAND_EXPLORER_GET_BLOCK_DETAILS_BY_HASH::request req;
+          req.hash = hash_str;
+          COMMAND_EXPLORER_GET_BLOCK_DETAILS_BY_HASH::response rsp;
+          bool r = on_get_explorer_block_by_hash(req, rsp);
+          if (r) {
+            response.status = 200;
+            response.set_content(rsp, "text/html");
           }
           else {
-            COMMAND_EXPLORER_GET_BLOCK_DETAILS_BY_HASH::request req;
-            req.hash = hash_str;
-            COMMAND_EXPLORER_GET_BLOCK_DETAILS_BY_HASH::response rsp;
-            bool r = on_get_explorer_block_by_hash(req, rsp);
-            if (r) {
-              response.status = 200;
-              response.set_content(rsp, "text/html");
-            }
-            else {
-              response.status = 500;
-              response.set_content("Internal error", "text/html");
-            }
-            return;
+            response.status = 500;
+            response.set_content("Internal error", "text/html");
           }
+          return;
+
 
           return;
         }
 
         if (Common::starts_with(url, tx_method)) {
+
 
           return;
         }
