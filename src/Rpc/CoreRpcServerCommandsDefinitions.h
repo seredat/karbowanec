@@ -321,6 +321,18 @@ struct COMMAND_EXPLORER {
   typedef std::string response;
 };
 
+struct COMMAND_EXPLORER_GET_BLOCK_DETAILS_BY_HASH {
+  struct request {
+    std::string hash;
+
+    void serialize(ISerializer& s) {
+      KV_MEMBER(hash)
+    }
+  };
+
+  typedef std::string response;
+};
+
 //-----------------------------------------------
 struct COMMAND_RPC_GET_INFO {
   typedef EMPTY_STRUCT request;

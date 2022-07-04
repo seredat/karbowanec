@@ -468,6 +468,26 @@ void RpcServer::processRequest(const httplib::Request& request, httplib::Respons
         std::string tx_method = "/explorer/tx/";
 
         if (Common::starts_with(url, block_method)) {
+          std::string hash_str = url.substr(block_method.size());
+          if (hash_str.size() < 64) { // assume it's height
+            //on_get_explorer_block_by_height
+
+          }
+          else {
+            COMMAND_EXPLORER_GET_BLOCK_DETAILS_BY_HASH::request req;
+            req.hash = hash_str;
+            COMMAND_EXPLORER_GET_BLOCK_DETAILS_BY_HASH::response rsp;
+            bool r = on_get_explorer_block_by_hash(req, rsp);
+            if (r) {
+              response.status = 200;
+              response.set_content(rsp, "text/html");
+            }
+            else {
+              response.status = 500;
+              response.set_content("Internal error", "text/html");
+            }
+            return;
+          }
 
           return;
         }
@@ -1552,7 +1572,114 @@ bool RpcServer::on_get_explorer(const COMMAND_EXPLORER::request& req, COMMAND_EX
   body += std::to_string(next_page);
   body += "\">next page</a></p>";
 
+  body += index_finish;
+
   res = body;
+
+  return true;
+}
+
+bool RpcServer::on_get_explorer_block_by_hash(const COMMAND_EXPLORER_GET_BLOCK_DETAILS_BY_HASH::request& req, COMMAND_EXPLORER_GET_BLOCK_DETAILS_BY_HASH::response& res) {
+  try {
+    Crypto::Hash block_hash;
+    if (!parse_hash256(req.hash, block_hash)) {
+      throw JsonRpc::JsonRpcError{
+        CORE_RPC_ERROR_CODE_WRONG_PARAM,
+        "Failed to parse hex representation of block hash. Hex = " + req.hash + '.' };
+    }
+    Block blk;
+    if (!m_core.getBlockByHash(block_hash, blk)) {
+      throw JsonRpc::JsonRpcError{
+        CORE_RPC_ERROR_CODE_INTERNAL_ERROR,
+        "Internal error: can't get block by hash. Hash = " + req.hash + '.' };
+    }
+    
+    Crypto::Hash blockHash = get_block_hash(blk);
+    uint32_t blockIndex = boost::get<BaseInput>(blk.baseTransaction.inputs.front()).blockIndex;
+
+    std::string body = index_start + (m_core.currency().isTestnet() ? "testnet" : "mainnet") + "\n<p>";
+
+    body += "<h2>Block " + Common::podToHex(blockHash) + "</h2>\n";
+
+    body += "<ul>\n";
+    body += "  <li>\n";
+    body += "    Index: " + std::to_string(blockIndex) + "\n";
+    body += "  </li>\n";
+    body += "  <li>\n";
+    time_t rawtime = (const time_t)blk.timestamp;
+    struct tm* timeinfo;
+    timeinfo = localtime(&rawtime);
+    body += "    Time: " + std::to_string(blk.timestamp) + " &bull; ";
+    body += asctime(timeinfo);
+    body += "  </li>\n";
+    body += "  <li>\n";
+    body += "    	Version: " + std::to_string(blk.majorVersion) + "." + std::to_string(blk.minorVersion) + "\n";
+    body += "  </li>\n";
+    body += "  <li>\n";
+    Crypto::Hash tmpHash = m_core.getBlockIdByHeight(blockIndex);
+    bool isOrphaned = blockHash != tmpHash;
+    body += "    	Orphan: ";
+    if (isOrphaned)
+      body += "YES\n";
+    else
+      body += "NO\n";
+    body += "  </li>\n";
+    body += "  <li>\n";
+    size_t blockSize = 0;
+    if (!m_core.getBlockSize(blockHash, blockSize)) {
+      throw JsonRpc::JsonRpcError{
+        CORE_RPC_ERROR_CODE_INTERNAL_ERROR,
+        "Internal error: can't get size of block " + req.hash + '.' };
+    }
+    body += "    	Size: " + std::to_string(blockSize) + "\n";
+    body += "  </li>\n";
+    body += "  <li>\n";
+    uint64_t blockDifficulty = 0;
+    if (!m_core.getBlockDifficulty(blockIndex, blockDifficulty)) {
+      throw JsonRpc::JsonRpcError{
+        CORE_RPC_ERROR_CODE_INTERNAL_ERROR,
+        "Internal error: can't calcualate difficulty for block " + req.hash + '.' };
+    }
+    body += "    Difficulty: " + std::to_string(blockDifficulty) + "\n";
+    body += "  </li>\n";
+    body += "  <li>\n";
+    body += "    Previous block hash: " + Common::podToHex(blk.previousBlockHash);
+    body += "  </li>\n";
+    body += "</ul>";
+
+    body += "<h3>Transactions</h3>\n";
+
+    // simple list of tx hashes without details
+    body += "<ol>\n";
+    body += "  <li>\n";
+    Crypto::Hash coinbaseHash = getObjectHash(blk.baseTransaction);
+    std::string txHashStr = Common::podToHex(coinbaseHash);
+    body += "    <a href=\"/explorer/tx/" + txHashStr + "\">";
+    body += txHashStr;
+    body += "</a>";
+    body += "  </li>\n";
+
+    for (const auto& t : blk.transactionHashes) {
+      body += "  <li>\n";
+      body += "    <a href=\"/explorer/tx/" + Common::podToHex(t) + "\">";
+      body += Common::podToHex(t);
+      body += "  </li>\n";
+    }
+
+    body += "</ol>\n";
+
+    body += index_finish;
+
+    res = body;
+  }
+  catch (std::system_error& e) {
+    throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_INTERNAL_ERROR, e.what() };
+    return false;
+  }
+  catch (std::exception& e) {
+    throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_INTERNAL_ERROR, "Error: " + std::string(e.what()) };
+    return false;
+  }
 
   return true;
 }
