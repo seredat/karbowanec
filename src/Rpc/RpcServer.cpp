@@ -1434,10 +1434,44 @@ bool RpcServer::on_get_explorer(const COMMAND_EXPLORER::request& req, COMMAND_EX
   if (last_height <= print_blocks_count)
     last_height = 0;
 
-  if (req_height == top_block_index) { // show mempool only on home page
-    body += "<h2>Transaction pool</h2>";
+  // show mempool only on home page
+  if (req_height == top_block_index) {
+    auto pool = m_core.getMemoryPool();
+    if (!pool.empty()) {
+      body += "<h2>Transaction pool</h2>";
+      body += "<table cellpadding=\"10px\">\n";
+      body += "  <thead>\n";
+      body += "  <tr>\n";
+      body += "    <td>Date</td><td>Hash</td><td>Amount</td><td>Fee</td><td>Size</td>\n";
+      body += "  </tr>\n";
+      body += "</thead>\n";
+      body += "<tbody>\n";
+      for (const CryptoNote::tx_memory_pool::TransactionDetails& txd : pool) {
+        time_t rawtime = (const time_t)txd.receiveTime;
+        struct tm* timeinfo;
+        timeinfo = localtime(&rawtime);
+        std::string txHashStr = Common::podToHex(txd.id);
 
-    /// TODO implement mempool list
+        body += "  <tr>\n";
+        body += "    <td>";
+        body += asctime(timeinfo);
+        body.pop_back(); // remove newline after asctime
+        body += "</td>\n    <td>";
+        body += "<a href=\"/explorer/tx/" + txHashStr + "\">";
+        body += txHashStr;
+        body += "</a>";
+        body += "</td>\n    <td>";
+        body += m_core.currency().formatAmount(getOutputAmount(txd.tx));
+        body += "</td>\n    <td>";
+        body += m_core.currency().formatAmount(txd.fee);
+        body += "</td>\n    <td>";
+        body += std::to_string(txd.blobSize);
+        body += "</td>\n    <td>";
+        body += "  </tr>\n";
+      }
+      body += "</tbody>\n";
+      body += "</table>\n";
+    }
   }
 
   // list last 10 blocks with txs
@@ -1946,7 +1980,7 @@ bool RpcServer::on_get_transactions_pool_short(const COMMAND_RPC_GET_TRANSACTION
     transaction_pool_response mempool_transaction;
     mempool_transaction.hash = Common::podToHex(txd.id);
     mempool_transaction.fee = txd.fee;
-    mempool_transaction.amount_out = getOutputAmount(txd.tx);;
+    mempool_transaction.amount_out = getOutputAmount(txd.tx);
     mempool_transaction.size = txd.blobSize;
     mempool_transaction.receive_time = txd.receiveTime;
     res.transactions.push_back(mempool_transaction);
