@@ -302,13 +302,13 @@ struct COMMAND_RPC_START_MINING {
     }
   };
 };
-
+//-----------------------------------------------
 struct COMMAND_HTTP {
   typedef EMPTY_STRUCT request;
 
   typedef std::string response;
 };
-
+//-----------------------------------------------
 struct COMMAND_EXPLORER {
   struct request {
     uint32_t height = 0;
@@ -333,6 +333,17 @@ struct COMMAND_EXPLORER_GET_BLOCK_DETAILS_BY_HASH {
   typedef std::string response;
 };
 
+struct COMMAND_EXPLORER_GET_TRANSACTION_DETAILS_BY_HASH {
+  struct request {
+    std::string hash;
+
+    void serialize(ISerializer& s) {
+      KV_MEMBER(hash);
+    }
+  };
+
+  typedef std::string response;
+};
 //-----------------------------------------------
 struct COMMAND_RPC_GET_INFO {
   typedef EMPTY_STRUCT request;

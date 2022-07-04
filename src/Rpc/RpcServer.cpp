@@ -493,14 +493,26 @@ void RpcServer::processRequest(const httplib::Request& request, httplib::Respons
             response.status = 500;
             response.set_content("Internal error", "text/html");
           }
-          return;
-
 
           return;
         }
 
         if (Common::starts_with(url, tx_method)) {
+          std::string hash_str = url.substr(tx_method.size());
+          
+          COMMAND_EXPLORER_GET_TRANSACTION_DETAILS_BY_HASH::request req;
+          req.hash = hash_str;
+          COMMAND_EXPLORER_GET_TRANSACTION_DETAILS_BY_HASH::response rsp;
 
+          bool r = on_get_explorer_tx_by_hash(req, rsp);
+          if (r) {
+            response.status = 200;
+            response.set_content(rsp, "text/html");
+          }
+          else {
+            response.status = 500;
+            response.set_content("Internal error", "text/html");
+          }
 
           return;
         }
@@ -1676,6 +1688,195 @@ bool RpcServer::on_get_explorer_block_by_hash(const COMMAND_EXPLORER_GET_BLOCK_D
 
     body += "</ol>\n";
 
+    body += index_finish;
+
+    res = body;
+  }
+  catch (std::system_error& e) {
+    throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_INTERNAL_ERROR, e.what() };
+    return false;
+  }
+  catch (std::exception& e) {
+    throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_INTERNAL_ERROR, "Error: " + std::string(e.what()) };
+    return false;
+  }
+
+  return true;
+}
+
+bool RpcServer::on_get_explorer_tx_by_hash(const COMMAND_EXPLORER_GET_TRANSACTION_DETAILS_BY_HASH::request& req, COMMAND_EXPLORER_GET_TRANSACTION_DETAILS_BY_HASH::response& res) {
+  try {
+    std::list<Crypto::Hash> missed_txs;
+    std::list<Transaction> txs;
+    std::vector<Crypto::Hash> hashes;
+    Crypto::Hash tx_hash;
+    if (!parse_hash256(req.hash, tx_hash)) {
+      throw JsonRpc::JsonRpcError{
+        CORE_RPC_ERROR_CODE_WRONG_PARAM,
+        "Failed to parse hex representation of transaction hash. Hex = " + req.hash + '.' };
+    }
+    hashes.push_back(tx_hash);
+    m_core.getTransactions(hashes, txs, missed_txs, true);
+
+    if (txs.empty() || !missed_txs.empty()) {
+      std::string hash_str = Common::podToHex(missed_txs.back());
+      throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_WRONG_PARAM,
+        "transaction wasn't found. Hash = " + hash_str + '.' };
+    }
+
+    TransactionDetails transactionsDetails;
+    if (!blockchainExplorerDataBuilder.fillTransactionDetails(txs.back(), transactionsDetails)) {
+      throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_INTERNAL_ERROR,
+        "Internal error: can't fill transaction details." };
+    }
+
+    std::string body = index_start + (m_core.currency().isTestnet() ? "testnet" : "mainnet") + "\n<p>";
+
+    body += "<h2>Transaction " + Common::podToHex(transactionsDetails.hash) + "</h2>\n";
+
+    body += "<ul>\n";
+    if (transactionsDetails.inBlockchain) {
+      body += "  <li>\n";
+      body += "    In block: ";
+      body += "<a href=\"/explorer/block/" + Common::podToHex(transactionsDetails.blockHash) + "\">";
+      body += std::to_string(transactionsDetails.blockHeight) + Common::podToHex(transactionsDetails.blockHash);
+      body += "    </a>\n";
+      body += "  </li>\n";
+      body += "  <li>\n";
+      time_t rawtime = (const time_t)transactionsDetails.timestamp;
+      struct tm* timeinfo;
+      timeinfo = localtime(&rawtime);
+      body += "    First confirmation time: ";
+      body += asctime(timeinfo);
+      body += "  </li>\n";
+    }
+    else {
+      body += "  <li>\n";
+      body += "    Unconfirmed\n";
+      body += "  </li>\n";
+    }
+    body += "  <li>\n";
+    body += "    Sum of outputs: " + m_core.currency().formatAmount(transactionsDetails.totalOutputsAmount) + "\n";
+    body += "  </li>\n";
+    body += "  <li>\n";
+    body += "    Size: " + std::to_string(transactionsDetails.size) + "\n";
+    body += "  </li>\n";
+    body += "  <li>\n";
+    body += "    Unlock time: " + std::to_string(transactionsDetails.unlockTime) + "\n";
+    body += "  </li>\n";
+    body += "  <li>\n";
+    body += "    Version: " + std::to_string(transactionsDetails.version) + "\n";
+    body += "  </li>\n";
+    body += "  <li>\n";
+    body += "    Mixin count: " + std::to_string(transactionsDetails.mixin) + "\n";
+    body += "  </li>\n";
+    body += "  <li>\n";
+    body += "    Public Key: " + Common::podToHex(transactionsDetails.extra.publicKey) + "\n";
+    body += "  </li>\n";
+    if (transactionsDetails.hasPaymentId) {
+      body += "  <li>\n";
+      body += "    Payment ID: " + Common::podToHex(transactionsDetails.paymentId) + "\n";
+      body += "  </li>\n";
+    }
+    body += "</ul>\n";
+
+    body += "<h3>Inputs</h3>\n";
+
+    body += "<table cellpadding=\"10px\">\n";
+    body += "  <thead>\n";
+    body += "  <tr>\n";
+    body += "    <td>Amount</td><td>Key Image</td><td>Output Indexes</td>\n";
+    body += "  </tr>\n";
+    body += "</thead>\n";
+    body += "<tbody>\n";
+    for (const auto& in : transactionsDetails.inputs) {
+      body += "  <tr>\n";
+      body += "    <td>";
+      if (in.type() == typeid(BaseInputDetails)) {
+        BaseInputDetails c = boost::get<BaseInputDetails>(in);
+        body += m_core.currency().formatAmount(c.amount);
+        body += "</td>\n    <td colspan=\"2\">coinbase</td>\n";
+      }
+      else if (in.type() == typeid(KeyInputDetails)) {
+        KeyInputDetails k = boost::get<KeyInputDetails>(in);
+        body += m_core.currency().formatAmount(k.input.amount);
+        body += "</td>\n    <td>";
+        body += Common::podToHex(k.input.keyImage);
+        body += "</td>\n    <td>";
+        for (const auto& oi : k.input.outputIndexes) {
+          body += std::to_string(oi) + ", ";
+        }
+        body.pop_back();
+        body.pop_back();
+        body += "    </td>\n";
+      }
+      else if (in.type() == typeid(MultisignatureInputDetails)) {
+        MultisignatureInputDetails m = boost::get<MultisignatureInputDetails>(in);
+        body += m_core.currency().formatAmount(m.input.amount);
+        body += "</td>\n    <td>multisig</td>\n    ";
+        body += "output index: " + std::to_string(m.input.outputIndex) + ", ";
+        body += "signature count: " + std::to_string(m.input.signatureCount) + ", ";
+        body += "output number: " + std::to_string(m.output.number) + ", ";
+        body += "output tx hash: " + Common::podToHex(m.output.transactionHash);
+        body += "    </td>\n";
+      }
+      body += "  </tr>\n";
+    }
+    body += "</tbody>\n";
+    body += "</table>\n";
+
+    body += "<h3>Outputs</h3>\n";
+
+    body += "<table cellpadding=\"10px\">\n";
+    body += "  <thead>\n";
+    body += "  <tr>\n";
+    body += "    <td>Amount</td><td>Public Key (stealth address)</td><td>Global Index</td>\n";
+    body += "  </tr>\n";
+    body += "</thead>\n";
+    body += "<tbody>\n";
+    for (const auto& o : transactionsDetails.outputs) {
+      body += "  <tr>\n";
+      body += "    <td>";
+      body += m_core.currency().formatAmount(o.output.amount);
+      body += "</td>\n    <td>";
+      if (o.output.target.type() == typeid(KeyOutput)) {
+        KeyOutput ko = boost::get<KeyOutput>(o.output.target);
+        body += Common::podToHex(ko);
+      }
+      else if (o.output.target.type() == typeid(MultisignatureOutput)) {
+        body += "multisig\n";
+        MultisignatureOutput mo = boost::get<MultisignatureOutput>(o.output.target);
+        body += "keys: \n";
+        for (const auto& k : mo.keys) {
+          body += Common::podToHex(k) + "\n";
+        }
+        body += "required signature count: ";
+        body += std::to_string(mo.requiredSignatureCount);
+      }
+      body += "</td>\n    <td>";
+      body += std::to_string(o.globalIndex);
+      body += "    </td>\n";
+      body += "  </tr>\n";
+    }
+    body += "</tbody>\n";
+    body += "</table>\n";
+
+    body += "<h3>Signatures</h3>\n";
+
+    body += "<ol>\n";
+    for (const auto& s0 : transactionsDetails.signatures) {
+      body += "  <li>\n";
+      body += "    <ol>\n";
+      for (const auto& s1 : s0) {
+        body += "      <li>\n";
+        body += "    " + Common::podToHex(s1) + "\n";
+        body += "      </li>\n";
+      }
+      body += "    </ol>\n";
+      body += "  </li>\n";
+    }
+    body += "</ol>\n";
+    
     body += index_finish;
 
     res = body;
