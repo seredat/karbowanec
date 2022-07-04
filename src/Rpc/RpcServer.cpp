@@ -1500,13 +1500,15 @@ bool RpcServer::on_get_explorer(const COMMAND_EXPLORER::request& req, COMMAND_EX
   uint32_t total_pages = top_block_index / print_blocks_count;
   uint32_t next_page = req_height - print_blocks_count;
   uint32_t prev_page = std::min<uint32_t>(req_height + print_blocks_count, top_block_index);
-
+  
   body += "<p>";
   if (curr_page != 0) {
-    body += "<a href=\"/explorer/height/";
-    body += std::to_string(prev_page);
-    body += "\">previous page</a>";
-    body += " | <a href=\"/explorer/\">first page</a> | ";
+    if (prev_page <= top_block_index - print_blocks_count) {
+      body += "<a href=\"/explorer/height/";
+      body += std::to_string(prev_page);
+      body += "\">previous page</a> | ";
+    }
+    body += "<a href=\"/explorer/\">first page</a> | ";
   }
   body += "current page: ";
   body += std::to_string(curr_page);
