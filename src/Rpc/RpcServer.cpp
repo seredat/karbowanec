@@ -23,6 +23,7 @@
 
 #include <future>
 #include <unordered_map>
+#include <time.h>
 #include <boost/lexical_cast.hpp>
 #include <boost/uuid/uuid.hpp>
 
@@ -1380,24 +1381,24 @@ bool RpcServer::on_get_payment_id(const COMMAND_HTTP::request& req, COMMAND_HTTP
 bool RpcServer::on_get_explorer(const COMMAND_HTTP::request& req, COMMAND_HTTP::response& res) {
   uint32_t top_block_index = m_core.getCurrentBlockchainHeight() - 1;
   std::string body = index_start + (m_core.currency().isTestnet() ? "testnet" : "mainnet") +
-    "<p>" + "Height: " + std::to_string(top_block_index) +
-    " &bull; " + "Difficulty: " + std::to_string(m_core.getNextBlockDifficulty()) +
-    " &bull; " + "Alt. blocks: " + std::to_string(m_core.getAlternativeBlocksCount()) +
-    " &bull; " + "Transactions: " + std::to_string(m_core.getBlockchainTotalTransactions() - top_block_index + 1) +
-    " &bull; " + "Mempool: " + std::to_string(m_core.getPoolTransactionsCount()) +
-    "</p>";
+    "\n<p>" + "Height: <b>" + std::to_string(top_block_index) + "</b>" +
+    " &bull; " + "Difficulty: <b>" + std::to_string(m_core.getNextBlockDifficulty()) + "</b>" +
+    " &bull; " + "Alt. blocks: <b>" + std::to_string(m_core.getAlternativeBlocksCount()) + "</b>" +
+    " &bull; " + "Transactions: <b>" + std::to_string(m_core.getBlockchainTotalTransactions() - top_block_index + 1) + "</b>" +
+    " &bull; " + "Mempool: <b>" + std::to_string(m_core.getPoolTransactionsCount()) + "</b>" +
+    "</p>\n";
 
   // list last 10 blocks with txs
   uint32_t print_blocks_count = 10;
   uint32_t last_height = top_block_index - print_blocks_count;
   
-  body += "<table cellpadding=\"10px\">";
-  body += "  <thead>";
-  body += "  <tr>";
-  body += "    <td>Height</td><td>Date</td><td>Hash</td><td>Size</td><td>Difficulty</td><td>Txs</td>";
-  body += "  </tr>";
-  body += "</thead>";
-  body += "</tbody>";
+  body += "<table cellpadding=\"10px\">\n";
+  body += "  <thead>\n";
+  body += "  <tr>\n";
+  body += "    <td>Height</td><td>Date</td><td>Hash</td><td>Size</td><td>Difficulty</td><td>Txs</td>\n";
+  body += "  </tr>\n";
+  body += "</thead>\n";
+  body += "<tbody>\n";
 
   for (uint32_t i = top_block_index; i >= last_height; i--) {
     Crypto::Hash blockHash = m_core.getBlockIdByHeight(i);
@@ -1407,7 +1408,10 @@ bool RpcServer::on_get_explorer(const COMMAND_HTTP::request& req, COMMAND_HTTP::
         "Internal error: can't get block by height. Height = " + std::to_string(i) + '.' };
     }
 
-    uint64_t timestamp = blk.timestamp;
+    time_t rawtime = (const time_t)blk.timestamp;
+    struct tm* timeinfo;
+    timeinfo = localtime(&rawtime);
+
     difficulty_type blockDifficulty;
     m_core.getBlockDifficulty(static_cast<uint32_t>(i), blockDifficulty);
     size_t tx_cumulative_block_size;
@@ -1416,28 +1420,31 @@ bool RpcServer::on_get_explorer(const COMMAND_HTTP::request& req, COMMAND_HTTP::
     size_t minerTxBlobSize = getObjectBinarySize(blk.baseTransaction);
     uint64_t blockSize = blokBlobSize + tx_cumulative_block_size - minerTxBlobSize;
  
-    body += "  <tr>";
+    body += "  <tr>\n";
     body += "    <td>";
     body += std::to_string(i);
-    body += "    </td><td>";
-    body += std::to_string(timestamp);
-    body += "    </td><td>";
+    body += "</td>\n    <td>";
+    body += asctime(timeinfo);
+    body.pop_back(); // remove newline after asctime
+    body += "</td>\n    <td>";
+    body += "<a href=\"/explorer/block/" + Common::podToHex(blockHash) + "\">";
     body += Common::podToHex(blockHash);
-    body += "    </td><td>";
+    body += "</a>";
+    body += "</td>\n    <td>";
     body += std::to_string(blockSize);
-    body += "    </td><td>";
+    body += "</td>\n    <td>";
     body += std::to_string(blockDifficulty);
-    body += "    </td><td>";
+    body += "</td>\n    <td>";
     body += std::to_string(blk.transactionHashes.size() + 1);
-    body += "    </td>";
-    body += "  </tr>";
+    body += "</td>\n";
+    body += "  </tr>\n";
 
     if (i == 0)
       break;
   }
 
-  body += "</tbody>";
-  body += "</table>";
+  body += "</tbody>\n";
+  body += "</table>\n";
 
   res = body;
 
