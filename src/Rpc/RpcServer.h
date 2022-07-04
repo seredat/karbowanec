@@ -86,6 +86,7 @@ private:
 
   // http handlers
   bool on_get_index(const COMMAND_HTTP::request& req, COMMAND_HTTP::response& res);
+  bool on_get_explorer(const COMMAND_HTTP::request& req, COMMAND_HTTP::response& res);
   bool on_get_supply(const COMMAND_HTTP::request& req, COMMAND_HTTP::response& res);
   bool on_get_payment_id(const COMMAND_HTTP::request& req, COMMAND_HTTP::response& res);
 

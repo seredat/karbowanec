@@ -53,17 +53,22 @@
 const uint32_t MAX_NUMBER_OF_BLOCKS_PER_STATS_REQUEST = 10000;
 const uint64_t BLOCK_LIST_MAX_COUNT = 1000;
 
+const std::string index_start =
+R"(<html><head><meta http-equiv='refresh' content='60'/></head><body><svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" version="1.1" style="vertical-align:middle; padding-right: 10px; shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd" viewBox="0 0 2500000 2500000" xmlns:xlink="http://www.w3.org/1999/xlink" width="64px" height="64px">
+<g><circle fill="#0AACFC" cx="1250000" cy="1250000" r="1214062" /><path fill="#FFED00" d="M1251219 1162750c18009,-3203 34019,-10006 48025,-20412 14009,-10407 27215,-28016 39622,-52029l275750 -538290c10803,-18010 24012,-32419 39218,-43625 15210,-10806 33219,-16410 53232,-16410l174893 0 -343384 633144c-15209,26016 -32419,47228 -51628,63635 -19613,16409 -41225,28815 -64838,37221 36822,9604 67638,25213 92854,47225 24812,21610 48425,52025 70437,91247l330578 668363 -192503 0c-38822,0 -70041,-21213 -93653,-63235l-270947 -566303c-14006,-25215 -29216,-43225 -45622,-54034 -16409,-10803 -37222,-17206 -62034,-18809l0 287359 -151281 0 0 -288559 -111263 0 0 703581 -213716 0 0 -1540835 213716 0 0 673166 111263 0 0 -332981 151281 0 0 330581z"/></g></svg>
+)" "karbowanecd" R"( v. )" PROJECT_VERSION_LONG R"( &bull; )";
+
+const std::string index_finish = " </body></html>";
+
 namespace CryptoNote {
 
-    namespace {
-        template <typename T>
-        static bool print_as_json(const T& obj) {
-            std::cout << CryptoNote::storeToJson(obj) << ENDL;
-            return true;
-        }
-    }
-
 namespace {
+
+template <typename T>
+static bool print_as_json(const T& obj) {
+  std::cout << CryptoNote::storeToJson(obj) << ENDL;
+  return true;
+}
 
 template <typename Command>
 RpcServer::HandlerFunction binMethod(bool (RpcServer::*handler)(typename Command::request const&, typename Command::response&)) {
@@ -137,7 +142,7 @@ RpcServer::HandlerFunction httpMethod(bool (RpcServer::*handler)(typename Comman
 }
 
 std::unordered_map<std::string, RpcServer::RpcHandler<RpcServer::HandlerFunction>> RpcServer::s_handlers = {
-  
+
   // binary handlers
   { "/getblocks.bin", { binMethod<COMMAND_RPC_GET_BLOCKS_FAST>(&RpcServer::on_get_blocks), true } },
   { "/queryblocks.bin", { binMethod<COMMAND_RPC_QUERY_BLOCKS>(&RpcServer::on_query_blocks), true } },
@@ -149,6 +154,7 @@ std::unordered_map<std::string, RpcServer::RpcHandler<RpcServer::HandlerFunction
 
   // plain text/html handlers
   { "/", { httpMethod<COMMAND_HTTP>(&RpcServer::on_get_index), true } },
+  { "/explorer", { httpMethod<COMMAND_HTTP>(&RpcServer::on_get_explorer), true } },
   { "/supply", { httpMethod<COMMAND_HTTP>(&RpcServer::on_get_supply), false } },
   { "/paymentid", { httpMethod<COMMAND_HTTP>(&RpcServer::on_get_payment_id), true } },
 
@@ -1313,14 +1319,6 @@ bool RpcServer::on_check_payment(const COMMAND_RPC_CHECK_PAYMENT_BY_PAYMENT_ID::
 //
 
 bool RpcServer::on_get_index(const COMMAND_HTTP::request& req, COMMAND_HTTP::response& res) {
-  const std::string index_start =
-    R"(<html><head><meta http-equiv='refresh' content='60'/></head><body><p><svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" version="1.1" style="vertical-align:middle; padding-right: 10px; shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd" viewBox="0 0 2500000 2500000" xmlns:xlink="http://www.w3.org/1999/xlink" width="64px" height="64px">
-<g>
-<circle fill="#0AACFC" cx="1250000" cy="1250000" r="1214062" />
-<path fill="#FFED00" d="M1251219 1162750c18009,-3203 34019,-10006 48025,-20412 14009,-10407 27215,-28016 39622,-52029l275750 -538290c10803,-18010 24012,-32419 39218,-43625 15210,-10806 33219,-16410 53232,-16410l174893 0 -343384 633144c-15209,26016 -32419,47228 -51628,63635 -19613,16409 -41225,28815 -64838,37221 36822,9604 67638,25213 92854,47225 24812,21610 48425,52025 70437,91247l330578 668363 -192503 0c-38822,0 -70041,-21213 -93653,-63235l-270947 -566303c-14006,-25215 -29216,-43225 -45622,-54034 -16409,-10803 -37222,-17206 -62034,-18809l0 287359 -151281 0 0 -288559 -111263 0 0 703581 -213716 0 0 -1540835 213716 0 0 673166 111263 0 0 -332981 151281 0 0 330581z"/>
-</g></svg></svg></td><td>)" "karbowanec" R"(d &bull; version 
-)";
-  const std::string index_finish = " </p></body></html>";
   const std::time_t uptime = std::time(nullptr) - m_core.getStartTime();
   const std::string uptime_str = std::to_string((unsigned int)floor(uptime / 60.0 / 60.0 / 24.0)) + "d " + std::to_string((unsigned int)floor(fmod((uptime / 60.0 / 60.0), 24.0))) + "h "
     + std::to_string((unsigned int)floor(fmod((uptime / 60.0), 60.0))) + "m " + std::to_string((unsigned int)fmod(uptime, 60.0)) + "s";
@@ -1335,7 +1333,7 @@ bool RpcServer::on_get_index(const COMMAND_HTTP::request& req, COMMAND_HTTP::res
   size_t total_tx_count = m_core.getBlockchainTotalTransactions() - top_block_index + 1;
   size_t tx_pool_count = m_core.getPoolTransactionsCount();
 
-  const std::string body = index_start + PROJECT_VERSION_LONG + " &bull; " + (m_core.currency().isTestnet() ? "testnet" : "mainnet") +
+  const std::string body = index_start + (m_core.currency().isTestnet() ? "testnet" : "mainnet") +
     "<ul>" +
       "<li>" + "Synchronization status: " + std::to_string(top_block_index) + "/" + std::to_string(top_known_block_index) +
       "<li>" + "Last block hash: " + Common::podToHex(last_block_hash) + "</li>" +
@@ -1360,7 +1358,6 @@ bool RpcServer::on_get_index(const COMMAND_HTTP::request& req, COMMAND_HTTP::res
   return true;
 }
 
-
 bool RpcServer::on_get_supply(const COMMAND_HTTP::request& req, COMMAND_HTTP::response& res) {
   std::string already_generated_coins = m_core.currency().formatAmount(m_core.getTotalGeneratedAmount());
   res = already_generated_coins;
@@ -1375,6 +1372,79 @@ bool RpcServer::on_get_payment_id(const COMMAND_HTTP::request& req, COMMAND_HTTP
 
   return true;
 }
+
+//
+// Explorer
+//
+
+bool RpcServer::on_get_explorer(const COMMAND_HTTP::request& req, COMMAND_HTTP::response& res) {
+  uint32_t top_block_index = m_core.getCurrentBlockchainHeight() - 1;
+  std::string body = index_start + (m_core.currency().isTestnet() ? "testnet" : "mainnet") +
+    "<p>" + "Height: " + std::to_string(top_block_index) +
+    " &bull; " + "Difficulty: " + std::to_string(m_core.getNextBlockDifficulty()) +
+    " &bull; " + "Alt. blocks: " + std::to_string(m_core.getAlternativeBlocksCount()) +
+    " &bull; " + "Transactions: " + std::to_string(m_core.getBlockchainTotalTransactions() - top_block_index + 1) +
+    " &bull; " + "Mempool: " + std::to_string(m_core.getPoolTransactionsCount()) +
+    "</p>";
+
+  // list last 10 blocks with txs
+  uint32_t print_blocks_count = 10;
+  uint32_t last_height = top_block_index - print_blocks_count;
+  
+  body += "<table cellpadding=\"10px\">";
+  body += "  <thead>";
+  body += "  <tr>";
+  body += "    <td>Height</td><td>Date</td><td>Hash</td><td>Size</td><td>Difficulty</td><td>Txs</td>";
+  body += "  </tr>";
+  body += "</thead>";
+  body += "</tbody>";
+
+  for (uint32_t i = top_block_index; i >= last_height; i--) {
+    Crypto::Hash blockHash = m_core.getBlockIdByHeight(i);
+    Block blk;
+    if (!m_core.getBlockByHash(blockHash, blk)) {
+      throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_INTERNAL_ERROR,
+        "Internal error: can't get block by height. Height = " + std::to_string(i) + '.' };
+    }
+
+    uint64_t timestamp = blk.timestamp;
+    difficulty_type blockDifficulty;
+    m_core.getBlockDifficulty(static_cast<uint32_t>(i), blockDifficulty);
+    size_t tx_cumulative_block_size;
+    m_core.getBlockSize(blockHash, tx_cumulative_block_size);
+    size_t blokBlobSize = getObjectBinarySize(blk);
+    size_t minerTxBlobSize = getObjectBinarySize(blk.baseTransaction);
+    uint64_t blockSize = blokBlobSize + tx_cumulative_block_size - minerTxBlobSize;
+ 
+    body += "  <tr>";
+    body += "    <td>";
+    body += std::to_string(i);
+    body += "    </td><td>";
+    body += std::to_string(timestamp);
+    body += "    </td><td>";
+    body += Common::podToHex(blockHash);
+    body += "    </td><td>";
+    body += std::to_string(blockSize);
+    body += "    </td><td>";
+    body += std::to_string(blockDifficulty);
+    body += "    </td><td>";
+    body += std::to_string(blk.transactionHashes.size() + 1);
+    body += "    </td>";
+    body += "  </tr>";
+
+    if (i == 0)
+      break;
+  }
+
+  body += "</tbody>";
+  body += "</table>";
+
+  res = body;
+
+  return true;
+}
+
+
 
 //
 // JSON handlers
