@@ -1469,10 +1469,10 @@ bool RpcServer::on_get_explorer(const COMMAND_EXPLORER::request& req, COMMAND_EX
     "</p>\n";
 
   const uint32_t print_blocks_count = 10;
-  uint32_t req_height = req.height == 0 ? top_block_index : req.height;
-  uint32_t last_height = req.height == 0 ? top_block_index - print_blocks_count : req.height - print_blocks_count;
-  if (last_height <= print_blocks_count)
-    last_height = 0;
+  uint32_t req_height = std::max<uint32_t>(req.height == 0 ? top_block_index : req.height, print_blocks_count);
+  uint32_t last_height = req_height - print_blocks_count;
+  if (last_height < print_blocks_count)
+      last_height = 0;
 
   // show mempool only on home page
   if (req_height == top_block_index) {
@@ -1588,9 +1588,11 @@ bool RpcServer::on_get_explorer(const COMMAND_EXPLORER::request& req, COMMAND_EX
   body += std::to_string(curr_page);
   body += " / ";
   body += std::to_string(total_pages);
-  body += " | <a href=\"/explorer/height/";
-  body += std::to_string(next_page);
-  body += "\">next page</a></p>";
+  if (req_height != 0 && req_height > print_blocks_count) {
+    body += " | <a href=\"/explorer/height/";
+    body += std::to_string(next_page);
+    body += "\">next page</a></p>";
+  }
 
   body += index_finish;
 
