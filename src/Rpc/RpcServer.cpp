@@ -155,9 +155,11 @@ std::unordered_map<std::string, RpcServer::RpcHandler<RpcServer::HandlerFunction
 
   // plain text/html handlers
   { "/", { httpMethod<COMMAND_HTTP>(&RpcServer::on_get_index), true } },
-  { "/explorer", { httpMethod<COMMAND_HTTP>(&RpcServer::on_get_explorer), true } },
   { "/supply", { httpMethod<COMMAND_HTTP>(&RpcServer::on_get_supply), false } },
   { "/paymentid", { httpMethod<COMMAND_HTTP>(&RpcServer::on_get_payment_id), true } },
+
+  // explorer
+  ////{ "/explorer", { httpMethod<COMMAND_EXPLORER>(&RpcServer::on_get_explorer), true } },
 
   // get json handlers
   { "/getinfo", { jsonMethod<COMMAND_RPC_GET_INFO>(&RpcServer::on_get_info), true } },
@@ -457,6 +459,45 @@ void RpcServer::processRequest(const httplib::Request& request, httplib::Respons
           return;
 
         }
+      }
+
+      if (Common::starts_with(url, "/explorer/")) {
+
+        std::string page_method = "/explorer/height/";
+        std::string block_method = "/explorer/block/";
+        std::string tx_method = "/explorer/tx/";
+
+        if (Common::starts_with(url, block_method)) {
+
+          return;
+        }
+
+        if (Common::starts_with(url, tx_method)) {
+
+          return;
+        }
+
+        // default is explorer home
+        uint32_t height = 0;
+        if (Common::starts_with(url, page_method)) {
+          std::string height_str = url.substr(page_method.size());
+          height = Common::integer_cast<uint32_t>(height_str);
+        }
+
+        COMMAND_EXPLORER::request req;
+        req.height = height;
+        COMMAND_EXPLORER::response rsp;
+        bool r = on_get_explorer(req, rsp);
+        if (r) {
+          response.status = 200;
+          response.set_content(rsp, "text/html");
+        }
+        else {
+          response.status = 500;
+          response.set_content("Internal error", "text/html");
+        }
+        return;
+
       }
 
       response.status = 404;
@@ -1378,20 +1419,29 @@ bool RpcServer::on_get_payment_id(const COMMAND_HTTP::request& req, COMMAND_HTTP
 // Explorer
 //
 
-bool RpcServer::on_get_explorer(const COMMAND_HTTP::request& req, COMMAND_HTTP::response& res) {
+bool RpcServer::on_get_explorer(const COMMAND_EXPLORER::request& req, COMMAND_EXPLORER::response& res) {
   uint32_t top_block_index = m_core.getCurrentBlockchainHeight() - 1;
   std::string body = index_start + (m_core.currency().isTestnet() ? "testnet" : "mainnet") +
     "\n<p>" + "Height: <b>" + std::to_string(top_block_index) + "</b>" +
     " &bull; " + "Difficulty: <b>" + std::to_string(m_core.getNextBlockDifficulty()) + "</b>" +
     " &bull; " + "Alt. blocks: <b>" + std::to_string(m_core.getAlternativeBlocksCount()) + "</b>" +
     " &bull; " + "Transactions: <b>" + std::to_string(m_core.getBlockchainTotalTransactions() - top_block_index + 1) + "</b>" +
-    " &bull; " + "Mempool: <b>" + std::to_string(m_core.getPoolTransactionsCount()) + "</b>" +
     "</p>\n";
 
+  const uint32_t print_blocks_count = 10;
+  uint32_t req_height = req.height == 0 ? top_block_index : req.height;
+  uint32_t last_height = req.height == 0 ? top_block_index - print_blocks_count : req.height - print_blocks_count;
+  if (last_height <= print_blocks_count)
+    last_height = 0;
+
+  if (req_height == top_block_index) { // show mempool only on home page
+    body += "<h2>Transaction pool</h2>";
+
+    /// TODO implement mempool list
+  }
+
   // list last 10 blocks with txs
-  uint32_t print_blocks_count = 10;
-  uint32_t last_height = top_block_index - print_blocks_count;
-  
+  body += "<h2>Blocks</h2>";
   body += "<table cellpadding=\"10px\">\n";
   body += "  <thead>\n";
   body += "  <tr>\n";
@@ -1400,7 +1450,7 @@ bool RpcServer::on_get_explorer(const COMMAND_HTTP::request& req, COMMAND_HTTP::
   body += "</thead>\n";
   body += "<tbody>\n";
 
-  for (uint32_t i = top_block_index; i >= last_height; i--) {
+  for (uint32_t i = req_height; i > last_height; i--) {
     Crypto::Hash blockHash = m_core.getBlockIdByHeight(i);
     Block blk;
     if (!m_core.getBlockByHash(blockHash, blk)) {
@@ -1446,11 +1496,30 @@ bool RpcServer::on_get_explorer(const COMMAND_HTTP::request& req, COMMAND_HTTP::
   body += "</tbody>\n";
   body += "</table>\n";
 
+  uint32_t curr_page = req_height == 0 ? 0 : (top_block_index - req_height) / print_blocks_count;
+  uint32_t total_pages = top_block_index / print_blocks_count;
+  uint32_t next_page = req_height - print_blocks_count;
+  uint32_t prev_page = std::min<uint32_t>(req_height + print_blocks_count, top_block_index);
+
+  body += "<p>";
+  if (curr_page != 0) {
+    body += "<a href=\"/explorer/height/";
+    body += std::to_string(prev_page);
+    body += "\">previous page</a>";
+    body += " | <a href=\"/explorer/\">first page</a> | ";
+  }
+  body += "current page: ";
+  body += std::to_string(curr_page);
+  body += " / ";
+  body += std::to_string(total_pages);
+  body += " | <a href=\"/explorer/height/";
+  body += std::to_string(next_page);
+  body += "\">next page</a></p>";
+
   res = body;
 
   return true;
 }
-
 
 
 //

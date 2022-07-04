@@ -309,6 +309,18 @@ struct COMMAND_HTTP {
   typedef std::string response;
 };
 
+struct COMMAND_EXPLORER {
+  struct request {
+    uint32_t height = 0;
+
+    void serialize(ISerializer& s) {
+      KV_MEMBER(height)
+    }
+  };
+
+  typedef std::string response;
+};
+
 //-----------------------------------------------
 struct COMMAND_RPC_GET_INFO {
   typedef EMPTY_STRUCT request;
