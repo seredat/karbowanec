@@ -1645,12 +1645,11 @@ bool RpcServer::on_get_explorer_block_by_hash(const COMMAND_EXPLORER_GET_BLOCK_D
       body += "NO\n";
     body += "  </li>\n";
     body += "  <li>\n";
-    size_t blockSize = 0;
-    if (!m_core.getBlockSize(blockHash, blockSize)) {
-      throw JsonRpc::JsonRpcError{
-        CORE_RPC_ERROR_CODE_INTERNAL_ERROR,
-        "Internal error: can't get size of block " + req.hash + '.' };
-    }
+    size_t tx_cumulative_block_size;
+    m_core.getBlockSize(blockHash, tx_cumulative_block_size);
+    size_t blokBlobSize = getObjectBinarySize(blk);
+    size_t minerTxBlobSize = getObjectBinarySize(blk.baseTransaction);
+    size_t blockSize = blokBlobSize + tx_cumulative_block_size - minerTxBlobSize;
     body += "    	Size: " + std::to_string(blockSize) + "\n";
     body += "  </li>\n";
     body += "  <li>\n";
