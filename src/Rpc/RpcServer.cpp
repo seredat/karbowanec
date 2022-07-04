@@ -1613,11 +1613,14 @@ bool RpcServer::on_get_explorer_block_by_hash(const COMMAND_EXPLORER_GET_BLOCK_D
         CORE_RPC_ERROR_CODE_INTERNAL_ERROR,
         "Internal error: can't get block by hash. Hash = " + req.hash + '.' };
     }
-    
+
     Crypto::Hash blockHash = get_block_hash(blk);
     uint32_t blockIndex = boost::get<BaseInput>(blk.baseTransaction.inputs.front()).blockIndex;
 
     std::string body = index_start + (m_core.currency().isTestnet() ? "testnet" : "mainnet") + "\n<p>";
+
+    body += "<a href=\"/explorer/\">Home</a>";
+    body += "<hr />";
 
     body += "<h2>Block " + Common::podToHex(blockHash) + "</h2>\n";
 
@@ -1730,6 +1733,9 @@ bool RpcServer::on_get_explorer_tx_by_hash(const COMMAND_EXPLORER_GET_TRANSACTIO
     }
 
     std::string body = index_start + (m_core.currency().isTestnet() ? "testnet" : "mainnet") + "\n<p>";
+
+    body += "<a href=\"/explorer/\">Home</a>";
+    body += "<hr />";
 
     body += "<h2>Transaction " + Common::podToHex(transactionsDetails.hash) + "</h2>\n";
 
