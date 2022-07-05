@@ -344,6 +344,18 @@ struct COMMAND_EXPLORER_GET_TRANSACTION_DETAILS_BY_HASH {
 
   typedef std::string response;
 };
+
+struct COMMAND_EXPLORER_GET_TRANSACTIONS_BY_PAYMENT_ID {
+  struct request {
+    std::string payment_id;
+
+    void serialize(ISerializer &s) {
+      KV_MEMBER(payment_id)
+    }
+  };
+
+  typedef std::string response;
+};
 //-----------------------------------------------
 struct COMMAND_RPC_GET_INFO {
   typedef EMPTY_STRUCT request;

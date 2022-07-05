@@ -466,6 +466,7 @@ void RpcServer::processRequest(const httplib::Request& request, httplib::Respons
         std::string page_method = "/explorer/height/";
         std::string block_method = "/explorer/block/";
         std::string tx_method = "/explorer/tx/";
+        std::string payment_id_method = "/explorer/payment_id/";
 
         if (Common::starts_with(url, block_method)) {
           std::string hash_str = url.substr(block_method.size());
@@ -512,6 +513,26 @@ void RpcServer::processRequest(const httplib::Request& request, httplib::Respons
           else {
             response.status = 500;
             response.set_content("Internal error", "text/html");
+          }
+
+          return;
+        }
+
+        if (Common::starts_with(url, payment_id_method)) {
+          std::string payment_id_str = url.substr(payment_id_method.size());
+
+          COMMAND_EXPLORER_GET_TRANSACTIONS_BY_PAYMENT_ID::request req;
+          req.payment_id = payment_id_str;
+          COMMAND_EXPLORER_GET_TRANSACTIONS_BY_PAYMENT_ID::response rsp;
+
+          bool r = on_get_explorer_txs_by_payment_id(req, rsp);
+          if (r) {
+            response.status = 200;
+            response.set_content(rsp, "text/html");
+          }
+          else {
+            response.status = 404;
+            response.set_content("Not found", "text/html");
           }
 
           return;
@@ -1916,6 +1937,47 @@ bool RpcServer::on_get_explorer_tx_by_hash(const COMMAND_EXPLORER_GET_TRANSACTIO
   return true;
 }
 
+bool RpcServer::on_get_explorer_txs_by_payment_id(const COMMAND_EXPLORER_GET_TRANSACTIONS_BY_PAYMENT_ID::request& req, COMMAND_EXPLORER_GET_TRANSACTIONS_BY_PAYMENT_ID::response& res) {
+  Crypto::Hash paymentId;
+  std::vector<Transaction> transactions;
+
+  if (!parse_hash256(req.payment_id, paymentId)) {
+    throw JsonRpc::JsonRpcError{
+      CORE_RPC_ERROR_CODE_WRONG_PARAM,
+      "Failed to parse Payment ID: " + req.payment_id + '.' };
+  }
+
+  if (!m_core.getTransactionsByPaymentId(paymentId, transactions)) {
+    return false;
+  }
+
+  std::string body = index_start + (m_core.currency().isTestnet() ? "testnet" : "mainnet") + "\n<p>";
+
+  body += "<a href=\"/explorer/\">Home</a>";
+  body += "<hr />";
+
+  body += "<h2>Payment ID <span class=\"wrap\">" + Common::podToHex(paymentId) + "</span></h2>\n";
+
+  body += "<h3>Transactions with this Payment ID:</h3>\n";
+
+  // simple list of tx hashes without details
+  body += "<ol>\n";
+  for (const Transaction& tx : transactions) {
+    std::string txHashStr = Common::podToHex(getObjectHash(tx));
+    body += "  <li>\n";
+    body += "    <a class=\"wrap\" href=\"/explorer/tx/" + txHashStr + "\">";
+    body += txHashStr;
+    body += "    </a>";
+    body += "  </li>\n";
+  }
+  body += "</ol>\n";
+
+  body += index_finish;
+
+  res = body;
+
+  return true;
+}
 
 //
 // JSON handlers
