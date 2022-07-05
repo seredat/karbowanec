@@ -1496,7 +1496,7 @@ bool RpcServer::on_get_explorer(const COMMAND_EXPLORER::request& req, COMMAND_EX
   // Search
   body += R"(
   <form style='padding: 10px;' name='searchform' action='javascript:handleSearch()'>
-    <input type='text' name='search' id='txt_search' size='80' placeholder='Search...'>
+    <input type='text' name='search' id='txt_search' size='80' placeholder='Search by block height/hash, transaction hash, payment id...'>
     <input type='submit' value='Search'>
   </form>
   <script>
