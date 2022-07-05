@@ -1513,7 +1513,11 @@ bool RpcServer::on_get_explorer(const COMMAND_EXPLORER::request& req, COMMAND_EX
     }));
     xhr.onload = function() {
       var data = JSON.parse(this.responseText);
-      window.location.href = data.result.result;
+      if (data.result) {
+        window.location.href = data.result.result;
+      } else if (data.error) {
+        alert(data.error.message);
+      }
     }
   }
   </script>)";
@@ -1685,8 +1689,8 @@ bool RpcServer::on_explorer_search(const COMMAND_RPC_EXPLORER_SEARCH::request& r
     return true;
   }
 
-  res.result = "";
-  res.status = CORE_RPC_STATUS_OK;
+  throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_WRONG_PARAM, "Not found" };
+  
   return true;
 }
 
