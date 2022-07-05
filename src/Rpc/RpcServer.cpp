@@ -1972,21 +1972,24 @@ bool RpcServer::on_get_explorer_tx_by_hash(const COMMAND_EXPLORER_GET_TRANSACTIO
     body += "</tbody>\n";
     body += "</table>\n";
 
-    body += "<h3>Signatures</h3>\n";
+    // no signatures e.g. in coinbase
+    if (!transactionsDetails.signatures.empty()) {
+      body += "<h3>Signatures</h3>\n";
 
-    body += "<ol>\n";
-    for (const auto& s0 : transactionsDetails.signatures) {
-      body += "  <li>\n";
-      body += "    <ol>\n";
-      for (const auto& s1 : s0) {
-        body += "      <li class=\"wrap\">\n";
-        body += "    " + Common::podToHex(s1) + "\n";
-        body += "      </li>\n";
+      body += "<ol>\n";
+      for (const auto& s0 : transactionsDetails.signatures) {
+        body += "  <li>\n";
+        body += "    <ol>\n";
+        for (const auto& s1 : s0) {
+          body += "      <li class=\"wrap\">\n";
+          body += "    " + Common::podToHex(s1) + "\n";
+          body += "      </li>\n";
+        }
+        body += "    </ol>\n";
+        body += "  </li>\n";
       }
-      body += "    </ol>\n";
-      body += "  </li>\n";
+      body += "</ol>\n";
     }
-    body += "</ol>\n";
     
     body += index_finish;
 
