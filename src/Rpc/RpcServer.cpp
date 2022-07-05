@@ -1650,41 +1650,36 @@ bool RpcServer::on_get_explorer(const COMMAND_EXPLORER::request& req, COMMAND_EX
 }
 
 bool RpcServer::on_explorer_search(const COMMAND_RPC_EXPLORER_SEARCH::request& req, COMMAND_RPC_EXPLORER_SEARCH::response& res) {
-  Crypto::Hash hashStr;
+  Crypto::Hash hash;
+
   if (req.query.size() < 64) {
     // assume it's height
     uint32_t height = static_cast<uint32_t>(std::stoul(req.query));
-    Crypto::Hash block_hash = m_core.getBlockIdByHeight(height);
-    if (block_hash != NULL_HASH && m_core.have_block(hashStr)) {
-      res.result = "/explorer/block/" + Common::podToHex(hashStr);
-      res.status = CORE_RPC_STATUS_OK;
-      return true;
-    }
-  }
-
-  if (!parse_hash256(req.query, hashStr)) {
+    hash = m_core.getBlockIdByHeight(height);
+  } 
+  else if (!parse_hash256(req.query, hash)) {
     throw JsonRpc::JsonRpcError{
       CORE_RPC_ERROR_CODE_WRONG_PARAM, "Failed to parse query: " + req.query };
   }
 
   // check if it's block
-  if (m_core.have_block(hashStr)) {
-    res.result = "/explorer/block/" + Common::podToHex(hashStr);
+  if (m_core.have_block(hash)) {
+    res.result = "/explorer/block/" + Common::podToHex(hash);
     res.status = CORE_RPC_STATUS_OK;
     return true;
   }
 
   // check if it's tx
-  if (m_core.haveTransaction(hashStr)) {
-    res.result = "/explorer/tx/" + Common::podToHex(hashStr);
+  if (m_core.haveTransaction(hash)) {
+    res.result = "/explorer/tx/" + Common::podToHex(hash);
     res.status = CORE_RPC_STATUS_OK;
     return true;
   }
 
   // check if it's payment id
-  std::vector<Crypto::Hash> txHashes = m_core.getTransactionHashesByPaymentId(hashStr);
+  std::vector<Crypto::Hash> txHashes = m_core.getTransactionHashesByPaymentId(hash);
   if (!txHashes.empty()) {
-    res.result = "/explorer/payment_id/" + Common::podToHex(hashStr);
+    res.result = "/explorer/payment_id/" + Common::podToHex(hash);
     res.status = CORE_RPC_STATUS_OK;
     return true;
   }
