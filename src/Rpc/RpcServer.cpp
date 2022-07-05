@@ -1667,8 +1667,16 @@ bool RpcServer::on_get_explorer_block_by_hash(const COMMAND_EXPLORER_GET_BLOCK_D
     body += "    Difficulty: " + std::to_string(blockDifficulty) + "\n";
     body += "  </li>\n";
     body += "  <li>\n";
-    body += "    Previous block hash: " + Common::podToHex(blk.previousBlockHash);
+    body += "    Previous block: ";
+    body += "<a href=\"/explorer/block/" + Common::podToHex(blk.previousBlockHash) + "\">";
+    body += Common::podToHex(blk.previousBlockHash);
+    body += "</a>\n";
     body += "  </li>\n";
+    if (blk.majorVersion >= BLOCK_MAJOR_VERSION_5) {
+      body += "  <li>\n";
+      body += "    Miner signature: " + Common::podToHex(blk.signature);
+      body += "  </li>\n";
+    }
     body += "</ul>";
 
     body += "<h3>Transactions</h3>\n";
@@ -1746,7 +1754,7 @@ bool RpcServer::on_get_explorer_tx_by_hash(const COMMAND_EXPLORER_GET_TRANSACTIO
       body += "  <li>\n";
       body += "    In block: ";
       body += "<a href=\"/explorer/block/" + Common::podToHex(transactionsDetails.blockHash) + "\">";
-      body += std::to_string(transactionsDetails.blockHeight) + Common::podToHex(transactionsDetails.blockHash);
+      body += std::to_string(transactionsDetails.blockHeight) + " (" + Common::podToHex(transactionsDetails.blockHash) + ")";
       body += "    </a>\n";
       body += "  </li>\n";
       body += "  <li>\n";
@@ -1778,7 +1786,7 @@ bool RpcServer::on_get_explorer_tx_by_hash(const COMMAND_EXPLORER_GET_TRANSACTIO
     body += "    Mixin count: " + std::to_string(transactionsDetails.mixin) + "\n";
     body += "  </li>\n";
     body += "  <li>\n";
-    body += "    Public Key: " + Common::podToHex(transactionsDetails.extra.publicKey) + "\n";
+    body += "    Public key: " + Common::podToHex(transactionsDetails.extra.publicKey) + "\n";
     body += "  </li>\n";
     if (transactionsDetails.hasPaymentId) {
       body += "  <li>\n";
@@ -1792,7 +1800,7 @@ bool RpcServer::on_get_explorer_tx_by_hash(const COMMAND_EXPLORER_GET_TRANSACTIO
     body += "<table cellpadding=\"10px\">\n";
     body += "  <thead>\n";
     body += "  <tr>\n";
-    body += "    <td>Amount</td><td>Key Image</td><td>Output Indexes</td>\n";
+    body += "    <td>Amount</td><td>Key image</td><td>Output indexes</td>\n";
     body += "  </tr>\n";
     body += "</thead>\n";
     body += "<tbody>\n";
@@ -1837,7 +1845,7 @@ bool RpcServer::on_get_explorer_tx_by_hash(const COMMAND_EXPLORER_GET_TRANSACTIO
     body += "<table cellpadding=\"10px\">\n";
     body += "  <thead>\n";
     body += "  <tr>\n";
-    body += "    <td>Amount</td><td>Public Key (stealth address)</td><td>Global Index</td>\n";
+    body += "    <td>Amount</td><td>Public key (stealth address)</td><td>Global index</td>\n";
     body += "  </tr>\n";
     body += "</thead>\n";
     body += "<tbody>\n";
