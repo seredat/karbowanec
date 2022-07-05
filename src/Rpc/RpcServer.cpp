@@ -1939,17 +1939,16 @@ bool RpcServer::on_get_explorer_tx_by_hash(const COMMAND_EXPLORER_GET_TRANSACTIO
 
 bool RpcServer::on_get_explorer_txs_by_payment_id(const COMMAND_EXPLORER_GET_TRANSACTIONS_BY_PAYMENT_ID::request& req, COMMAND_EXPLORER_GET_TRANSACTIONS_BY_PAYMENT_ID::response& res) {
   Crypto::Hash paymentId;
-  std::vector<Transaction> transactions;
-
   if (!parse_hash256(req.payment_id, paymentId)) {
     throw JsonRpc::JsonRpcError{
       CORE_RPC_ERROR_CODE_WRONG_PARAM,
       "Failed to parse Payment ID: " + req.payment_id + '.' };
   }
 
-  if (!m_core.getTransactionsByPaymentId(paymentId, transactions)) {
+  std::vector<Crypto::Hash> txHashes = m_core.getTransactionHashesByPaymentId(paymentId);
+
+  if (txHashes.empty())
     return false;
-  }
 
   std::string body = index_start + (m_core.currency().isTestnet() ? "testnet" : "mainnet") + "\n<p>";
 
@@ -1962,8 +1961,8 @@ bool RpcServer::on_get_explorer_txs_by_payment_id(const COMMAND_EXPLORER_GET_TRA
 
   // simple list of tx hashes without details
   body += "<ol>\n";
-  for (const Transaction& tx : transactions) {
-    std::string txHashStr = Common::podToHex(getObjectHash(tx));
+  for (const auto& tx : txHashes) {
+    std::string txHashStr = Common::podToHex(tx);
     body += "  <li>\n";
     body += "    <a class=\"wrap\" href=\"/explorer/tx/" + txHashStr + "\">";
     body += txHashStr;
