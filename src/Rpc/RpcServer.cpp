@@ -55,7 +55,7 @@ const uint32_t MAX_NUMBER_OF_BLOCKS_PER_STATS_REQUEST = 10000;
 const uint64_t BLOCK_LIST_MAX_COUNT = 1000;
 
 const std::string index_start =
-R"(<html><head><meta http-equiv='refresh' content='60'/><style>* { font-family: monospace; word-break: break-all; word-wrap: break-word; } table.counter { counter-reset: row-num -1; } table.counter tbody tr td:first-child:before { counter-increment: row-num; content: counter(row-num) ") "; } table.counter tbody tr td:first-child { text-align: right; min-width: 2em; }</style></head><body><svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" version="1.1" style="vertical-align:middle; padding-right: 10px; shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd" viewBox="0 0 2500000 2500000" xmlns:xlink="http://www.w3.org/1999/xlink" width="64px" height="64px">
+R"(<html><head><meta http-equiv='refresh' content='60'/><style>* { font-family: monospace; } .wrap { word-break: break-all; word-wrap: break-word; } table.counter tbody tr td:first-child { text-align: right; }</style></head><body><svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" version="1.1" style="vertical-align:middle; padding-right: 10px; shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd" viewBox="0 0 2500000 2500000" xmlns:xlink="http://www.w3.org/1999/xlink" width="64px" height="64px">
 <g><circle fill="#0AACFC" cx="1250000" cy="1250000" r="1214062" /><path fill="#FFED00" d="M1251219 1162750c18009,-3203 34019,-10006 48025,-20412 14009,-10407 27215,-28016 39622,-52029l275750 -538290c10803,-18010 24012,-32419 39218,-43625 15210,-10806 33219,-16410 53232,-16410l174893 0 -343384 633144c-15209,26016 -32419,47228 -51628,63635 -19613,16409 -41225,28815 -64838,37221 36822,9604 67638,25213 92854,47225 24812,21610 48425,52025 70437,91247l330578 668363 -192503 0c-38822,0 -70041,-21213 -93653,-63235l-270947 -566303c-14006,-25215 -29216,-43225 -45622,-54034 -16409,-10803 -37222,-17206 -62034,-18809l0 287359 -151281 0 0 -288559 -111263 0 0 703581 -213716 0 0 -1540835 213716 0 0 673166 111263 0 0 -332981 151281 0 0 330581z"/></g></svg>
 )" "karbowanecd" R"( v. )" PROJECT_VERSION_LONG R"( &bull; )";
 
@@ -1497,7 +1497,7 @@ bool RpcServer::on_get_explorer(const COMMAND_EXPLORER::request& req, COMMAND_EX
         body += asctime(timeinfo);
         body.pop_back(); // remove newline after asctime
         body += "</td>\n    <td>";
-        body += "<a href=\"/explorer/tx/" + txHashStr + "\">";
+        body += "<a class=\"wrap\" href=\"/explorer/tx/" + txHashStr + "\">";
         body += txHashStr;
         body += "</a>";
         body += "</td>\n    <td>";
@@ -1551,7 +1551,7 @@ bool RpcServer::on_get_explorer(const COMMAND_EXPLORER::request& req, COMMAND_EX
     body += asctime(timeinfo);
     body.pop_back(); // remove newline after asctime
     body += "</td>\n    <td>";
-    body += "<a href=\"/explorer/block/" + Common::podToHex(blockHash) + "\">";
+    body += "<a class=\"wrap\" href=\"/explorer/block/" + Common::podToHex(blockHash) + "\">";
     body += Common::podToHex(blockHash);
     body += "</a>";
     body += "</td>\n    <td>";
@@ -1624,7 +1624,7 @@ bool RpcServer::on_get_explorer_block_by_hash(const COMMAND_EXPLORER_GET_BLOCK_D
     body += "<a href=\"/explorer/\">Home</a>";
     body += "<hr />";
 
-    body += "<h2>Block " + Common::podToHex(blockHash) + "</h2>\n";
+    body += "<h2>Block <span class=\"wrap\">" + Common::podToHex(blockHash) + "</span></h2>\n";
 
     body += "<ul>\n";
     body += "  <li>\n";
@@ -1668,32 +1668,32 @@ bool RpcServer::on_get_explorer_block_by_hash(const COMMAND_EXPLORER_GET_BLOCK_D
     body += "  </li>\n";
     body += "  <li>\n";
     body += "    Previous block: ";
-    body += "<a href=\"/explorer/block/" + Common::podToHex(blk.previousBlockHash) + "\">";
+    body += "<a class=\"wrap\" href=\"/explorer/block/" + Common::podToHex(blk.previousBlockHash) + "\">";
     body += Common::podToHex(blk.previousBlockHash);
     body += "</a>\n";
     body += "  </li>\n";
     if (blk.majorVersion >= BLOCK_MAJOR_VERSION_5) {
       body += "  <li>\n";
-      body += "    Miner signature: " + Common::podToHex(blk.signature);
+      body += "    Miner signature: <span class=\"wrap\">" + Common::podToHex(blk.signature) + "</span>";
       body += "  </li>\n";
     }
     body += "</ul>";
 
     body += "<h3>Transactions</h3>\n";
 
-    // simple list of tx hashes without details
+    // simple list of tx hashes without details, add coinbase first
     body += "<ol>\n";
     body += "  <li>\n";
     Crypto::Hash coinbaseHash = getObjectHash(blk.baseTransaction);
     std::string txHashStr = Common::podToHex(coinbaseHash);
-    body += "    <a href=\"/explorer/tx/" + txHashStr + "\">";
+    body += "    <a class=\"wrap\" href=\"/explorer/tx/" + txHashStr + "\">";
     body += txHashStr;
     body += "</a>";
     body += "  </li>\n";
 
     for (const auto& t : blk.transactionHashes) {
       body += "  <li>\n";
-      body += "    <a href=\"/explorer/tx/" + Common::podToHex(t) + "\">";
+      body += "    <a class=\"wrap\" href=\"/explorer/tx/" + Common::podToHex(t) + "\">";
       body += Common::podToHex(t);
       body += "    </a>";
       body += "  </li>\n";
@@ -1748,13 +1748,13 @@ bool RpcServer::on_get_explorer_tx_by_hash(const COMMAND_EXPLORER_GET_TRANSACTIO
     body += "<a href=\"/explorer/\">Home</a>";
     body += "<hr />";
 
-    body += "<h2>Transaction " + Common::podToHex(transactionsDetails.hash) + "</h2>\n";
+    body += "<h2>Transaction <span class=\"wrap\">" + Common::podToHex(transactionsDetails.hash) + "</span></h2>\n";
 
     body += "<ul>\n";
     if (transactionsDetails.inBlockchain) {
       body += "  <li>\n";
       body += "    In block: ";
-      body += "<a href=\"/explorer/block/" + Common::podToHex(transactionsDetails.blockHash) + "\">";
+      body += "<a class=\"wrap\" href=\"/explorer/block/" + Common::podToHex(transactionsDetails.blockHash) + "\">";
       body += std::to_string(transactionsDetails.blockHeight) + " (" + Common::podToHex(transactionsDetails.blockHash) + ")";
       body += "    </a>\n";
       body += "  </li>\n";
@@ -1787,11 +1787,11 @@ bool RpcServer::on_get_explorer_tx_by_hash(const COMMAND_EXPLORER_GET_TRANSACTIO
     body += "    Mixin count: " + std::to_string(transactionsDetails.mixin) + "\n";
     body += "  </li>\n";
     body += "  <li>\n";
-    body += "    Public key: " + Common::podToHex(transactionsDetails.extra.publicKey) + "\n";
+    body += "    Public key: <span class=\"wrap\">" + Common::podToHex(transactionsDetails.extra.publicKey) + "</span>\n";
     body += "  </li>\n";
     if (transactionsDetails.hasPaymentId) {
       body += "  <li>\n";
-      body += "    Payment ID: " + Common::podToHex(transactionsDetails.paymentId) + "\n";
+      body += "    Payment ID: <span class=\"wrap\">" + Common::podToHex(transactionsDetails.paymentId) + "</span>\n";
       body += "  </li>\n";
     }
     body += "</ul>\n";
@@ -1805,9 +1805,10 @@ bool RpcServer::on_get_explorer_tx_by_hash(const COMMAND_EXPLORER_GET_TRANSACTIO
     body += "  </tr>\n";
     body += "</thead>\n";
     body += "<tbody>\n";
-    for (const auto& in : transactionsDetails.inputs) {
+    for (size_t i = 0; i < transactionsDetails.inputs.size(); ++i) {
+      const auto& in = transactionsDetails.inputs[i];
       body += "  <tr>\n";
-      body += "    <td></td>"; // empty for row counter
+      body += "    <td>" + std::to_string(i) + ")</td>";
       body += "    <td>";
       if (in.type() == typeid(BaseInputDetails)) {
         BaseInputDetails c = boost::get<BaseInputDetails>(in);
@@ -1817,7 +1818,7 @@ bool RpcServer::on_get_explorer_tx_by_hash(const COMMAND_EXPLORER_GET_TRANSACTIO
       else if (in.type() == typeid(KeyInputDetails)) {
         KeyInputDetails k = boost::get<KeyInputDetails>(in);
         body += m_core.currency().formatAmount(k.input.amount);
-        body += "</td>\n    <td>";
+        body += "</td>\n    <td class=\"wrap\">";
         body += Common::podToHex(k.input.keyImage);
         body += "</td>\n    <td>";
         for (size_t i = 0; i < k.input.outputIndexes.size(); ++i) {
@@ -1837,7 +1838,7 @@ bool RpcServer::on_get_explorer_tx_by_hash(const COMMAND_EXPLORER_GET_TRANSACTIO
         body += "output index: " + std::to_string(m.input.outputIndex) + ", ";
         body += "signature count: " + std::to_string(m.input.signatureCount) + ", ";
         body += "output number: " + std::to_string(m.output.number) + ", ";
-        body += "output tx hash: " + Common::podToHex(m.output.transactionHash);
+        body += "output tx hash: <span class=\"wrap\">" + Common::podToHex(m.output.transactionHash) + "</span>";
         body += "    </td>\n";
       }
       body += "  </tr>\n";
@@ -1854,12 +1855,13 @@ bool RpcServer::on_get_explorer_tx_by_hash(const COMMAND_EXPLORER_GET_TRANSACTIO
     body += "  </tr>\n";
     body += "</thead>\n";
     body += "<tbody>\n";
-    for (const auto& o : transactionsDetails.outputs) {
+    for (size_t i = 0; i < transactionsDetails.outputs.size(); ++i) {
+      const auto& o = transactionsDetails.outputs[i];
       body += "  <tr>\n";
-      body += "    <td></td>"; // empty for row counter
+      body += "    <td>" + std::to_string(i) + ")</td>";
       body += "    <td>";
       body += m_core.currency().formatAmount(o.output.amount);
-      body += "</td>\n    <td>";
+      body += "</td>\n    <td class=\"wrap\">";
       if (o.output.target.type() == typeid(KeyOutput)) {
         KeyOutput ko = boost::get<KeyOutput>(o.output.target);
         body += Common::podToHex(ko);
@@ -1889,7 +1891,7 @@ bool RpcServer::on_get_explorer_tx_by_hash(const COMMAND_EXPLORER_GET_TRANSACTIO
       body += "  <li>\n";
       body += "    <ol>\n";
       for (const auto& s1 : s0) {
-        body += "      <li>\n";
+        body += "      <li class=\"wrap\">\n";
         body += "    " + Common::podToHex(s1) + "\n";
         body += "      </li>\n";
       }
