@@ -1695,6 +1695,7 @@ bool RpcServer::on_get_explorer_block_by_hash(const COMMAND_EXPLORER_GET_BLOCK_D
       body += "  <li>\n";
       body += "    <a href=\"/explorer/tx/" + Common::podToHex(t) + "\">";
       body += Common::podToHex(t);
+      body += "    </a>";
       body += "  </li>\n";
     }
 
