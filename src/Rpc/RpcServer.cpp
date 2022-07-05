@@ -158,9 +158,6 @@ std::unordered_map<std::string, RpcServer::RpcHandler<RpcServer::HandlerFunction
   { "/supply", { httpMethod<COMMAND_HTTP>(&RpcServer::on_get_supply), false } },
   { "/paymentid", { httpMethod<COMMAND_HTTP>(&RpcServer::on_get_payment_id), true } },
 
-  // explorer
-  ////{ "/explorer", { httpMethod<COMMAND_EXPLORER>(&RpcServer::on_get_explorer), true } },
-
   // get json handlers
   { "/getinfo", { jsonMethod<COMMAND_RPC_GET_INFO>(&RpcServer::on_get_info), true } },
   { "/getheight", { jsonMethod<COMMAND_RPC_GET_HEIGHT>(&RpcServer::on_get_height), true } },
@@ -467,7 +464,7 @@ void RpcServer::processRequest(const httplib::Request& request, httplib::Respons
         std::string block_method = "/explorer/block/";
         std::string tx_method = "/explorer/tx/";
         std::string payment_id_method = "/explorer/payment_id/";
-
+        
         if (Common::starts_with(url, block_method)) {
           std::string hash_str = url.substr(block_method.size());
           if (hash_str.size() < 64) {
@@ -640,6 +637,7 @@ bool RpcServer::processJsonRpcRequest(const httplib::Request& request, httplib::
       { "verifymessage", { makeMemberMethod(&RpcServer::on_verify_message), true } },
       { "submitblock", { makeMemberMethod(&RpcServer::on_submitblock), false } },
       { "resolveopenalias", { makeMemberMethod(&RpcServer::on_resolve_open_alias), true } },
+      { "search", { makeMemberMethod(&RpcServer::on_explorer_search), true } },
 
     };
 
@@ -1620,6 +1618,50 @@ bool RpcServer::on_get_explorer(const COMMAND_EXPLORER::request& req, COMMAND_EX
   res = body;
 
   return true;
+}
+
+bool RpcServer::on_explorer_search(const COMMAND_RPC_EXPLORER_SEARCH::request& req, COMMAND_RPC_EXPLORER_SEARCH::response& res) {
+  Crypto::Hash hashStr;
+  if (req.query.size() < 64) {
+    // assume it's height
+    uint32_t height = static_cast<uint32_t>(std::stoul(req.query));
+    Crypto::Hash block_hash = m_core.getBlockIdByHeight(height);
+    if (block_hash != NULL_HASH && m_core.have_block(hashStr)) {
+      res.result = "/explorer/block/" + Common::podToHex(hashStr);
+      res.status = CORE_RPC_STATUS_OK;
+      return true;
+    }
+  }
+
+  if (!parse_hash256(req.query, hashStr)) {
+    throw JsonRpc::JsonRpcError{
+      CORE_RPC_ERROR_CODE_WRONG_PARAM, "Failed to parse query: " + req.query };
+  }
+
+  // check if it's block
+  if (m_core.have_block(hashStr)) {
+    res.result = "/explorer/block/" + Common::podToHex(hashStr);
+    res.status = CORE_RPC_STATUS_OK;
+    return true;
+  }
+
+  // check if it's tx
+  if (m_core.haveTransaction(hashStr)) {
+    res.result = "/explorer/tx/" + Common::podToHex(hashStr);
+    res.status = CORE_RPC_STATUS_OK;
+    return true;
+  }
+
+  // check if it's payment id
+  std::vector<Crypto::Hash> txHashes = m_core.getTransactionHashesByPaymentId(hashStr);
+  if (!txHashes.empty()) {
+    res.result = "/explorer/payment_id/" + Common::podToHex(hashStr);
+    res.status = CORE_RPC_STATUS_OK;
+    return true;
+  }
+
+  res.status = "NOT_FOUND";
+  return false;
 }
 
 bool RpcServer::on_get_explorer_block_by_hash(const COMMAND_EXPLORER_GET_BLOCK_DETAILS_BY_HASH::request& req, COMMAND_EXPLORER_GET_BLOCK_DETAILS_BY_HASH::response& res) {

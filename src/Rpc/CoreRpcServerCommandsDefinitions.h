@@ -356,6 +356,27 @@ struct COMMAND_EXPLORER_GET_TRANSACTIONS_BY_PAYMENT_ID {
 
   typedef std::string response;
 };
+
+struct COMMAND_RPC_EXPLORER_SEARCH {
+  struct request {
+    std::string query;
+
+    void serialize(ISerializer& s) {
+      KV_MEMBER(query);
+    }
+  };
+
+  struct response {
+    std::string result;
+    std::string status;
+
+    void serialize(ISerializer& s) {
+      KV_MEMBER(result);
+      KV_MEMBER(status);
+    }
+  };
+};
+
 //-----------------------------------------------
 struct COMMAND_RPC_GET_INFO {
   typedef EMPTY_STRUCT request;
