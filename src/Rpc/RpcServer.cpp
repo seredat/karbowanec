@@ -55,7 +55,7 @@ const uint32_t MAX_NUMBER_OF_BLOCKS_PER_STATS_REQUEST = 10000;
 const uint64_t BLOCK_LIST_MAX_COUNT = 1000;
 
 const std::string index_start =
-R"(<html><head><meta http-equiv='refresh' content='60'/><style>* { font-family: monospace; } .wrap { word-break: break-all; word-wrap: break-word; } table.counter tbody tr td:first-child { text-align: right; }</style></head><body><svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" version="1.1" style="vertical-align:middle; padding-right: 10px; shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd" viewBox="0 0 2500000 2500000" xmlns:xlink="http://www.w3.org/1999/xlink" width="64px" height="64px">
+R"(<!DOCTYPE html><html><head><meta http-equiv='refresh' content='60'/><style>* { font-family: monospace; } .wrap { word-break: break-all; word-wrap: break-word; } table.counter tbody tr td:first-child { text-align: right; }</style></head><body><svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" version="1.1" style="vertical-align:middle; padding-right: 10px; shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd" viewBox="0 0 2500000 2500000" xmlns:xlink="http://www.w3.org/1999/xlink" width="64px" height="64px">
 <g><circle fill="#0AACFC" cx="1250000" cy="1250000" r="1214062" /><path fill="#FFED00" d="M1251219 1162750c18009,-3203 34019,-10006 48025,-20412 14009,-10407 27215,-28016 39622,-52029l275750 -538290c10803,-18010 24012,-32419 39218,-43625 15210,-10806 33219,-16410 53232,-16410l174893 0 -343384 633144c-15209,26016 -32419,47228 -51628,63635 -19613,16409 -41225,28815 -64838,37221 36822,9604 67638,25213 92854,47225 24812,21610 48425,52025 70437,91247l330578 668363 -192503 0c-38822,0 -70041,-21213 -93653,-63235l-270947 -566303c-14006,-25215 -29216,-43225 -45622,-54034 -16409,-10803 -37222,-17206 -62034,-18809l0 287359 -151281 0 0 -288559 -111263 0 0 703581 -213716 0 0 -1540835 213716 0 0 673166 111263 0 0 -332981 151281 0 0 330581z"/></g></svg>
 )" "karbowanecd" R"( v. )" PROJECT_VERSION_LONG R"( &bull; )";
 
@@ -1492,6 +1492,31 @@ bool RpcServer::on_get_explorer(const COMMAND_EXPLORER::request& req, COMMAND_EX
   uint32_t last_height = req_height - print_blocks_count;
   if (last_height < print_blocks_count)
       last_height = 0;
+
+  // Search
+  body += R"(
+  <form style='padding: 10px;' name='searchform' action='javascript:handleSearch()'>
+    <input type='text' name='search' id='txt_search' size='80' placeholder='Search...'>
+    <input type='submit' value='Search'>
+  </form>
+  <script>
+  function handleSearch() {
+    var search_str = document.getElementById('txt_search').value;
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/json_rpc', true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.send(JSON.stringify({
+      method: 'search',
+      params: {
+        query: search_str
+      }
+    }));
+    xhr.onload = function() {
+      var data = JSON.parse(this.responseText);
+      window.location.href = data.result.result;
+    }
+  }
+  </script>)";
 
   // show mempool only on home page
   if (req_height == top_block_index) {
