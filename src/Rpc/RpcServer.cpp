@@ -1685,8 +1685,9 @@ bool RpcServer::on_explorer_search(const COMMAND_RPC_EXPLORER_SEARCH::request& r
     return true;
   }
 
-  res.status = "NOT_FOUND";
-  return false;
+  res.result = "";
+  res.status = CORE_RPC_STATUS_OK;
+  return true;
 }
 
 bool RpcServer::on_get_explorer_block_by_hash(const COMMAND_EXPLORER_GET_BLOCK_DETAILS_BY_HASH::request& req, COMMAND_EXPLORER_GET_BLOCK_DETAILS_BY_HASH::response& res) {
