@@ -1537,7 +1537,7 @@ bool RpcServer::on_get_explorer(const COMMAND_EXPLORER::request& req, COMMAND_EX
       for (const CryptoNote::tx_memory_pool::TransactionDetails& txd : pool) {
         time_t rawtime = (const time_t)txd.receiveTime;
         struct tm* timeinfo;
-        timeinfo = localtime(&rawtime);
+        timeinfo = gmtime(&rawtime);
         std::string txHashStr = Common::podToHex(txd.id);
 
         body += "  <tr>\n";
@@ -1582,7 +1582,7 @@ bool RpcServer::on_get_explorer(const COMMAND_EXPLORER::request& req, COMMAND_EX
 
     time_t rawtime = (const time_t)blk.timestamp;
     struct tm* timeinfo;
-    timeinfo = localtime(&rawtime);
+    timeinfo = gmtime(&rawtime);
 
     difficulty_type blockDifficulty;
     m_core.getBlockDifficulty(static_cast<uint32_t>(i), blockDifficulty);
@@ -1721,7 +1721,7 @@ bool RpcServer::on_get_explorer_block_by_hash(const COMMAND_EXPLORER_GET_BLOCK_D
     body += "  <li>\n";
     time_t rawtime = (const time_t)blk.timestamp;
     struct tm* timeinfo;
-    timeinfo = localtime(&rawtime);
+    timeinfo = gmtime(&rawtime);
     body += "    Time: " + std::to_string(blk.timestamp) + " &bull; ";
     body += asctime(timeinfo);
     body += "  </li>\n";
@@ -1849,7 +1849,7 @@ bool RpcServer::on_get_explorer_tx_by_hash(const COMMAND_EXPLORER_GET_TRANSACTIO
       body += "  <li>\n";
       time_t rawtime = (const time_t)transactionsDetails.timestamp;
       struct tm* timeinfo;
-      timeinfo = localtime(&rawtime);
+      timeinfo = gmtime(&rawtime);
       body += "    First confirmation time: ";
       body += asctime(timeinfo);
       body += "  </li>\n";
