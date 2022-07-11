@@ -24,6 +24,8 @@
 
 #include "CoreRpcServerCommandsDefinitions.h"
 #include "Common/JsonValue.h"
+#include "Common/base64.hpp"
+#include "Common/StringTools.h"
 #include "HTTP/httplib.h"
 #include "Serialization/ISerializer.h"
 #include "Serialization/SerializationTools.h"
@@ -200,6 +202,29 @@ void invokeJsonRpcCommand(httplib::Client& httpClient, const std::string& method
   invokeJsonRpcCommand(httpClient, jsReq, jsRes, user, password);
 
   jsRes.getResult(res);
+}
+
+template <typename Request, typename Response>
+void invokeJsonCommand(httplib::Client& client, const std::string& url, const Request& req, Response& res, const std::string& user = "", const std::string& password = "") {
+  httplib::Request hreq;
+  httplib::Response hres;
+
+  hreq.set_header("Connection", "keep-alive");
+  hreq.set_header("Content-Type", "application/json");
+  if (!user.empty() || !password.empty()) {
+    hreq.set_header("Authorization", "Basic " + base64::encode(Common::asBinaryArray(user + ":" + password)));
+  }
+
+  //hreq.body = storeToJson(req); not passed to client anyways, it's get method
+
+  auto rsp = client.Get(url.c_str(), hreq.headers);
+  if (!rsp && rsp->status != 200) {
+    throw std::runtime_error("HTTP status: " + std::to_string(rsp->status));
+  }
+
+  if (!loadFromJson(res, rsp->body)) {
+    throw std::runtime_error("Failed to parse JSON response");
+  }
 }
 
 template <typename Request, typename Response, typename Handler>
