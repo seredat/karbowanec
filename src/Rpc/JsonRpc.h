@@ -211,8 +211,9 @@ void invokeJsonCommand(httplib::Client& client, const std::string& url, const Re
 
   hreq.set_header("Connection", "keep-alive");
   hreq.set_header("Content-Type", "application/json");
+
   if (!user.empty() || !password.empty()) {
-    hreq.set_header("Authorization", "Basic " + base64::encode(Common::asBinaryArray(user + ":" + password)));
+    client.set_basic_auth(user.c_str(), password.c_str());
   }
 
   //hreq.body = storeToJson(req); not passed to client anyways, it's get method
