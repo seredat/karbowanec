@@ -111,6 +111,7 @@ public:
   const std::string m_nodeHost;
   const unsigned short m_nodePort;
   const bool m_daemon_ssl;
+  std::string m_node_url;
 
   virtual void setRootCert(const std::string &path) override;
   virtual void disableVerify() override;
@@ -172,9 +173,6 @@ private:
   Tools::ObserverManager<CryptoNote::INodeRpcProxyObserver> m_rpcProxyObserverManager;
 
   unsigned int m_rpcTimeout;
-  
-  std::shared_ptr<httplib::Client> m_httpClient = nullptr;
-  std::shared_ptr<httplib::SSLClient> m_httpsClient = nullptr;
 
   httplib::Headers m_requestHeaders;
   System::Event* m_httpEvent = nullptr;
