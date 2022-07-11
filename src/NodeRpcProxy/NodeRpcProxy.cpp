@@ -1018,7 +1018,7 @@ std::error_code NodeRpcProxy::jsonCommand(const std::string& comm, const Request
     httpClient.enable_server_certificate_verification(false);
     httpClient.set_connection_timeout(1000);
 
-    const auto rsp = httpClient.Get(rpc_url.c_str());
+    const auto rsp = httpClient.Post(rpc_url.c_str(), m_requestHeaders, storeToJson(req), "application/json");
     if (rsp) {
       if (rsp->status == 200) {
         if (!loadFromJson(res, rsp->body)) {
