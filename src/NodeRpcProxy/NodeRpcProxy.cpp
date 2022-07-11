@@ -909,7 +909,7 @@ std::error_code NodeRpcProxy::doGetTransaction(const Crypto::Hash& transactionHa
     return ec;
   }
 
-  if (resp.missed_txs.size() > 0) {
+  if (resp.missed_txs.size() > 0 || resp.txs_as_hex.size() == 0) {
     return make_error_code(CryptoNote::error::REQUEST_ERROR);
   }
 
