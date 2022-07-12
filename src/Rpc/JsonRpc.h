@@ -209,18 +209,15 @@ void invokeJsonCommand(httplib::Client& client, const std::string& url, const Re
   httplib::Request hreq;
   httplib::Response hres;
 
-  hreq.set_header("Connection", "keep-alive");
-  hreq.set_header("Content-Type", "application/json");
 
   if (!user.empty() || !password.empty()) {
     client.set_basic_auth(user.c_str(), password.c_str());
   }
 
-  //hreq.body = storeToJson(req); not passed to client anyways, it's get method
+  auto rsp = client.Post(url.c_str(), storeToJson(req), "application/json");
 
-  auto rsp = client.Get(url.c_str(), hreq.headers);
-  if (!rsp && rsp->status != 200) {
-    throw std::runtime_error("HTTP status: " + std::to_string(rsp->status));
+  if (!rsp || rsp->status != 200) {
+    throw std::runtime_error("JSON-RPC call failed");
   }
 
   if (!loadFromJson(res, rsp->body)) {
