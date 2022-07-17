@@ -271,8 +271,10 @@ bool BlockchainExplorerDataBuilder::fillTransactionDetails(const Transaction& tr
   Crypto::Hash paymentId;
   if (getPaymentId(transaction, paymentId)) {
     transactionDetails.paymentId = paymentId;
+    transactionDetails.hasPaymentId = true;
   } else {
     transactionDetails.paymentId = boost::value_initialized<Crypto::Hash>();
+    transactionDetails.hasPaymentId = false;
   }
   fillTxExtra(transaction.extra, transactionDetails.extra);
   transactionDetails.signatures.reserve(transaction.signatures.size());
