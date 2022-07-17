@@ -167,7 +167,7 @@ private:
   Crypto::SecretKey m_view_key;
   CryptoNote::AccountPublicAddress m_fee_acc;
 
-  std::vector<std::unique_ptr<System::RemoteContext<void>>> m_workers;
+  std::list<std::thread> m_workers;
 
   RpcThreadPool* m_http_queue;
   RpcThreadPool* m_https_queue;
