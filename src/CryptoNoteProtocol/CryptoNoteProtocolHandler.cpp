@@ -1091,7 +1091,7 @@ void CryptoNoteProtocolHandler::relay_transactions(NOTIFY_NEW_TRANSACTIONS::requ
       auto transactionBinary = asBinaryArray(*tx_blob_it);
       Crypto::Hash transactionHash = Crypto::cn_fast_hash(transactionBinary.data(), transactionBinary.size());
       if (!m_stemPool.hasTransaction(transactionHash)) {
-        logger(Logging::DEBUGGING) << "Adding relayed transaction " << transactionHash << " to stempool";      
+        logger(Logging::DEBUGGING) << "Adding relayed transaction " << transactionHash << " to stempool";
         auto txblob = *tx_blob_it;
         m_dispatcher.remoteSpawn([this, transactionHash, txblob] {
           m_stemPool.addTransaction(transactionHash, txblob);

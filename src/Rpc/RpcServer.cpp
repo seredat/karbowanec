@@ -272,6 +272,7 @@ void RpcServer::start() {
   if (m_config.isEnabledSSL()) {
     uint16_t ssl_port = m_config.getBindPortSSL(); // make sure to use separate port for SSL server
     logger(Logging::DEBUGGING, Logging::BRIGHT_MAGENTA) << "bind https to port " << ssl_port << ENDL;
+
     m_workers.emplace_back(std::unique_ptr<System::RemoteContext<void>>(
       new System::RemoteContext<void>(m_dispatcher, std::bind(&RpcServer::listen_ssl, this, address, ssl_port)))
     );
@@ -279,6 +280,7 @@ void RpcServer::start() {
 
   uint16_t port = m_config.getBindPort();
   logger(Logging::DEBUGGING, Logging::BRIGHT_MAGENTA) << "bind http to port " << port << ENDL;
+
   m_workers.emplace_back(std::unique_ptr<System::RemoteContext<void>>(
     new System::RemoteContext<void>(m_dispatcher, std::bind(&RpcServer::listen, this, address, port)))
   );
@@ -1572,10 +1574,17 @@ bool RpcServer::on_send_raw_transaction(const COMMAND_RPC_SEND_RAW_TRANSACTION::
     }
   }
 
-  NOTIFY_NEW_TRANSACTIONS::request r;
-  r.stem = true;
-  r.txs.push_back(Common::asString(tx_blob));
-  m_core.get_protocol()->relay_transactions(r);
+  try {
+    NOTIFY_NEW_TRANSACTIONS::request r;
+    r.stem = true;
+    r.txs.push_back(Common::asString(tx_blob));
+    m_core.get_protocol()->relay_transactions(r);
+  }
+  catch (std::exception& e) {
+    throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_INTERNAL_ERROR, "Error: " + std::string(e.what()) };
+    return false;
+  }
+
   res.status = CORE_RPC_STATUS_OK;
   return true;
 }
