@@ -3,6 +3,7 @@
 // Copyright (c) 2014-2018, The Forknote developers
 // Copyright (c) 2017-2019, The Iridium developers
 // Copyright (c) 2018-2019, The TurtleCoin developers
+// Copyright (c) 2020-2022, The Talleo developers
 // Copyright (c) 2016-2022, The Karbo developers
 //
 // This file is part of Karbo.
@@ -79,7 +80,7 @@ size_t get_random_index_with_fixed_probability(size_t max_index) {
 }
 
 
-void addPortMapping(Logging::LoggerRef& logger, uint32_t port) {
+void addPortMapping(Logging::LoggerRef& logger, uint32_t port, uint32_t externalPort) {
   // Add UPnP port mapping
   logger(INFO) << "Attempting to add IGD port mapping.";
   int result;
@@ -91,9 +92,11 @@ void addPortMapping(Logging::LoggerRef& logger, uint32_t port) {
   freeUPNPDevlist(deviceList);
   if (result != 0) {
     if (result == 1) {
+      std::ostringstream extPortString;
+      extPortString << (externalPort ? externalPort : port);
       std::ostringstream portString;
       portString << port;
-      if (UPNP_AddPortMapping(urls.controlURL, igdData.first.servicetype, portString.str().c_str(),
+      if (UPNP_AddPortMapping(urls.controlURL, igdData.first.servicetype, extPortString.str().c_str(),
         portString.str().c_str(), lanAddress, CryptoNote::CRYPTONOTE_NAME, "TCP", 0, "0") != 0) {
         logger(ERROR) << "UPNP_AddPortMapping failed.";
       } else {
@@ -581,7 +584,7 @@ namespace CryptoNote
     if(m_external_port)
       logger(INFO) << "External port defined as " << m_external_port;
 
-    addPortMapping(logger, m_listeningPort);
+    addPortMapping(logger, m_listeningPort, m_external_port);
 
     return true;
   }
