@@ -102,8 +102,13 @@ namespace CryptoNote {
   void RpcServerConfig::init(const boost::program_options::variables_map& vm)  {
     bindIp = command_line::get_arg(vm, arg_rpc_bind_ip);
     bindPort = command_line::get_arg(vm, arg_rpc_bind_port);
-    enableCors = command_line::get_arg(vm, arg_enable_cors);
-    restrictedRPC = command_line::get_arg(vm, arg_restricted_rpc);
+
+    if (command_line::has_arg(vm, arg_enable_cors)) {
+      enableCors = command_line::get_arg(vm, arg_enable_cors);
+    }
+    if (command_line::has_arg(vm, arg_restricted_rpc)) {
+      restrictedRPC = command_line::get_arg(vm, arg_restricted_rpc);
+    }
     
     if (command_line::has_arg(vm, arg_set_contact)) {
       contactInfo = command_line::get_arg(vm, arg_set_contact);
@@ -139,13 +144,25 @@ namespace CryptoNote {
       }
     }
 
-    nodeFeeViewKey = command_line::get_arg(vm, arg_set_view_key);
+    if (command_line::has_arg(vm, arg_set_view_key)) {
+      nodeFeeViewKey = command_line::get_arg(vm, arg_set_view_key);
+    }
 
-    enableSSL = command_line::get_arg(vm, arg_rpc_bind_ssl_enable);
-    bindPortSSL = command_line::get_arg(vm, arg_rpc_bind_ssl_port);
-    chainFile = command_line::get_arg(vm, arg_chain_file);
+    if (command_line::has_arg(vm, arg_rpc_bind_ssl_enable)) {
+      enableSSL = command_line::get_arg(vm, arg_rpc_bind_ssl_enable);
+    }
+    if (command_line::has_arg(vm, arg_rpc_bind_ssl_port)) {
+      bindPortSSL = command_line::get_arg(vm, arg_rpc_bind_ssl_port);
+    }
+    if (command_line::has_arg(vm, arg_chain_file)) {
+      chainFile = command_line::get_arg(vm, arg_chain_file);
+    }
+    if (command_line::has_arg(vm, arg_key_file)) {
     keyFile = command_line::get_arg(vm, arg_key_file);
-    dhFile = command_line::get_arg(vm, arg_dh_file);
+    }
+    if (command_line::has_arg(vm, arg_dh_file)) {
+      dhFile = command_line::get_arg(vm, arg_dh_file);
+    }
 
     boost::filesystem::path chain_file_path(chainFile);
     boost::filesystem::path key_file_path(keyFile);
