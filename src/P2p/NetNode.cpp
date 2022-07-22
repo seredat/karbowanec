@@ -38,15 +38,6 @@
 #include <miniupnpc/upnpcommands.h>
 #include <miniupnpc/upnpdev.h>
 
-#include <System/Context.h>
-#include <System/ContextGroupTimeout.h>
-#include <System/EventLock.h>
-#include <System/InterruptedException.h>
-#include <System/Ipv4Address.h>
-#include <System/Ipv4Resolver.h>
-#include <System/TcpListener.h>
-#include <System/TcpConnector.h>
- 
 #include "version.h"
 #include "Common/StdInputStream.h"
 #include "Common/StdOutputStream.h"

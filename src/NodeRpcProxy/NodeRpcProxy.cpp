@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
-// Copyright (c) 2016-2020, The Karbo developers
+// Copyright (c) 2016-2022, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -19,9 +19,7 @@
 #include "NodeRpcProxy.h"
 #include "NodeErrors.h"
 
-#include <atomic>
 #include <system_error>
-#include <thread>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/lexical_cast.hpp>
@@ -34,14 +32,14 @@
 #include <System/EventLock.h>
 #include <System/Timer.h>
 #include <CryptoNoteCore/TransactionApi.h>
-#include "Common/FormatTools.h"
-#include "Common/StringTools.h"
-#include "CryptoNoteCore/CryptoNoteBasicImpl.h"
-#include "CryptoNoteCore/CryptoNoteFormatUtils.h"
-#include "CryptoNoteCore/CryptoNoteTools.h"
-#include "Rpc/CoreRpcServerCommandsDefinitions.h"
-#include "Rpc/HttpClient.h"
-#include "Rpc/JsonRpc.h"
+#include <Common/FormatTools.h>
+#include <Common/StringTools.h>
+#include <CryptoNoteCore/CryptoNoteBasicImpl.h>
+#include <CryptoNoteCore/CryptoNoteFormatUtils.h>
+#include <CryptoNoteCore/CryptoNoteTools.h>
+#include <Rpc/CoreRpcServerCommandsDefinitions.h>
+#include <Rpc/JsonRpc.h>
+#include <Serialization/SerializationTools.h>
 
 #ifndef AUTO_VAL_INIT
 #define AUTO_VAL_INIT(n) boost::value_initialized<decltype(n)>()
@@ -56,9 +54,9 @@ namespace CryptoNote {
 namespace {
 
 std::error_code interpretResponseStatus(const std::string& status) {
-  if (CORE_RPC_STATUS_BUSY == status) {
+  if (500 == std::stoi(status)) {
     return make_error_code(error::NODE_BUSY);
-  } else if (CORE_RPC_STATUS_OK != status) {
+  } else if (200 != std::stoi(status)) {
     return make_error_code(error::INTERNAL_NODE_ERROR);
   }
   return std::error_code();
@@ -91,8 +89,12 @@ NodeRpcProxy::NodeRpcProxy(const std::string& nodeHost, unsigned short nodePort,
     m_incConnectionsCount(0),
     m_rpcConnectionsCount(0),
     m_whitePeerlistSize(0),
-    m_greyPeerlistSize(0)
+    m_greyPeerlistSize(0),
+    m_node_url((m_daemon_ssl ? "https://" : "http://") + m_nodeHost + ":" + std::to_string(m_nodePort))
 {
+  std::stringstream userAgent;
+  userAgent << "NodeRpcProxy";
+  m_requestHeaders = { {"User-Agent", userAgent.str()}, { "Connection", "keep-alive" } };
   resetInternalState();
 }
 
@@ -179,10 +181,7 @@ void NodeRpcProxy::workerThread(const INode::Callback& initialized_callback) {
     m_dispatcher = &dispatcher;
     ContextGroup contextGroup(dispatcher);
     m_context_group = &contextGroup;
-    HttpClient httpClient(dispatcher, m_nodeHost, m_nodePort, m_daemon_ssl);
-    m_httpClient = &httpClient;
-    if (!m_daemon_cert.empty()) m_httpClient->setRootCert(m_daemon_cert);
-    if (m_daemon_no_verify) m_httpClient->disableVerify();
+
     Event httpEvent(dispatcher);
     m_httpEvent = &httpEvent;
     m_httpEvent->set();
@@ -214,7 +213,6 @@ void NodeRpcProxy::workerThread(const INode::Callback& initialized_callback) {
 
   m_dispatcher = nullptr;
   m_context_group = nullptr;
-  m_httpClient = nullptr;
   m_httpEvent = nullptr;
   m_connected = false;
   m_rpcProxyObserverManager.notify(&INodeRpcProxyObserver::connectionStatusUpdated, m_connected);
@@ -331,8 +329,13 @@ void NodeRpcProxy::updateBlockchainStatus() {
     }
   }
 
-  if (m_initial || m_connected != m_httpClient->isConnected()) {
-    m_connected = m_httpClient->isConnected();
+  if (!ec && !m_connected) {
+    m_connected = true;
+    m_rpcProxyObserverManager.notify(&INodeRpcProxyObserver::connectionStatusUpdated, m_connected);
+  }
+  
+  if ((!(!ec) && m_connected) || (m_initial && !(!ec) && !m_connected)) {
+    m_connected = false;
     m_rpcProxyObserverManager.notify(&INodeRpcProxyObserver::connectionStatusUpdated, m_connected);
   }
 
@@ -906,7 +909,7 @@ std::error_code NodeRpcProxy::doGetTransaction(const Crypto::Hash& transactionHa
     return ec;
   }
 
-  if (resp.missed_txs.size() > 0) {
+  if (resp.missed_txs.size() > 0 || resp.txs_as_hex.size() == 0) {
     return make_error_code(CryptoNote::error::REQUEST_ERROR);
   }
 
@@ -963,32 +966,40 @@ void NodeRpcProxy::scheduleRequest(std::function<std::error_code()>&& procedure,
   assert(m_dispatcher != nullptr && m_context_group != nullptr);
   m_dispatcher->remoteSpawn(Wrapper([this](std::function<std::error_code()>& procedure, Callback& callback) {
     m_context_group->spawn(Wrapper([this](std::function<std::error_code()>& procedure, const Callback& callback) {
-        if (m_stop) {
-          callback(std::make_error_code(std::errc::operation_canceled));
-        } else {
-          std::error_code ec = procedure();
-          if (m_connected != m_httpClient->isConnected()) {
-            m_connected = m_httpClient->isConnected();
-            m_rpcProxyObserverManager.notify(&INodeRpcProxyObserver::connectionStatusUpdated, m_connected);
-          }
-          callback(m_stop ? std::make_error_code(std::errc::operation_canceled) : ec);
-        }
-      }, std::move(procedure), std::move(callback)));
-    }, std::move(procedure), callback));
+      if (m_stop) {
+        callback(std::make_error_code(std::errc::operation_canceled));
+      } else {
+        std::error_code ec = procedure();
+
+        callback(m_stop ? std::make_error_code(std::errc::operation_canceled) : ec);
+      }
+    }, std::move(procedure), std::move(callback)));
+  }, std::move(procedure), callback));
 }
 
 template <typename Request, typename Response>
 std::error_code NodeRpcProxy::binaryCommand(const std::string& comm, const Request& req, Response& res) {
   std::error_code ec;
-
   std::string rpc_url = this->m_daemon_path + comm;
-
   try {
     EventLock eventLock(*m_httpEvent);
-    invokeBinaryCommand(*m_httpClient, rpc_url, req, res);
-    ec = interpretResponseStatus(res.status);
-  } catch (const ConnectException&) {
-    ec = make_error_code(error::CONNECT_ERROR);
+
+    httplib::Client httpClient(m_node_url);
+    httpClient.enable_server_certificate_verification(false);
+    httpClient.set_connection_timeout(1000);
+
+    const auto rsp = httpClient.Post(rpc_url.c_str(), m_requestHeaders, storeToBinaryKeyValue(req), "application/octet-stream");
+    if (rsp) {
+      if (rsp->status == 200) {
+        if (!loadFromBinaryKeyValue(res, rsp->body)) {
+          throw std::runtime_error("Failed to parse binary response");
+        }
+      }
+      ec = interpretResponseStatus(std::to_string(rsp->status));
+    }
+    else {
+      ec = make_error_code(error::CONNECT_ERROR);
+    }
   } catch (const std::exception&) {
     ec = make_error_code(error::NETWORK_ERROR);
   }
@@ -999,15 +1010,26 @@ std::error_code NodeRpcProxy::binaryCommand(const std::string& comm, const Reque
 template <typename Request, typename Response>
 std::error_code NodeRpcProxy::jsonCommand(const std::string& comm, const Request& req, Response& res) {
   std::error_code ec;
-
   std::string rpc_url = this->m_daemon_path + comm;
-
   try {
     EventLock eventLock(*m_httpEvent);
-    invokeJsonCommand(*m_httpClient, rpc_url, req, res);
-    ec = interpretResponseStatus(res.status);
-  } catch (const ConnectException&) {
-    ec = make_error_code(error::CONNECT_ERROR);
+
+    httplib::Client httpClient(m_node_url);
+    httpClient.enable_server_certificate_verification(false);
+    httpClient.set_connection_timeout(1000);
+
+    const auto rsp = httpClient.Post(rpc_url.c_str(), m_requestHeaders, storeToJson(req), "application/json");
+    if (rsp) {
+      if (rsp->status == 200) {
+        if (!loadFromJson(res, rsp->body)) {
+          throw std::runtime_error("Failed to parse JSON response");
+        }
+      }
+      ec = interpretResponseStatus(std::to_string(rsp->status));
+    }
+    else {
+      ec = make_error_code(error::CONNECT_ERROR);
+    }
   } catch (const std::exception&) {
     ec = make_error_code(error::NETWORK_ERROR);
   }
@@ -1018,36 +1040,37 @@ std::error_code NodeRpcProxy::jsonCommand(const std::string& comm, const Request
 template <typename Request, typename Response>
 std::error_code NodeRpcProxy::jsonRpcCommand(const std::string& method, const Request& req, Response& res) {
   std::error_code ec = make_error_code(error::INTERNAL_NODE_ERROR);
-
+  std::string rpc_url = this->m_daemon_path + "json_rpc";
   try {
     EventLock eventLock(*m_httpEvent);
-
     JsonRpc::JsonRpcRequest jsReq;
-
     jsReq.setMethod(method);
     jsReq.setParams(req);
-
-    HttpRequest httpReq;
-    HttpResponse httpRes;
-
-    std::string rpc_url = this->m_daemon_path + "json_rpc";
-
-    httpReq.addHeader("Content-Type", "application/json");
-    httpReq.setUrl(rpc_url);
-    httpReq.setBody(jsReq.getBody());
-
-    m_httpClient->request(httpReq, httpRes);
-
     JsonRpc::JsonRpcResponse jsRes;
 
-    if (httpRes.getStatus() == HttpResponse::STATUS_200) {
-      jsRes.parse(httpRes.getBody());
-      if (jsRes.getResult(res)) {
-        ec = interpretResponseStatus(res.status);
+    httplib::Client httpClient(m_node_url);
+    httpClient.enable_server_certificate_verification(false);
+    httpClient.set_connection_timeout(1000);
+
+    const auto rsp = httpClient.Post(rpc_url.c_str(), m_requestHeaders, jsReq.getBody(), "application/json");
+    if (rsp) {
+      if (rsp->status == 200) {
+        jsRes.parse(rsp->body);
+
+        JsonRpc::JsonRpcError err;
+        if (jsRes.getError(err)) {
+          throw err;
+        }
+
+        if (!jsRes.getResult(res)) {
+          throw std::runtime_error("Failed to parse JSON response");
+        }
       }
+      ec = interpretResponseStatus(std::to_string(rsp->status));
     }
-  } catch (const ConnectException&) {
-    ec = make_error_code(error::CONNECT_ERROR);
+    else {
+      ec = make_error_code(error::CONNECT_ERROR);
+    }
   } catch (const std::exception&) {
     ec = make_error_code(error::NETWORK_ERROR);
   }

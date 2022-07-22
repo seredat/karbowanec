@@ -129,7 +129,7 @@ bool DaemonCommandsHandler::status(const std::vector<std::string>& args) {
   uint32_t last_known_block_index = std::max(static_cast<uint32_t>(1), protocolQuery.getObservedHeight()) - 1;
   Crypto::Hash last_block_hash = m_core.getBlockIdByHeight(height);
   size_t total_conn = m_srv.get_connections_count();
-  size_t rpc_conn = m_prpc_server->get_connections_count();
+  size_t rpc_conn = 0; //m_prpc_server->get_connections_count();
   size_t outgoing_connections_count = m_srv.get_outgoing_connections_count();
   size_t incoming_connections_count = total_conn - outgoing_connections_count;
   size_t white_peerlist_size = m_srv.getPeerlistManager().get_white_peers_count();

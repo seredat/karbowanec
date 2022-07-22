@@ -302,11 +302,79 @@ struct COMMAND_RPC_START_MINING {
     }
   };
 };
-
+//-----------------------------------------------
 struct COMMAND_HTTP {
   typedef EMPTY_STRUCT request;
 
   typedef std::string response;
+};
+//-----------------------------------------------
+struct COMMAND_EXPLORER {
+  struct request {
+    uint32_t height = 0;
+
+    void serialize(ISerializer& s) {
+      KV_MEMBER(height)
+    }
+  };
+
+  typedef std::string response;
+};
+
+struct COMMAND_EXPLORER_GET_BLOCK_DETAILS_BY_HASH {
+  struct request {
+    std::string hash;
+
+    void serialize(ISerializer& s) {
+      KV_MEMBER(hash)
+    }
+  };
+
+  typedef std::string response;
+};
+
+struct COMMAND_EXPLORER_GET_TRANSACTION_DETAILS_BY_HASH {
+  struct request {
+    std::string hash;
+
+    void serialize(ISerializer& s) {
+      KV_MEMBER(hash);
+    }
+  };
+
+  typedef std::string response;
+};
+
+struct COMMAND_EXPLORER_GET_TRANSACTIONS_BY_PAYMENT_ID {
+  struct request {
+    std::string payment_id;
+
+    void serialize(ISerializer &s) {
+      KV_MEMBER(payment_id)
+    }
+  };
+
+  typedef std::string response;
+};
+
+struct COMMAND_RPC_EXPLORER_SEARCH {
+  struct request {
+    std::string query;
+
+    void serialize(ISerializer& s) {
+      KV_MEMBER(query);
+    }
+  };
+
+  struct response {
+    std::string result;
+    std::string status;
+
+    void serialize(ISerializer& s) {
+      KV_MEMBER(result);
+      KV_MEMBER(status);
+    }
+  };
 };
 
 //-----------------------------------------------

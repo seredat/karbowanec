@@ -63,7 +63,7 @@
 #include "Common/CommandLine.h"
 #include "Common/SignalHandler.h"
 #include "Common/StringTools.h"
-#include <Common/Base58.h>
+#include "Common/Base58.h"
 #include "Common/PathTools.h"
 #include "Common/DnsTools.h"
 #include "Common/UrlTools.h"
@@ -74,23 +74,20 @@
 #include "CryptoNoteProtocol/CryptoNoteProtocolHandler.h"
 #include "NodeRpcProxy/NodeRpcProxy.h"
 #include "Rpc/CoreRpcServerCommandsDefinitions.h"
-#include "Rpc/HttpClient.h"
-
+#include "Rpc/JsonRpc.h"
+#include "Logging/LoggerManager.h"
+#include "Mnemonics/electrum-words.h"
 #include "Wallet/WalletRpcServer.h"
 #include "WalletLegacy/WalletLegacy.h"
 #include "Wallet/LegacyKeysImporter.h"
 #include "WalletLegacy/WalletHelper.h"
+#include "ITransfersContainer.h"
 
 #include "version.h"
-#include "Mnemonics/electrum-words.h"
-
-#include <Logging/LoggerManager.h>
 
 #if defined(WIN32)
 #include <Windows.h>
 #endif
-
-#include "ITransfersContainer.h"
 
 using namespace CryptoNote;
 using namespace Logging;
@@ -108,6 +105,7 @@ const command_line::arg_descriptor<std::string> arg_wallet_file = { "wallet-file
 const command_line::arg_descriptor<std::string> arg_generate_new_wallet = { "generate-new-wallet", "Generate new wallet and save it to <arg>", "" };
 const command_line::arg_descriptor<std::string> arg_daemon_address = { "daemon-address", "Use daemon instance at <host>:<port>", "" };
 const command_line::arg_descriptor<std::string> arg_daemon_host = { "daemon-host", "Use daemon instance at host <arg> instead of localhost", "" };
+const command_line::arg_descriptor<uint16_t> arg_daemon_port = { "daemon-port", "Use daemon instance at port <arg> instead of default", 0 };
 const command_line::arg_descriptor<std::string> arg_daemon_cert = { "daemon-cert", "Custom cert file for performing verification", "" };
 const command_line::arg_descriptor<bool> arg_daemon_no_verify = { "daemon-no-verify", "Disable verification procedure", false };
 const command_line::arg_descriptor<std::string> arg_password = { "password", "Wallet password", "", true };
@@ -119,7 +117,6 @@ const command_line::arg_descriptor<std::string> arg_view_secret_key = { "view-ke
 const command_line::arg_descriptor<std::string> arg_spend_secret_key = { "spend-key", "Specify spend secret key for wallet recovery", "" };
 const command_line::arg_descriptor<bool> arg_restore_wallet = { "restore", "Recover wallet using electrum-style mnemonic or raw keys", false };
 const command_line::arg_descriptor<bool> arg_non_deterministic = { "non-deterministic", "Creates non-deterministic (independent) view and spend keys", false };
-const command_line::arg_descriptor<uint16_t> arg_daemon_port = { "daemon-port", "Use daemon instance at port <arg> instead of default", 0 };
 const command_line::arg_descriptor<std::string> arg_log_file = {"log-file", "Set the log file location", ""};
 const command_line::arg_descriptor<uint32_t> arg_log_level = { "log-level", "Set the log verbosity level", INFO, true };
 const command_line::arg_descriptor<bool> arg_testnet = { "testnet", "Used to deploy test nets. The daemon must be launched with --testnet flag", false };
@@ -200,17 +197,15 @@ void seedLoader(const char *seed_file, std::string& seed) {
   }
 }
 
-inline std::string interpret_rpc_response(bool ok, const std::string& status) {
+inline std::string interpret_rpc_response(const std::string& status) {
   std::string err;
-  if (ok) {
-    if (status == CORE_RPC_STATUS_BUSY) {
-      err = "daemon is busy. Please try later";
-    } else if (status != CORE_RPC_STATUS_OK) {
-      err = status;
-    }
-  } else {
-    err = "possible lost connection to daemon";
+  if (status == CORE_RPC_STATUS_BUSY) {
+    err = "daemon is busy. Please try later";
   }
+  else if (status != CORE_RPC_STATUS_OK) {
+    err = status;
+  }
+
   return err;
 }
 
@@ -691,6 +686,11 @@ simple_wallet::simple_wallet(System::Dispatcher& dispatcher, const CryptoNote::C
   m_consoleHandler.setHandler("verify_message", std::bind(&simple_wallet::verify_message, this, std::placeholders::_1), "Verify a signature of the message");
   m_consoleHandler.setHandler("help", std::bind(&simple_wallet::help, this, std::placeholders::_1), "Show this help");
   m_consoleHandler.setHandler("exit", std::bind(&simple_wallet::exit, this, std::placeholders::_1), "Close wallet");
+
+  std::stringstream userAgent;
+  userAgent << "NodeRpcProxy/" << PROJECT_VERSION_LONG;
+  m_requestHeaders = { {"User-Agent", userAgent.str()}, { "Connection", "keep-alive" } };
+
 }
 //----------------------------------------------------------------------------------------------------
 
@@ -1808,27 +1808,35 @@ bool simple_wallet::start_mining(const std::vector<std::string>& args) {
   COMMAND_RPC_START_MINING::response res;
 
   std::string rpc_url = this->m_daemon_path + "start_mining";
+  std::string err;
 
   try {
-    HttpClient httpClient(m_dispatcher, m_daemon_host, m_daemon_port, m_daemon_ssl);
+    httplib::Client cli(m_daemon_address);
+    if (m_daemon_ssl && m_daemon_no_verify) {
+      cli.enable_server_certificate_verification(!m_daemon_no_verify);
+    }
+    const auto rsp = cli.Post(rpc_url.c_str(), m_requestHeaders, storeToJson(req), "application/json");
+    if (rsp) {
+      if (rsp->status == 200) {
+        if (!loadFromJson(res, rsp->body)) {
+          err = "Failed to parse JSON response";
+        }
+      }
+      err = interpret_rpc_response(res.status);
+    }
+    else {
+      err = "No response...";
+    }
 
-    if (!m_daemon_cert.empty()) httpClient.setRootCert(m_daemon_cert);
-    if (m_daemon_no_verify) httpClient.disableVerify();
-
-    invokeJsonCommand(httpClient, rpc_url, req, res);
-
-    std::string err = interpret_rpc_response(true, res.status);
-    if (err.empty())
+    if (err.empty()) {
       success_msg_writer() << "Mining started in daemon";
-    else
+    }
+    else {
       fail_msg_writer() << "Mining has not started due to an error: " << err;
-
-  } catch (const ConnectException&) {
-    printConnectionError();
+    }
   } catch (const std::exception& e) {
     fail_msg_writer() << "Failed to invoke RPC method: " << e.what();
   }
-
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -1838,26 +1846,35 @@ bool simple_wallet::stop_mining(const std::vector<std::string>& args)
   COMMAND_RPC_STOP_MINING::response res;
 
   std::string rpc_url = this->m_daemon_path + "stop_mining";
+  std::string err;
 
   try {
-    HttpClient httpClient(m_dispatcher, m_daemon_host, m_daemon_port, m_daemon_ssl);
+    httplib::Client cli(m_daemon_address);
+    if (m_daemon_ssl && m_daemon_no_verify) {
+      cli.enable_server_certificate_verification(!m_daemon_no_verify);
+    }
+    const auto rsp = cli.Post(rpc_url.c_str(), m_requestHeaders, storeToJson(req), "application/json");
+    if (rsp) {
+      if (rsp->status == 200) {
+        if (!loadFromJson(res, rsp->body)) {
+          err = "Failed to parse JSON response";
+        }
+      }
+      err = interpret_rpc_response(res.status);
+    }
+    else {
+      err = "No response...";
+    }
 
-    if (!m_daemon_cert.empty()) httpClient.setRootCert(m_daemon_cert);
-    if (m_daemon_no_verify) httpClient.disableVerify();
-
-    invokeJsonCommand(httpClient, rpc_url, req, res);
-
-    std::string err = interpret_rpc_response(true, res.status);
-    if (err.empty())
+    if (err.empty()) {
       success_msg_writer() << "Mining stopped in daemon";
-    else
+    }
+    else {
       fail_msg_writer() << "Mining has not stopped: " << err;
-  } catch (const ConnectException&) {
-    printConnectionError();
+    }
   } catch (const std::exception& e) {
     fail_msg_writer() << "Failed to invoke RPC method: " << e.what();
   }
-
   return true;
 }
 //----------------------------------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
-// Copyright (c) 2016-2020, The Karbo developers
+// Copyright (c) 2016-2022, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -16,9 +16,13 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with Karbo.  If not, see <http://www.gnu.org/licenses/>.
 
+#include <boost/filesystem.hpp>
+
 #include "RpcServerConfig.h"
 #include "Common/CommandLine.h"
 #include "CryptoNoteConfig.h"
+#include "CryptoNoteCore/CryptoNoteBasicImpl.h"
+#include "Common/FormatTools.h"
 #include "android.h"
 
 namespace CryptoNote {
@@ -48,7 +52,8 @@ namespace CryptoNote {
   }
 
 
-  RpcServerConfig::RpcServerConfig() : 
+  RpcServerConfig::RpcServerConfig() :
+    m_data_dir(""),
     bindIp(DEFAULT_RPC_IP),
     bindPort(DEFAULT_RPC_PORT),
     enableCors(""),
@@ -58,18 +63,25 @@ namespace CryptoNote {
     nodeFeeAddress(""),
     nodeFeeAmountStr(""),
     nodeFeeViewKey(""),
-    bindPortSSL(RPC_DEFAULT_SSL_PORT) {
+    bindPortSSL(RPC_DEFAULT_SSL_PORT)
+  {
   }
 
   bool RpcServerConfig::isEnabledSSL() const { return enableSSL; }
+  bool RpcServerConfig::isRestricted() const { return restrictedRPC; }
   uint16_t RpcServerConfig::getBindPort() const { return bindPort; }
   uint16_t RpcServerConfig::getBindPortSSL() const { return bindPortSSL; }
   std::string RpcServerConfig::getBindIP() const { return bindIp; }
+  std::string RpcServerConfig::getBindAddress() const { return bindIp + ":" + std::to_string(bindPort); }
+  std::string RpcServerConfig::getBindAddressSSL() const { return bindIp + ":" + std::to_string(bindPortSSL); }
   std::string RpcServerConfig::getDhFile() const { return dhFile; }
   std::string RpcServerConfig::getChainFile() const { return chainFile; }
   std::string RpcServerConfig::getKeyFile() const { return keyFile; }
-  std::string RpcServerConfig::getBindAddress() const { return bindIp + ":" + std::to_string(bindPort); }
-  std::string RpcServerConfig::getBindAddressSSL() const { return bindIp + ":" + std::to_string(bindPortSSL); }
+  std::string RpcServerConfig::getCors() const { return enableCors; }
+  std::string RpcServerConfig::getNodeFeeAddress() const { return nodeFeeAddress; }
+  uint64_t RpcServerConfig::getNodeFeeAmount() const { return nodeFeeAmount; }
+  std::string RpcServerConfig::getNodeFeeViewKey() const { return nodeFeeViewKey; }
+  std::string RpcServerConfig::getContactInfo() const { return contactInfo; }
 
   void RpcServerConfig::initOptions(boost::program_options::options_description& desc) {
     command_line::add_arg(desc, arg_rpc_bind_ip);
@@ -90,17 +102,78 @@ namespace CryptoNote {
   void RpcServerConfig::init(const boost::program_options::variables_map& vm)  {
     bindIp = command_line::get_arg(vm, arg_rpc_bind_ip);
     bindPort = command_line::get_arg(vm, arg_rpc_bind_port);
+    enableCors = command_line::get_arg(vm, arg_enable_cors);
+    restrictedRPC = command_line::get_arg(vm, arg_restricted_rpc);
+    
+    if (command_line::has_arg(vm, arg_set_contact)) {
+      contactInfo = command_line::get_arg(vm, arg_set_contact);
+      if (!contactInfo.empty() && contactInfo.size() > 128) {
+        throw std::runtime_error("Too long contact info");
+      }
+    }
+
+    if (command_line::has_arg(vm, arg_set_fee_address)) {
+      nodeFeeAddress = command_line::get_arg(vm, arg_set_fee_address);
+    }
+
+    if (command_line::has_arg(vm, arg_set_fee_amount)) {
+      nodeFeeAmountStr = command_line::get_arg(vm, arg_set_fee_amount);
+    }
+
+    if ((nodeFeeAddress.empty() && !nodeFeeAmountStr.empty()) ||
+      (!nodeFeeAddress.empty() && nodeFeeAmountStr.empty())) {
+      throw std::runtime_error("Need to set both, fee-address and fee-amount");
+    }
+    else if (!nodeFeeAddress.empty() && !nodeFeeAmountStr.empty()) {
+      uint64_t prefix;
+      AccountPublicAddress acc;
+      if (!CryptoNote::parseAccountAddressString(prefix, acc, nodeFeeAddress)) {
+        throw std::runtime_error("Bad fee address: " + nodeFeeAddress);
+      }
+
+      if (!Common::Format::parseAmount(nodeFeeAmountStr, nodeFeeAmount)) {
+        throw std::runtime_error("Couldn't parse fee amount");
+      }
+      if (nodeFeeAmount > CryptoNote::parameters::COIN) {
+        throw std::runtime_error("Maximum allowed fee is " + Common::Format::formatAmount(CryptoNote::parameters::COIN));
+      }
+    }
+
+    nodeFeeViewKey = command_line::get_arg(vm, arg_set_view_key);
+
     enableSSL = command_line::get_arg(vm, arg_rpc_bind_ssl_enable);
     bindPortSSL = command_line::get_arg(vm, arg_rpc_bind_ssl_port);
     chainFile = command_line::get_arg(vm, arg_chain_file);
     keyFile = command_line::get_arg(vm, arg_key_file);
     dhFile = command_line::get_arg(vm, arg_dh_file);
-    enableCors = command_line::get_arg(vm, arg_enable_cors);
-    restrictedRPC = command_line::get_arg(vm, arg_restricted_rpc);
-    contactInfo = command_line::get_arg(vm, arg_set_contact);
-    nodeFeeAddress = command_line::get_arg(vm, arg_set_fee_address);
-    nodeFeeAmountStr = command_line::get_arg(vm, arg_set_fee_amount);
-    nodeFeeViewKey = command_line::get_arg(vm, arg_set_view_key);
+
+    boost::filesystem::path chain_file_path(chainFile);
+    boost::filesystem::path key_file_path(keyFile);
+    boost::filesystem::path dh_file_path(dhFile);
+    
+    // default certs location, we need full path to pass to http(s) server
+    if (!chain_file_path.has_parent_path()) {
+      chain_file_path = m_data_dir / chain_file_path;
+      chainFile = chain_file_path.string();
+    }
+    if (!key_file_path.has_parent_path()) {
+      key_file_path = m_data_dir / key_file_path;
+      keyFile = key_file_path.string();
+    }
+    if (!dh_file_path.has_parent_path()) {
+      dh_file_path = m_data_dir / dh_file_path;
+      dhFile = dh_file_path.string();
+    }
+
+    boost::system::error_code ec;
+    if (isEnabledSSL() && (!boost::filesystem::exists(chain_file_path, ec) ||
+      !boost::filesystem::exists(key_file_path, ec))) {
+      throw std::runtime_error("SSL certificate file(s) could not be found");
+      enableSSL = false;
+    }
   }
 
+  void RpcServerConfig::setDataDir(std::string dataDir) {
+    m_data_dir = dataDir;
+  }
 }

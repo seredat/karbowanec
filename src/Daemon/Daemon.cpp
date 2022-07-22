@@ -18,19 +18,17 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with Karbo.  If not, see <http://www.gnu.org/licenses/>.
 
-#include "version.h"
-
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
 
 #include "DaemonCommandsHandler.h"
 
+#include "crypto/hash.h"
 #include "Common/FormatTools.h"
 #include "Common/SignalHandler.h"
 #include "Common/StringTools.h"
 #include "Common/PathTools.h"
-#include <Common/ColouredMsg.h>
-#include "crypto/hash.h"
+#include "Common/ColouredMsg.h"
 #include "Checkpoints/CheckpointsData.h"
 #include "CryptoNoteCore/CryptoNoteTools.h"
 #include "CryptoNoteCore/Core.h"
@@ -39,17 +37,21 @@
 #include "CryptoNoteCore/MinerConfig.h"
 #include "CryptoNoteProtocol/CryptoNoteProtocolHandler.h"
 #include "CryptoNoteProtocol/ICryptoNoteProtocolQuery.h"
-#include "P2p/NetNode.h"
-#include "P2p/NetNodeConfig.h"
+#include "HTTP/httplib.h"
+#include "Logging/LoggerManager.h"
 #include "Rpc/RpcServer.h"
 #include "Rpc/RpcServerConfig.h"
+#include "Rpc/JsonRpc.h"
+#include "P2p/NetNode.h"
+#include "P2p/NetNodeConfig.h"
+#include "Serialization/SerializationTools.h"
 #include "version.h"
-
-#include <Logging/LoggerManager.h>
 
 #if defined(WIN32)
 #include <crtdbg.h>
 #endif
+
+#define CHECK_FOR_UPDATE_ENDPOINT "/repos/seredat/karbowanec/tags"
 
 using Common::JsonValue;
 using namespace CryptoNote;
@@ -119,6 +121,26 @@ namespace
     return loggerConfiguration;
   }
 
+  // https://stackoverflow.com/questions/2941491/compare-versions-as-strings
+  void Parse(int result[4], const std::string& input)
+  {
+    std::istringstream parser(input);
+    parser >> result[0];
+    for (int idx = 1; idx < 4; idx++)
+    {
+      parser.get(); //Skip period
+      parser >> result[idx];
+    }
+  }
+
+  bool LessThanVersion(const std::string& a, const std::string& b)
+  {
+    int parsedA[4], parsedB[4];
+    Parse(parsedA, a);
+    Parse(parsedB, b);
+    return std::lexicographical_compare(parsedA, parsedA + 4, parsedB, parsedB + 4);
+  }
+
 } // end anonymous namespace
 
 int main(int argc, char* argv[])
@@ -136,7 +158,7 @@ int main(int argc, char* argv[])
     po::options_description desc_cmd_only("Command line options");
     po::options_description desc_cmd_sett("Command line options and settings options");
 
-    desc_cmd_sett.add_options() 
+    desc_cmd_sett.add_options()
       ("enable-blockchain-indexes,i", po::bool_switch()->default_value(false), "Enable blockchain indexes");
 
     command_line::add_arg(desc_cmd_only, command_line::arg_help);
@@ -201,13 +223,14 @@ int main(int argc, char* argv[])
 
     if (!r)
       return 1;
-  
+
     auto modulePath = Common::NativePathToGeneric(argv[0]);
     auto cfgLogFile = Common::NativePathToGeneric(command_line::get_arg(vm, arg_log_file));
 
     if (cfgLogFile.empty()) {
       cfgLogFile = Common::ReplaceExtenstion(modulePath, ".log");
-    } else {
+    }
+    else {
       if (!Common::HasParentPath(cfgLogFile)) {
         cfgLogFile = Common::CombinePath(Common::GetPathDirectory(modulePath), cfgLogFile);
       }
@@ -229,15 +252,13 @@ int main(int argc, char* argv[])
       ": ##::'##::::'## ##::: ##.... ##: ##.... ##:'##.... ##:\n"
       ": ##:'##::::'##:. ##:: ##:::: ##: ##:::: ##: ##:::: ##:\n"
       ": #####::::'##:::. ##: ########:: ########:: ##:::: ##:\n",
-    Common::Console::Color::BrightCyan);
+      Common::Console::Color::BrightCyan);
     std::cout << ColouredMsg(
       ": ##. ##::: #########: ##.. ##::: ##.... ##: ##:::: ##:\n"
       ": ##:. ##:: ##.... ##: ##::. ##:: ##:::: ##: ##:::: ##:\n"
       ": ##::. ##: ##:::: ##: ##:::. ##: ########::. #######::\n"
       ":..::::..::..:::::..::..:::::..::........::::.......:::\n\n",
-    Common::Console::Color::BrightYellow);
-
-    logger(INFO) << "Module folder: " << argv[0];
+      Common::Console::Color::BrightYellow);
 
     bool testnet_mode = command_line::get_arg(vm, arg_testnet_on);
     if (testnet_mode) {
@@ -252,27 +273,17 @@ int main(int argc, char* argv[])
     MinerConfig minerConfig;
     minerConfig.init(vm);
     RpcServerConfig rpcConfig;
+    boost::filesystem::path data_dir_path(data_dir);
+    rpcConfig.setDataDir(data_dir_path.string());
     rpcConfig.init(vm);
-
-    std::string contact_str = rpcConfig.contactInfo;
-    if (!contact_str.empty() && contact_str.size() > 128) {
-      logger(ERROR, BRIGHT_RED) << "Too long contact info";
-      return 1;
-    }
-
-    // check this early
-    if ((rpcConfig.nodeFeeAddress.empty() && !rpcConfig.nodeFeeAmountStr.empty()) ||
-       (!rpcConfig.nodeFeeAddress.empty() && rpcConfig.nodeFeeAmountStr.empty())) {
-      logger(ERROR, BRIGHT_RED) << "Need to set both, fee-address and fee-amount";
-      return 1;
-    }
 
     //create objects and link them
     CryptoNote::CurrencyBuilder currencyBuilder(logManager);
     currencyBuilder.testnet(testnet_mode);
     try {
       currencyBuilder.currency();
-    } catch (std::exception&) {
+    }
+    catch (std::exception&) {
       std::cout << "GENESIS_COINBASE_TX_HEX constant has an incorrect value. Please launch: " << CryptoNote::CRYPTONOTE_NAME << "d --" << arg_print_genesis_tx.name;
       return 1;
     }
@@ -322,33 +333,46 @@ int main(int argc, char* argv[])
       if (!Tools::directoryExists(coreConfig.configFolder)) {
         throw std::runtime_error("Directory does not exist: " + coreConfig.configFolder);
       }
-    } else {
+    }
+    else {
       if (!Tools::create_directories_if_necessary(coreConfig.configFolder)) {
         throw std::runtime_error("Can't create directory: " + coreConfig.configFolder);
       }
     }
 
+    // check for update
+    try {
+      httplib::Client cli("https://api.github.com");
+      auto rsp = cli.Get(CHECK_FOR_UPDATE_ENDPOINT);
+      if (rsp) {
+        if (rsp->status == 200) {
+          Common::JsonValue psResp = Common::JsonValue::fromString(rsp->body);
+          Common::JsonValue::Array a = psResp.getArray();
+          const auto& o = a.at(0);
+          if (o.contains("name")) {
+            const JsonValue& vo = o("name");
+            std::string remote_v = vo.toString();
+            remote_v.erase(remove(remote_v.begin(), remote_v.end(), '"'), remote_v.end());
+            remote_v.erase(0, 2);
+            std::string ours_v = PROJECT_VERSION;
+            if (LessThanVersion(ours_v, remote_v)) {
+              logger(INFO, BRIGHT_RED) << "NEW VERSION IS AVAILABLE. PLEASE UPDATE!\n";
+            }
+          }
+        }
+      }
+    }
+    catch (std::exception& e) {
+      logger(ERROR, BRIGHT_RED) << "Failed to check for update: " << e.what();
+    }
+
     CryptoNote::CryptoNoteProtocolHandler cprotocol(currency, dispatcher, m_core, nullptr, logManager);
     CryptoNote::NodeServer p2psrv(dispatcher, cprotocol, logManager);
-    CryptoNote::RpcServer rpcServer(dispatcher, logManager, m_core, p2psrv, cprotocol);
+    CryptoNote::RpcServer rpcServer(rpcConfig, dispatcher, logManager, m_core, p2psrv, cprotocol);
 
     cprotocol.set_p2p_endpoint(&p2psrv);
     m_core.set_cryptonote_protocol(&cprotocol);
     DaemonCommandsHandler dch(m_core, p2psrv, logManager, cprotocol, &rpcServer);
-
-    boost::filesystem::path data_dir_path(data_dir);
-    boost::filesystem::path chain_file_path(rpcConfig.getChainFile());
-    boost::filesystem::path key_file_path(rpcConfig.getKeyFile());
-    boost::filesystem::path dh_file_path(rpcConfig.getDhFile());
-    if (!chain_file_path.has_parent_path()) {
-      chain_file_path = data_dir_path / chain_file_path;
-    }
-    if (!key_file_path.has_parent_path()) {
-      key_file_path = data_dir_path / key_file_path;
-    }
-    if (!dh_file_path.has_parent_path()) {
-      dh_file_path = data_dir_path / dh_file_path;
-    }
 
     // initialize objects
     logger(INFO) << "Initializing p2p server...";
@@ -383,54 +407,8 @@ int main(int argc, char* argv[])
       dch.start_handling();
     }
 
-    bool server_ssl_enable = false;
-    if (rpcConfig.isEnabledSSL()) {
-      if (boost::filesystem::exists(chain_file_path, ec) &&
-        boost::filesystem::exists(key_file_path, ec) &&
-        boost::filesystem::exists(dh_file_path, ec)) {
-        rpcServer.setCerts(boost::filesystem::canonical(chain_file_path).string(),
-          boost::filesystem::canonical(key_file_path).string(),
-          boost::filesystem::canonical(dh_file_path).string());
-        server_ssl_enable = true;
-      }
-      else {
-        logger(ERROR, BRIGHT_RED) << "Start RPC SSL server was canceled because certificate file(s) could not be found" << std::endl;
-      }
-    }
-    std::string ssl_info = "";
-    if (server_ssl_enable) ssl_info += ", SSL on address " + rpcConfig.getBindAddressSSL();
-    logger(INFO) << "Starting core rpc server on address " << rpcConfig.getBindAddress() << ssl_info;
-    rpcServer.start(rpcConfig.getBindIP(), rpcConfig.getBindPort(), rpcConfig.getBindPortSSL(), server_ssl_enable);
-    rpcServer.restrictRpc(rpcConfig.restrictedRPC);
-    rpcServer.enableCors(rpcConfig.enableCors);
-    if (!rpcConfig.nodeFeeAddress.empty() && !rpcConfig.nodeFeeAmountStr.empty()) {
-      AccountPublicAddress acc = boost::value_initialized<AccountPublicAddress>();
-      if (!currency.parseAccountAddressString(rpcConfig.nodeFeeAddress, acc)) {
-        logger(ERROR, BRIGHT_RED) << "Bad fee address: " << rpcConfig.nodeFeeAddress;
-        return 1;
-      }
-      rpcServer.setFeeAddress(rpcConfig.nodeFeeAddress, acc);
+    rpcServer.start();
 
-      uint64_t fee;
-      if (!Common::Format::parseAmount(rpcConfig.nodeFeeAmountStr, fee)) {
-        logger(ERROR, BRIGHT_RED) << "Couldn't parse fee amount";
-        return 1;
-      }
-      if (fee > CryptoNote::parameters::COIN) {
-        logger(ERROR, BRIGHT_RED) << "Maximum allowed fee is " 
-          << Common::Format::formatAmount(CryptoNote::parameters::COIN);
-        return 1;
-      }
-
-      rpcServer.setFeeAmount(fee);
-    }
-    
-    if (!rpcConfig.nodeFeeViewKey.empty()) {
-      rpcServer.setViewKey(rpcConfig.nodeFeeViewKey);
-    }
-    if (!rpcConfig.contactInfo.empty()) {
-      rpcServer.setContactInfo(rpcConfig.contactInfo);
-    }
     logger(INFO) << "Core rpc server started ok";
 
 
