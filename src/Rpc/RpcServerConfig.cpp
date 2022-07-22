@@ -34,7 +34,6 @@ namespace CryptoNote {
     const uint16_t DEFAULT_RPC_SSL_PORT = RPC_DEFAULT_SSL_PORT;
     const std::string DEFAULT_RPC_CHAIN_FILE = std::string(RPC_DEFAULT_CHAIN_FILE);
     const std::string DEFAULT_RPC_KEY_FILE = std::string(RPC_DEFAULT_KEY_FILE);
-    const std::string DEFAULT_RPC_DH_FILE = std::string(RPC_DEFAULT_DH_FILE);
 
     const command_line::arg_descriptor<std::string> arg_rpc_bind_ip     = { "rpc-bind-ip", "", DEFAULT_RPC_IP };
     const command_line::arg_descriptor<uint16_t>    arg_rpc_bind_port   = { "rpc-bind-port", "", DEFAULT_RPC_PORT };
@@ -42,7 +41,6 @@ namespace CryptoNote {
     const command_line::arg_descriptor<uint16_t> arg_rpc_bind_ssl_port  = { "rpc-bind-ssl-port", "SSL port for RPC service", DEFAULT_RPC_SSL_PORT };
     const command_line::arg_descriptor<std::string> arg_chain_file      = { "rpc-chain-file", "SSL chain file", DEFAULT_RPC_CHAIN_FILE };
     const command_line::arg_descriptor<std::string> arg_key_file        = { "rpc-key-file", "SSL key file", DEFAULT_RPC_KEY_FILE };
-    const command_line::arg_descriptor<std::string> arg_dh_file         = { "rpc-dh-file", "SSL DH file", DEFAULT_RPC_DH_FILE };
     const command_line::arg_descriptor<bool>        arg_restricted_rpc  = { "restricted-rpc", "Restrict RPC to view only commands to prevent abuse", false };
     const command_line::arg_descriptor<std::string> arg_enable_cors     = { "enable-cors", "Adds header 'Access-Control-Allow-Origin' to the daemon's RPC responses. Uses the value as domain. Use * for all", "" };
     const command_line::arg_descriptor<std::string> arg_set_contact     = { "contact", "Sets node admin contact", "" };
@@ -74,7 +72,6 @@ namespace CryptoNote {
   std::string RpcServerConfig::getBindIP() const { return bindIp; }
   std::string RpcServerConfig::getBindAddress() const { return bindIp + ":" + std::to_string(bindPort); }
   std::string RpcServerConfig::getBindAddressSSL() const { return bindIp + ":" + std::to_string(bindPortSSL); }
-  std::string RpcServerConfig::getDhFile() const { return dhFile; }
   std::string RpcServerConfig::getChainFile() const { return chainFile; }
   std::string RpcServerConfig::getKeyFile() const { return keyFile; }
   std::string RpcServerConfig::getCors() const { return enableCors; }
@@ -90,7 +87,6 @@ namespace CryptoNote {
     command_line::add_arg(desc, arg_rpc_bind_ssl_port);
     command_line::add_arg(desc, arg_chain_file);
     command_line::add_arg(desc, arg_key_file);
-    command_line::add_arg(desc, arg_dh_file);
     command_line::add_arg(desc, arg_restricted_rpc);
     command_line::add_arg(desc, arg_set_contact);
     command_line::add_arg(desc, arg_enable_cors);
@@ -160,14 +156,10 @@ namespace CryptoNote {
     if (command_line::has_arg(vm, arg_key_file)) {
     keyFile = command_line::get_arg(vm, arg_key_file);
     }
-    if (command_line::has_arg(vm, arg_dh_file)) {
-      dhFile = command_line::get_arg(vm, arg_dh_file);
-    }
 
     boost::filesystem::path chain_file_path(chainFile);
     boost::filesystem::path key_file_path(keyFile);
-    boost::filesystem::path dh_file_path(dhFile);
-    
+
     // default certs location, we need full path to pass to http(s) server
     if (!chain_file_path.has_parent_path()) {
       chain_file_path = m_data_dir / chain_file_path;
@@ -176,10 +168,6 @@ namespace CryptoNote {
     if (!key_file_path.has_parent_path()) {
       key_file_path = m_data_dir / key_file_path;
       keyFile = key_file_path.string();
-    }
-    if (!dh_file_path.has_parent_path()) {
-      dh_file_path = m_data_dir / dh_file_path;
-      dhFile = dh_file_path.string();
     }
 
     boost::system::error_code ec;

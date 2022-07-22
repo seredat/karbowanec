@@ -38,7 +38,6 @@ public:
   std::string getBindIP() const;
   std::string getBindAddress() const;
   std::string getBindAddressSSL() const;
-  std::string getDhFile() const;
   std::string getChainFile() const;
   std::string getKeyFile() const;
   std::string getCors() const;
@@ -55,7 +54,6 @@ private:
   uint16_t    bindPort;
   uint16_t    bindPortSSL;
   std::string bindIp;
-  std::string dhFile;
   std::string chainFile;
   std::string keyFile;
   std::string enableCors;
