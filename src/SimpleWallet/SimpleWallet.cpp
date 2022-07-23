@@ -125,22 +125,6 @@ const command_line::arg_descriptor<uint32_t> arg_scan_height = { "scan-height", 
 const command_line::arg_descriptor< std::vector<std::string> > arg_command = { "command", "" };
 
 
-bool validateCertPath(std::string &path) {
-  bool res = false;
-  boost::system::error_code ec;
-  boost::filesystem::path data_dir_path(boost::filesystem::current_path());
-  boost::filesystem::path cert_file_path(path);
-  if (!cert_file_path.has_parent_path()) cert_file_path = data_dir_path / cert_file_path;
-  if (boost::filesystem::exists(cert_file_path, ec)) {
-    path = boost::filesystem::canonical(cert_file_path).string();
-    res = true;
-  } else {
-    path.clear();
-    res = false;
-  }
-  return res;
-}
-
 void seedFormater(std::string& seed){
   const unsigned int word_width = 12;
   const unsigned int seed_col = 5;
@@ -868,7 +852,7 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
   handle_command_line(vm);
 
   if (!m_daemon_cert.empty()) {
-    if (!validateCertPath(m_daemon_cert)) {
+    if (!Common::validateCertPath(m_daemon_cert)) {
       fail_msg_writer() << "Custom cert file could not be found" << std::endl;
     }
   }
@@ -2663,7 +2647,7 @@ int main(int argc, char* argv[]) {
       daemon_port = RPC_DEFAULT_PORT;
 
     if (!daemon_cert.empty()) {
-      if (!validateCertPath(daemon_cert)) {
+      if (!Common::validateCertPath(daemon_cert)) {
         logger(ERROR, BRIGHT_RED) << "Custom cert file could not be found" << std::endl;
       }
     }
