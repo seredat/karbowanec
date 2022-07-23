@@ -60,6 +60,7 @@ public:
   void stop();
   typedef std::function<bool(RpcServer*, const httplib::Request& req, httplib::Response& res)> HandlerFunction;
   std::string getCorsDomain();
+  size_t getRpcConnectionsCount();
 
 private:
 
@@ -151,7 +152,6 @@ private:
   void fill_block_header_response(const Block& blk, bool orphan_status, uint32_t height, const Crypto::Hash& hash, block_header_response& responce);
   void listen(const std::string address, const uint16_t port);
   void listen_ssl(const std::string address, const uint16_t port);
-  size_t getRpcConnectionsCount();
   bool isCoreReady();
   bool checkIncomingTransactionForFee(const BinaryArray& tx_blob);
 
