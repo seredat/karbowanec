@@ -407,9 +407,13 @@ int main(int argc, char* argv[])
       dch.start_handling();
     }
 
+    std::string ssl_info = "";
+    if (rpcConfig.isEnabledSSL()) ssl_info += ", SSL on address " + rpcConfig.getBindAddressSSL();
+    logger(INFO) << "Starting core RPC server on address " << rpcConfig.getBindAddress() << ssl_info;
+
     rpcServer.start();
 
-    logger(INFO) << "Core rpc server started ok";
+    logger(INFO) << "Core RPC server started OK";
 
 
     std::cout << ENDL << "**********************************************************************" << ENDL
@@ -437,7 +441,7 @@ int main(int argc, char* argv[])
     dch.stop_handling();
 
     //stop components
-    logger(INFO) << "Stopping core rpc server...";
+    logger(INFO) << "Stopping core RPC server...";
     rpcServer.stop();
 
     //deinitialize components
