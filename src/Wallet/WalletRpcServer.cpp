@@ -48,7 +48,7 @@ using namespace CryptoNote;
 namespace Tools {
 
 const command_line::arg_descriptor<uint16_t>    wallet_rpc_server::arg_rpc_bind_port =
-  { "rpc-bind-port", "Starts wallet as RPC server for wallet operations, sets bind port for server.", 0, true };
+  { "rpc-bind-port", "Starts wallet as RPC server for wallet operations, sets bind port for server.", WALLET_RPC_DEFAULT_PORT, true };
 const command_line::arg_descriptor<uint16_t>    wallet_rpc_server::arg_rpc_bind_ssl_port =
   { "rpc-bind-ssl-port", "Starts wallet as RPC server for wallet operations, sets bind port ssl for server.", WALLET_RPC_DEFAULT_SSL_PORT };
 const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_rpc_bind_ip = 
@@ -231,6 +231,8 @@ void wallet_rpc_server::getServerConf(std::string &bind_address, std::string &bi
   enable_ssl = m_enable_ssl;
 }
 
+//------------------------------------------------------------------------------------------------------------------------------
+
 void wallet_rpc_server::processRequest(const httplib::Request& request, httplib::Response& response)
 {
   using namespace CryptoNote::JsonRpc;
@@ -298,16 +300,6 @@ void wallet_rpc_server::processRequest(const httplib::Request& request, httplib:
 
 //------------------------------------------------------------------------------------------------------------------------------
 
-bool wallet_rpc_server::on_get_balance(const wallet_rpc::COMMAND_RPC_GET_BALANCE::request& req, 
-  wallet_rpc::COMMAND_RPC_GET_BALANCE::response& res)
-{
-  res.locked_amount    = m_wallet.pendingBalance();
-  res.available_balance = m_wallet.actualBalance();
-  return true;
-}
-
-//------------------------------------------------------------------------------------------------------------------------------
-
 bool wallet_rpc_server::authenticate(const httplib::Request& request) const {
   if (!m_credentials.empty()) {
     auto headerIt = request.headers.find("authorization");
@@ -324,6 +316,16 @@ bool wallet_rpc_server::authenticate(const httplib::Request& request) const {
     }
   }
 
+  return true;
+}
+
+//------------------------------------------------------------------------------------------------------------------------------
+
+bool wallet_rpc_server::on_get_balance(const wallet_rpc::COMMAND_RPC_GET_BALANCE::request& req, 
+  wallet_rpc::COMMAND_RPC_GET_BALANCE::response& res)
+{
+  res.locked_amount    = m_wallet.pendingBalance();
+  res.available_balance = m_wallet.actualBalance();
   return true;
 }
 
