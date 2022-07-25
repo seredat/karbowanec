@@ -399,7 +399,7 @@ int CryptoNoteProtocolHandler::handle_notify_new_transactions(int command, NOTIF
           if (dandelion_peer.m_state == CryptoNoteConnectionContext::state_normal || dandelion_peer.m_state == CryptoNoteConnectionContext::state_synchronizing) {
             if (!post_notify<NOTIFY_NEW_TRANSACTIONS>(*m_p2p, arg, dandelion_peer)) {
               arg.stem = false;
-              logger(Logging::DEBUGGING) << "Failed to relay transactions to Dandelion peer " << dandelion_peer.m_connection_id << ", remove from stempool and broadcast as fluff:";
+              logger(Logging::DEBUGGING) << "Failed to relay transactions to Dandelion peer " << dandelion_peer.m_remote_ip << ", remove from stempool and broadcast as fluff:";
               for (const auto& h : txHashes) {
                 m_stemPool.removeTransaction(h);
                 logger(Logging::DEBUGGING) << h;
@@ -1107,7 +1107,7 @@ void CryptoNoteProtocolHandler::relay_transactions(NOTIFY_NEW_TRANSACTIONS::requ
       for (const auto& dandelion_peer : m_dandelion_stem) {
         if (dandelion_peer.m_state == CryptoNoteConnectionContext::state_normal || dandelion_peer.m_state == CryptoNoteConnectionContext::state_synchronizing) {
           if (!post_notify<NOTIFY_NEW_TRANSACTIONS>(*m_p2p, arg, dandelion_peer)) {
-            logger(Logging::WARNING, Logging::BRIGHT_YELLOW) << "Failed to relay transactions to Dandelion peer " << dandelion_peer.m_connection_id << ", broadcasting in dandelion fluff mode";
+            logger(Logging::WARNING, Logging::BRIGHT_YELLOW) << "Failed to relay transactions to Dandelion peer " << dandelion_peer.m_remote_ip << ", broadcasting in dandelion fluff mode";
             arg.stem = false;
             for (const auto& h : txHashes) {
               m_stemPool.removeTransaction(h);
