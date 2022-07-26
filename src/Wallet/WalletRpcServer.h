@@ -61,7 +61,7 @@ public:
   bool init(const boost::program_options::variables_map& vm);
   void getServerConf(std::string &bind_address, std::string &bind_address_ssl, bool &enable_ssl);
     
-  bool run();
+  bool run(bool noEvent = false);
   void send_stop_signal();
   void stop();
 

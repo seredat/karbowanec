@@ -21,7 +21,7 @@
 #include <list>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/filesystem.hpp>
-#include "WalletRpcServer.h"
+
 #include "crypto/hash.h"
 #include "Common/base64.hpp"
 #include "Common/CommandLine.h"
@@ -29,18 +29,14 @@
 #include "CryptoNoteCore/CryptoNoteFormatUtils.h"
 #include "CryptoNoteCore/CryptoNoteBasicImpl.h"
 #include "CryptoNoteCore/Account.h"
+#include "ITransfersContainer.h"
 #include "Rpc/JsonRpc.h"
 #include "WalletLegacy/WalletHelper.h"
 #include "WalletLegacy/WalletLegacy.h"
 #include "Common/StringTools.h"
 #include "Common/Base58.h"
 #include "Common/Util.h"
-
-#include "ITransfersContainer.h"
-
-#if defined(WIN32)
-#undef ERROR
-#endif
+#include "WalletRpcServer.h"
 
 using namespace Logging;
 using namespace CryptoNote;
@@ -104,7 +100,7 @@ wallet_rpc_server::~wallet_rpc_server() {
 
 //------------------------------------------------------------------------------------------------------------------------------
 
-bool wallet_rpc_server::run()
+bool wallet_rpc_server::run(bool noEvent)
 {
   if (m_run_ssl) {
     m_workers.emplace_back(std::unique_ptr<System::RemoteContext<void>>(
@@ -115,8 +111,9 @@ bool wallet_rpc_server::run()
   m_workers.emplace_back(std::unique_ptr<System::RemoteContext<void>>(
     new System::RemoteContext<void>(m_dispatcher, std::bind(&wallet_rpc_server::listen, this, m_bind_ip, m_port)))
   );
+  if (!noEvent)
+    m_stopComplete.wait();
 
-  m_stopComplete.wait();
   return true;
 }
 
