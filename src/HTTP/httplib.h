@@ -147,7 +147,9 @@ using ssize_t = int;
 #endif // NOMINMAX
 
 #include <io.h>
+//# if !defined(_WINSOCKAPI_) && !defined(_WINSOCK2API_)
 #include <winsock2.h>
+//#endif
 #include <ws2tcpip.h>
 
 #ifndef WSA_FLAG_NO_HANDLE_INHERIT
