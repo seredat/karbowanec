@@ -221,7 +221,6 @@ namespace CryptoNote
     const CryptoNote::Currency& m_currency;
     Logging::LoggerManager& m_logManager;
     System::Dispatcher& m_dispatcher;
-    
     Logging::LoggerRef logger;
 
     std::unique_ptr<CryptoNote::NodeRpcProxy> m_node;

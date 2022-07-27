@@ -2541,7 +2541,6 @@ int main(int argc, char* argv[]) {
   System::Dispatcher dispatcher;
   System::Event m_stopComplete(dispatcher);
 
-
   po::variables_map vm;
 
   bool r = command_line::handle_error_helper(desc_all, [&]() {
@@ -2684,7 +2683,7 @@ int main(int argc, char* argv[]) {
       return 1;
     }
 
-    Tools::wallet_rpc_server wrpc(/*dispatcher,*/ logManager, *wallet, *node, currency, walletFileName);
+    Tools::wallet_rpc_server wrpc(logManager, *wallet, *node, currency, walletFileName);
 
     if (!wrpc.init(vm)) {
       logger(ERROR, BRIGHT_RED) << "Failed to initialize wallet rpc server";
@@ -2692,7 +2691,7 @@ int main(int argc, char* argv[]) {
     }
 
     Tools::SignalHandler::install([&m_stopComplete, &dispatcher, &wrpc, &wallet] {
-      wrpc.send_stop_signal();
+      wrpc.stop();
 
       dispatcher.remoteSpawn([&] {
         m_stopComplete.set();
@@ -2710,7 +2709,6 @@ int main(int argc, char* argv[]) {
     wrpc.run();
 
     m_stopComplete.wait();
-
 
     logger(INFO) << "Stopped wallet rpc server";
     

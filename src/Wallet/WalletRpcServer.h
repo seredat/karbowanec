@@ -31,8 +31,6 @@
 #include "Logging/LoggerRef.h"
 #include "WalletRpcServerCommandsDefinitions.h"
 #include "WalletLegacy/WalletLegacy.h"
-//#include "System/Dispatcher.h"
-//#include "System/RemoteContext.h"
 
 namespace Tools
 {
@@ -63,7 +61,6 @@ public:
   void getServerConf(std::string &bind_address, std::string &bind_address_ssl, bool &enable_ssl);
     
   bool run();
-  void send_stop_signal();
   void stop();
 
 private:
@@ -104,9 +101,6 @@ private:
   httplib::Server* http;
   httplib::SSLServer* https;
   Logging::LoggerRef logger;
-  //System::Dispatcher& m_dispatcher;
-  //System::Event m_stopComplete;
-  //std::vector<std::unique_ptr<System::RemoteContext<void>>> m_workers;
   std::list<std::thread> m_workers;
 
   bool m_enable_ssl;
