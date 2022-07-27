@@ -75,15 +75,15 @@ void wallet_rpc_server::init_options(boost::program_options::options_description
 //------------------------------------------------------------------------------------------------------------------------------
 
 wallet_rpc_server::wallet_rpc_server(
-  System::Dispatcher& dispatcher,
+  //System::Dispatcher& dispatcher,
   Logging::ILogger& log,
   CryptoNote::IWalletLegacy& w,
   CryptoNote::INode& n,
   CryptoNote::Currency& currency,
   const std::string& walletFilename) :
   logger(log, "WalletRpc"),
-  m_dispatcher(dispatcher),
-  m_stopComplete(dispatcher),
+  //m_dispatcher(dispatcher),
+  //m_stopComplete(dispatcher),
   m_wallet(w),
   m_node(n),
   m_currency(currency),
@@ -94,25 +94,27 @@ wallet_rpc_server::wallet_rpc_server(
 
 //------------------------------------------------------------------------------------------------------------------------------
 
-wallet_rpc_server::~wallet_rpc_server() {
-  stop();
+wallet_rpc_server::~wallet_rpc_server() {  
 }
 
 //------------------------------------------------------------------------------------------------------------------------------
 
-bool wallet_rpc_server::run(bool noEvent)
+bool wallet_rpc_server::run()
 {
   if (m_run_ssl) {
-    m_workers.emplace_back(std::unique_ptr<System::RemoteContext<void>>(
-      new System::RemoteContext<void>(m_dispatcher, std::bind(&wallet_rpc_server::listen_ssl, this, m_bind_ip, m_port_ssl)))
-    );
+    //m_workers.emplace_back(std::unique_ptr<System::RemoteContext<void>>(
+    //  new System::RemoteContext<void>(m_dispatcher, std::bind(&wallet_rpc_server::listen_ssl, this, m_bind_ip, m_port_ssl)))
+    //);
+    m_workers.push_back(std::thread(std::bind(&wallet_rpc_server::listen_ssl, this, m_bind_ip, m_port_ssl)));
   }
 
-  m_workers.emplace_back(std::unique_ptr<System::RemoteContext<void>>(
-    new System::RemoteContext<void>(m_dispatcher, std::bind(&wallet_rpc_server::listen, this, m_bind_ip, m_port)))
-  );
-  if (!noEvent)
-    m_stopComplete.wait();
+  //m_workers.emplace_back(std::unique_ptr<System::RemoteContext<void>>(
+  //  new System::RemoteContext<void>(m_dispatcher, std::bind(&wallet_rpc_server::listen, this, m_bind_ip, m_port)))
+  //);
+  m_workers.push_back(std::thread(std::bind(&wallet_rpc_server::listen, this, m_bind_ip, m_port)));
+
+  //if (!noEvent)
+  //  m_stopComplete.wait();
 
   return true;
 }
@@ -121,12 +123,11 @@ bool wallet_rpc_server::run(bool noEvent)
 
 void wallet_rpc_server::send_stop_signal()
 {
-  m_dispatcher.remoteSpawn([this]
-  {
-    std::cout << "wallet_rpc_server::send_stop_signal()" << std::endl;
+  //m_dispatcher.remoteSpawn([this]
+  //{
     stop();
-    m_stopComplete.set();
-  });
+    //m_stopComplete.set();
+  //});
 }
 
 //------------------------------------------------------------------------------------------------------------------------------
@@ -137,6 +138,12 @@ void wallet_rpc_server::stop() {
   }
 
   http->stop();
+
+  for (auto& th : m_workers) {
+    if (th.joinable()) {
+      th.join();
+    }
+  }
 
   m_workers.clear();
 }
