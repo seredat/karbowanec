@@ -50,6 +50,8 @@
 #include "Logging/LoggerRef.h"
 #include "Logging/LoggerManager.h"
 #include "System/Dispatcher.h"
+#include "System/Event.h"
+#include "System/RemoteContext.h"
 #include "System/Ipv4Address.h"
 
 using namespace Logging;
@@ -219,6 +221,7 @@ namespace CryptoNote
     const CryptoNote::Currency& m_currency;
     Logging::LoggerManager& m_logManager;
     System::Dispatcher& m_dispatcher;
+    
     Logging::LoggerRef logger;
 
     std::unique_ptr<CryptoNote::NodeRpcProxy> m_node;
