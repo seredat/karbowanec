@@ -38,7 +38,6 @@ class wallet_rpc_server
 {
 public:
   wallet_rpc_server(
-    //System::Dispatcher& dispatcher,
     Logging::ILogger& log,
     CryptoNote::IWalletLegacy &w, 
     CryptoNote::INode &n, 
