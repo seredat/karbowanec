@@ -22,7 +22,9 @@ public:
   typedef std::vector<JsonValue> Array;
   typedef bool Bool;
   typedef int64_t Integer;
+#ifndef Nil
   typedef std::nullptr_t Nil;
+#endif
   typedef std::map<Key, JsonValue> Object;
   typedef double Real;
   typedef std::string String;
