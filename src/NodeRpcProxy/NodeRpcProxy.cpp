@@ -333,8 +333,7 @@ void NodeRpcProxy::updateBlockchainStatus() {
     m_connected = true;
     m_rpcProxyObserverManager.notify(&INodeRpcProxyObserver::connectionStatusUpdated, m_connected);
   }
-  
-  if ((!(!ec) && m_connected) || (m_initial && !(!ec) && !m_connected)) {
+  else if ((!(!ec) && m_connected) || (m_initial && !(!ec) && !m_connected)) {
     m_connected = false;
     m_rpcProxyObserverManager.notify(&INodeRpcProxyObserver::connectionStatusUpdated, m_connected);
   }
