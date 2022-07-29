@@ -71,6 +71,7 @@
 #include "Common/ColouredMsg.h"
 #include "CryptoNoteCore/Account.h"
 #include "CryptoNoteCore/CryptoNoteFormatUtils.h"
+#include "CryptoNoteCore/CryptoNoteTools.h"
 #include "CryptoNoteProtocol/CryptoNoteProtocolHandler.h"
 #include "NodeRpcProxy/NodeRpcProxy.h"
 #include "Rpc/CoreRpcServerCommandsDefinitions.h"
@@ -1260,7 +1261,9 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
       && addressPrefix == parameters::CRYPTONOTE_PUBLIC_ADDRESS_BASE58_PREFIX
       && data.size() == sizeof(keys))
     {
-      std::memcpy(&keys, data.data(), sizeof(keys));
+      if (!fromBinaryArray(keys, Common::asBinaryArray(data))) {
+        logger(ERROR, BRIGHT_RED) << "Failed to parse account keys";
+      }
     }
 
     if (!new_wallet(walletFileName, pwd_container.password(), keys))
