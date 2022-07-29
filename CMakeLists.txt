@@ -536,7 +536,7 @@ endif()
 
 if(OPENSSL_FOUND)
   ## On non MSVC build systems, we need to link ldl with the static OpenSSL library
-  if(NOT MSVC)
+  if(NOT MSVC AND NOT MINGW)
     set(OPENSSL_LIBRARIES "${OPENSSL_LIBRARIES};dl")
   endif()
 
