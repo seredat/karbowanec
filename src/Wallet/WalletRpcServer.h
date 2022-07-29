@@ -21,6 +21,7 @@
 #pragma  once
 
 #include <future>
+#include <thread>
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/variables_map.hpp>
 
@@ -30,8 +31,6 @@
 #include "Logging/LoggerRef.h"
 #include "WalletRpcServerCommandsDefinitions.h"
 #include "WalletLegacy/WalletLegacy.h"
-#include "System/Dispatcher.h"
-#include "System/RemoteContext.h"
 
 namespace Tools
 {
@@ -39,7 +38,6 @@ class wallet_rpc_server
 {
 public:
   wallet_rpc_server(
-    System::Dispatcher& dispatcher, 
     Logging::ILogger& log,
     CryptoNote::IWalletLegacy &w, 
     CryptoNote::INode &n, 
@@ -61,8 +59,7 @@ public:
   bool init(const boost::program_options::variables_map& vm);
   void getServerConf(std::string &bind_address, std::string &bind_address_ssl, bool &enable_ssl);
     
-  bool run(bool noEvent = false);
-  void send_stop_signal();
+  bool run();
   void stop();
 
 private:
@@ -103,9 +100,7 @@ private:
   httplib::Server* http;
   httplib::SSLServer* https;
   Logging::LoggerRef logger;
-  System::Dispatcher& m_dispatcher;
-  System::Event m_stopComplete;
-  std::vector<std::unique_ptr<System::RemoteContext<void>>> m_workers;
+  std::list<std::thread> m_workers;
 
   bool m_enable_ssl;
   bool m_run_ssl;
