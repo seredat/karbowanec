@@ -2498,7 +2498,9 @@ int main(int argc, char* argv[]) {
    setlocale(LC_ALL, "Russian");
    SetConsoleCP(1251);
    SetConsoleOutputCP(1251);
+#if defined( _MSC_VER )
   _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+#endif
 #endif
 
   setbuf(stdout, NULL);
