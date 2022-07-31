@@ -243,11 +243,6 @@ int main(int argc, char** argv) {
 
     System::Dispatcher dispatcher;
 
-#ifdef _WIN32
-    std::string consoletitle = std::string(CryptoNote::CRYPTONOTE_NAME) + " address generator v. " + std::string(PROJECT_VERSION_LONG);
-    SetConsoleTitleA(consoletitle.c_str());
-#endif
-
     std::string coinName(CryptoNote::CRYPTONOTE_NAME);
     std::cout << InformationMsg(coinName + " address generator v. " + std::string(PROJECT_VERSION)) << std::endl;
 

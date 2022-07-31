@@ -11,9 +11,11 @@
 #include <boost/filesystem.hpp>
 
 #include <Common/Base58.h>
+#include <Common/StringTools.h>
 
 #include <CryptoNoteCore/Account.h>
 #include <CryptoNoteCore/CryptoNoteBasicImpl.h>
+#include <CryptoNoteCore/CryptoNoteTools.h>
 
 #include <Mnemonics/electrum-words.h>
 
@@ -142,8 +144,9 @@ std::shared_ptr<WalletInfo> importGUIWallet(CryptoNote::WalletGreen &wallet)
         break;
     }
 
-    /* Copy the keys into the struct */
-    std::memcpy(&keys, data.data(), sizeof(keys));
+    if (!fromBinaryArray(keys, Common::asBinaryArray(data))) {
+        std::cout << WarningMsg("Failed to parse account keys") << std::endl;
+    }
 
     return importFromKeys(wallet, keys.spendSecretKey, keys.viewSecretKey);
 }

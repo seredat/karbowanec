@@ -10,6 +10,8 @@
 #include <boost/algorithm/string.hpp>
 
 #include <cmath>
+#include <chrono>
+#include <thread>
 
 #include <Common/Base58.h>
 #include <Common/StringTools.h>
@@ -23,6 +25,8 @@
 #include <Common/ColouredMsg.h>
 #include <Common/PasswordContainer.h>
 #include <GreenWallet/WalletConfig.h>
+
+#define _GLIBCXX_USE_NANOSLEEP 1
 
 void confirmPassword(std::string walletPass, std::string msg)
 {
