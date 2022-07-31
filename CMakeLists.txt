@@ -139,7 +139,7 @@ else()
   set(DEFAULT_STATIC false)
 endif()
 
-if(MSVC)
+if(MSVC OR MINGW)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/Platform/Windows)
 elseif(APPLE)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/Platform/OSX)
@@ -157,6 +157,10 @@ endif()
 
 option(STATIC "Link libraries statically" ${DEFAULT_STATIC})
 set(STATIC ${MSVC} CACHE BOOL "Link libraries statically")
+
+if(MINGW AND STATIC)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static-libstdc++ -static-libgcc")
+endif()
 
 # This is a CMake built-in switch that concerns internal libraries
 if(NOT DEFINED BUILD_SHARED_LIBS AND NOT STATIC AND CMAKE_BUILD_TYPE_LOWER STREQUAL "debug")
@@ -530,7 +534,7 @@ endif()
 
 if(OPENSSL_FOUND)
   ## On non MSVC build systems, we need to link ldl with the static OpenSSL library
-  if(NOT MSVC)
+  if(NOT MSVC AND NOT MINGW)
     set(OPENSSL_LIBRARIES "${OPENSSL_LIBRARIES};dl")
   endif()
 
@@ -542,7 +546,7 @@ else()
 endif()
 
 if(MINGW)
-  set(Boost_LIBRARIES "${Boost_LIBRARIES};ws2_32;mswsock;iphlpapi")
+  set(Boost_LIBRARIES "${Boost_LIBRARIES};ws2_32;mswsock;iphlpapi;bcrypt")
 elseif(APPLE OR OPENBSD OR ANDROID)
   set(Boost_LIBRARIES "${Boost_LIBRARIES}")
 elseif(NOT MSVC)
@@ -550,7 +554,7 @@ elseif(NOT MSVC)
 endif()
 
 if(MINGW)
-  set(EXTRA_LIBRARIES mswsock;ws2_32;iphlpapi)
+  set(EXTRA_LIBRARIES mswsock;ws2_32;iphlpapi;bcrypt)
 elseif(APPLE OR OPENBSD OR ANDROID)
   set(EXTRA_LIBRARIES "")
 elseif(FREEBSD)
@@ -561,6 +565,10 @@ elseif(DRAGONFLY)
 elseif(NOT MSVC)
   find_library(RT rt)
   set(EXTRA_LIBRARIES ${RT})
+endif()
+
+if(MINGW AND STATIC)
+  set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-Bstatic,--whole-archive -lwinpthread -Wl,--no-whole-archive")
 endif()
 
 list(APPEND EXTRA_LIBRARIES ${CMAKE_DL_LIBS})

@@ -9,9 +9,14 @@
 
 #include <boost/algorithm/string.hpp>
 
+#include <chrono>
+#include <thread>
+
 #include "linenoise.hpp"
 
 #include <GreenWallet/Sync.h>
+
+#define _GLIBCXX_USE_NANOSLEEP 1
 
 /* Note: this is not portable, it only works with terminals that support ANSI
    codes (e.g., not Windows) - however! due to the way linenoise-cpp works,

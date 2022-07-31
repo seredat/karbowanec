@@ -9,6 +9,9 @@
 
 #include <boost/algorithm/string.hpp>
 
+#include <chrono>
+#include <thread>
+
 #include <Common/StringTools.h>
 
 #include "CryptoNoteConfig.h"
@@ -19,6 +22,8 @@
 #include <iostream>
 
 #include "IWallet.h"
+
+#define _GLIBCXX_USE_NANOSLEEP 1
 
 #ifndef __has_cpp_attribute
 #define __has_cpp_attribute(name) 0
