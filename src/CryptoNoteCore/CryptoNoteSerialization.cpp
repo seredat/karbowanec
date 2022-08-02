@@ -461,5 +461,29 @@ void serialize(KeyPair& keyPair, ISerializer& serializer) {
   serializer(keyPair.publicKey, "public_key");
 }
 
+void serialize(CryptoNote::Difficulty& difficulty, ISerializer& serializer) {
+  if (serializer.type() == ISerializer::OUTPUT) {
+    // store high part
+    CryptoNote::Difficulty x_ = difficulty >> 64;
+    uint64_t v = x_.convert_to<uint64_t>();
+    serializer(v, "hi");
+    
+    // store low part
+    x_ = difficulty << 64 >> 64;
+    v = x_.convert_to<uint64_t>();
+    serializer(v, "lo");
+  }
+  else {
+    // load high part
+    uint64_t v = 0;
+    serializer(v, "hi");
+    difficulty = v;
+    // load low part
+    difficulty = difficulty << 64;
+    serializer(v, "lo");
+    difficulty += v;
+  }
+}
+
 
 } //namespace CryptoNote

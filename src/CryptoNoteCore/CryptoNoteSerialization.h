@@ -20,6 +20,7 @@
 #include "CryptoNoteBasic.h"
 #include "crypto/chacha8.h"
 #include "Serialization/ISerializer.h"
+#include "Difficulty.h"
 #include "crypto/crypto.h"
 
 namespace Crypto {
@@ -65,5 +66,7 @@ void serialize(AccountPublicAddress& address, ISerializer& serializer);
 void serialize(AccountKeys& keys, ISerializer& s);
 
 void serialize(KeyPair& keyPair, ISerializer& serializer);
+
+void serialize(CryptoNote::Difficulty& difficulty, ISerializer& serializer);
 
 }

@@ -1589,7 +1589,7 @@ bool RpcServer::on_get_explorer(const COMMAND_EXPLORER::request& req, COMMAND_EX
     struct tm* timeinfo;
     timeinfo = gmtime(&rawtime);
 
-    Difficulty blockDifficulty;
+    uint64_t blockDifficulty;
     m_core.getBlockDifficulty(static_cast<uint32_t>(i), blockDifficulty);
     size_t tx_cumulative_block_size;
     m_core.getBlockSize(blockHash, tx_cumulative_block_size);
@@ -2425,7 +2425,7 @@ bool RpcServer::on_blocks_list_json(const COMMAND_RPC_GET_BLOCKS_LIST::request& 
     m_core.getBlockSize(block_hash, tx_cumulative_block_size);
     size_t blokBlobSize = getObjectBinarySize(blk);
     size_t minerTxBlobSize = getObjectBinarySize(blk.baseTransaction);
-    Difficulty blockDiff;
+    uint64_t blockDiff;
     m_core.getBlockDifficulty(static_cast<uint32_t>(i), blockDiff);
 
     block_short_response block_short;
@@ -2457,7 +2457,7 @@ bool RpcServer::on_alt_blocks_list_json(const COMMAND_RPC_GET_ALT_BLOCKS_LIST::r
       m_core.getBlockSize(block_hash, tx_cumulative_block_size);
       size_t blokBlobSize = getObjectBinarySize(b);
       size_t minerTxBlobSize = getObjectBinarySize(b.baseTransaction);
-      Difficulty blockDiff;
+      uint64_t blockDiff;
       m_core.getBlockDifficulty(static_cast<uint32_t>(block_height), blockDiff);
 
       block_short_response block_short;
@@ -2626,10 +2626,13 @@ bool RpcServer::on_getblocktemplate(const COMMAND_RPC_GETBLOCKTEMPLATE::request&
   Block b = boost::value_initialized<Block>();
   CryptoNote::BinaryArray blob_reserve;
   blob_reserve.resize(req.reserve_size, 0);
-  if (!m_core.get_block_template(b, keys, res.difficulty, res.height, blob_reserve)) {
+
+  CryptoNote::Difficulty diff;
+  if (!m_core.get_block_template(b, keys, diff, res.height, blob_reserve)) {
     logger(Logging::ERROR) << "Failed to create block template";
     throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_INTERNAL_ERROR, "Internal error: failed to create block template" };
   }
+  res.difficulty = diff.convert_to<std::uint64_t>(); // wide diff may be not needed, as only cumulative will ever get this high
 
   BinaryArray block_blob = toBinaryArray(b);
   Crypto::PublicKey tx_pub_key = CryptoNote::getTransactionPublicKeyFromExtra(b.baseTransaction.extra);

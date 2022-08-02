@@ -27,7 +27,9 @@
 
 namespace CryptoNote
 {
-    typedef std::uint64_t Difficulty;
+    typedef boost::multiprecision::uint128_t Difficulty;
 
     bool check_hash(const Crypto::Hash &hash, Difficulty difficulty);
+    bool check_hash_64(const Crypto::Hash& hash, uint64_t difficulty);
+    bool check_hash_128(const Crypto::Hash& hash, Difficulty difficulty);
 }

@@ -1688,24 +1688,24 @@ uint64_t Blockchain::blockDifficulty(size_t i) {
   std::lock_guard<decltype(m_blockchain_lock)> lk(m_blockchain_lock);
   if (!(i < m_blocks.size())) { logger(ERROR, BRIGHT_RED) << "wrong block index i = " << i << " at Blockchain::block_difficulty()"; return false; }
   if (i == 0)
-    return m_blocks[i].cumulative_difficulty;
+    return m_blocks[i].cumulative_difficulty.convert_to<std::uint64_t>();
 
-  return m_blocks[i].cumulative_difficulty - m_blocks[i - 1].cumulative_difficulty;
+  return (m_blocks[i].cumulative_difficulty - m_blocks[i - 1].cumulative_difficulty).convert_to<std::uint64_t>();
 }
 
-uint64_t Blockchain::blockCumulativeDifficulty(size_t i) {
+Difficulty Blockchain::blockCumulativeDifficulty(size_t i) {
   std::lock_guard<decltype(m_blockchain_lock)> lk(m_blockchain_lock);
   if (!(i < m_blocks.size())) { logger(ERROR, BRIGHT_RED) << "wrong block index i = " << i << " at Blockchain::block_difficulty()"; return false; }
 
   return m_blocks[i].cumulative_difficulty;
 }
 
-bool Blockchain::getblockEntry(size_t i, uint64_t& block_cumulative_size, Difficulty& difficulty, uint64_t& already_generated_coins, uint64_t& reward, uint64_t& transactions_count, uint64_t& timestamp) {
+bool Blockchain::getblockEntry(size_t i, uint64_t& block_cumulative_size, uint64_t& difficulty, uint64_t& already_generated_coins, uint64_t& reward, uint64_t& transactions_count, uint64_t& timestamp) {
   std::lock_guard<decltype(m_blockchain_lock)> lk(m_blockchain_lock);
   if (!(i < m_blocks.size())) { logger(ERROR, BRIGHT_RED) << "wrong block index i = " << i << " at Blockchain::get_block_entry()"; return false; }
 
   block_cumulative_size = m_blocks[i].block_cumulative_size;
-  difficulty = m_blocks[i].cumulative_difficulty - m_blocks[i - 1].cumulative_difficulty;
+  difficulty = (m_blocks[i].cumulative_difficulty - m_blocks[i - 1].cumulative_difficulty).convert_to<std::uint64_t>();
   already_generated_coins = m_blocks[i].already_generated_coins;
   reward = m_blocks[i].already_generated_coins - m_blocks[i - 1].already_generated_coins;
   timestamp = m_blocks[i].bl.timestamp;

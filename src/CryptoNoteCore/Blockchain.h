@@ -115,8 +115,8 @@ namespace CryptoNote {
     bool checkTransactionInputs(const Transaction& tx, uint32_t& pmax_used_block_height, Crypto::Hash& max_used_block_id, BlockInfo* tail = 0);
     uint64_t getCurrentCumulativeBlocksizeLimit();
     uint64_t blockDifficulty(size_t i);
-    uint64_t blockCumulativeDifficulty(size_t i);
-    bool getblockEntry(size_t i, uint64_t& block_cumulative_size, Difficulty& difficulty, uint64_t& already_generated_coins, uint64_t& reward, uint64_t& transactions_count, uint64_t& timestamp);
+    Difficulty blockCumulativeDifficulty(size_t i);
+    bool getblockEntry(size_t i, uint64_t& block_cumulative_size, uint64_t& difficulty, uint64_t& already_generated_coins, uint64_t& reward, uint64_t& transactions_count, uint64_t& timestamp);
     bool getBlockContainingTransaction(const Crypto::Hash& txId, Crypto::Hash& blockId, uint32_t& blockHeight);
     bool getAlreadyGeneratedCoins(const Crypto::Hash& hash, uint64_t& generatedCoins);
     bool getBlockSize(const Crypto::Hash& hash, size_t& size);

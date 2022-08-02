@@ -168,7 +168,7 @@ size_t Core::getAlternativeBlocksCount() {
   return m_blockchain.getAlternativeBlocksCount();
 }
 
-bool Core::getblockEntry(uint32_t height, uint64_t& block_cumulative_size, Difficulty& difficulty, uint64_t& already_generated_coins, uint64_t& reward, uint64_t& transactions_count, uint64_t& timestamp) {
+bool Core::getblockEntry(uint32_t height, uint64_t& block_cumulative_size, uint64_t& difficulty, uint64_t& already_generated_coins, uint64_t& reward, uint64_t& transactions_count, uint64_t& timestamp) {
   return m_blockchain.getblockEntry(static_cast<size_t>(height), block_cumulative_size, difficulty, already_generated_coins, reward, transactions_count, timestamp);
 }
 
@@ -1098,7 +1098,7 @@ bool Core::getBlockTimestamp(uint32_t height, uint64_t& timestamp) {
   return true;
 }
 
-bool Core::getBlockDifficulty(uint32_t height, Difficulty& difficulty) {
+bool Core::getBlockDifficulty(uint32_t height, uint64_t& difficulty) {
   difficulty = m_blockchain.blockDifficulty(height);
   return true;
 }
@@ -1225,7 +1225,7 @@ std::error_code Core::executeLocked(const std::function<std::error_code()>& func
 }
 
 uint64_t Core::getNextBlockDifficulty() {
-  return m_blockchain.getDifficultyForNextBlock(get_tail_id());
+  return m_blockchain.getDifficultyForNextBlock(get_tail_id()).convert_to<std::uint64_t>();
 }
 
 uint64_t Core::getTotalGeneratedAmount() {

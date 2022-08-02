@@ -21,11 +21,12 @@
 #include <array>
 #include <string>
 #include <vector>
+#include <boost/variant.hpp>
 
 #include "CryptoTypes.h"
 #include "CryptoNote.h"
+#include "CryptoNoteCore/Difficulty.h"
 #include "BlockchainExplorerData.h"
-#include <boost/variant.hpp>
 
 namespace CryptoNote {
 
@@ -154,7 +155,7 @@ struct BlockDetails {
   uint32_t depth = 0;
   Crypto::Hash hash;
   uint64_t difficulty = 0;
-  uint64_t cumulativeDifficulty = 0;
+  CryptoNote::Difficulty cumulativeDifficulty;
   uint64_t reward = 0;
   uint64_t baseReward = 0;
   uint64_t blockSize = 0;

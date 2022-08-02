@@ -476,7 +476,7 @@ namespace CryptoNote {
 		assert(totalWork > 0);
 
 		uint64_t low, high;
-		low = mul128(totalWork, m_difficultyTarget, &high);
+		low = mul128(totalWork.convert_to<uint64_t>(), m_difficultyTarget, &high);
 		if (high != 0 || low + timeSpan - 1 < low) {
 			return 0;
 		}
@@ -521,7 +521,7 @@ namespace CryptoNote {
 		// uint64_t nextDiffZ = totalWork * m_difficultyTarget / timeSpan; 
 
 		uint64_t low, high;
-		low = mul128(totalWork, m_difficultyTarget, &high);
+		low = mul128(totalWork.convert_to<std::uint64_t>(), m_difficultyTarget, &high);
 		// blockchain error "Difficulty overhead" if this function returns zero
 		if (high != 0) {
 			return 0;
@@ -573,7 +573,7 @@ namespace CryptoNote {
 
 		double LWMA(0), sum_inverse_D(0), harmonic_mean_D(0), nextDifficulty(0);
 		int64_t solveTime(0);
-		uint64_t difficulty(0), next_difficulty(0);
+		CryptoNote::Difficulty difficulty(0), next_difficulty(0);
 
 		// Loop through N most recent blocks.
 		for (size_t i = 1; i <= N; i++) {
@@ -617,7 +617,7 @@ namespace CryptoNote {
 		const int64_t  T = static_cast<int64_t>(m_difficultyTarget);
 		int64_t  N = difficultyBlocksCount3();
 		int64_t  L(0), ST, sum_3_ST(0);
-		uint64_t next_D, prev_D;
+		CryptoNote::Difficulty next_D, prev_D;
 
 		assert(timestamps.size() == cumulativeDifficulties.size() && timestamps.size() <= static_cast<uint64_t>(N + 1));
 
@@ -645,11 +645,11 @@ namespace CryptoNote {
 			}
 		}
 
-		next_D = uint64_t((cumulativeDifficulties[N] - cumulativeDifficulties[0]) * T * (N + 1)) / uint64_t(2 * L);
+		next_D = (cumulativeDifficulties[N] - cumulativeDifficulties[0]) * T * (N + 1) / uint64_t(2 * L);
 		next_D = (next_D * 99ull) / 100ull;
 
 		prev_D = cumulativeDifficulties[N] - cumulativeDifficulties[N - 1];
-		next_D = clamp((uint64_t)(prev_D * 67ull / 100ull), next_D, (uint64_t)(prev_D * 150ull / 100ull));
+		next_D = clamp((CryptoNote::Difficulty)(prev_D * 67ull / 100ull), next_D, (CryptoNote::Difficulty)(prev_D * 150ull / 100ull));
 		if (sum_3_ST < (8 * T) / 10)
 		{
 			next_D = (prev_D * 110ull) / 100ull;
@@ -676,7 +676,7 @@ namespace CryptoNote {
     height--; // there's difference between karbo1 and karbo2 here (height vs top block index)
 
     if (height == upgradeHeight(CryptoNote::BLOCK_MAJOR_VERSION_5)) {
-		return cumulativeDifficulties[0] / height / RESET_WORK_FACTOR_V5;
+		return cumulativeDifficulties[0].convert_to<uint64_t>() / height / RESET_WORK_FACTOR_V5;
     }
     uint32_t count = (uint32_t)difficultyBlocksCountByBlockVersion(blockMajorVersion) - 1;
     if (height > upgradeHeight(CryptoNote::BLOCK_MAJOR_VERSION_5) && height < CryptoNote::parameters::UPGRADE_HEIGHT_V5 + count) {
@@ -690,8 +690,9 @@ namespace CryptoNote {
     assert(timestamps.size() == cumulativeDifficulties.size());
 
     const int64_t T = static_cast<int64_t>(m_difficultyTarget);
-    uint64_t N = std::min<uint64_t>(difficultyBlocksCount4(), cumulativeDifficulties.size() - 1); // adjust for new epoch difficulty reset, N should be by 1 block smaller
-    uint64_t L(0), avg_D, next_D, i, this_timestamp(0), previous_timestamp(0);
+		uint64_t N = std::min<uint64_t>(difficultyBlocksCount4(), cumulativeDifficulties.size() - 1); // adjust for new epoch difficulty reset, N should be by 1 block smaller
+    uint64_t i, this_timestamp(0), previous_timestamp(0);
+		uint64_t L(0), avg_D, next_D;
 
     previous_timestamp = timestamps[0] - T;
     for (i = 1; i <= N; i++) {
@@ -702,7 +703,7 @@ namespace CryptoNote {
       previous_timestamp = this_timestamp;
     }
     if (L < N * N * T / 20) { L = N * N * T / 20; }
-    avg_D = (cumulativeDifficulties[N] - cumulativeDifficulties[0]) / N;
+    avg_D = (cumulativeDifficulties[N] - cumulativeDifficulties[0]).convert_to<uint64_t>() / N;
 
     // Prevent round off error for small D and overflow for large D.
     if (avg_D > 2000000 * N * N * T) {
