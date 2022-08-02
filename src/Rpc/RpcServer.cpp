@@ -1674,7 +1674,7 @@ bool RpcServer::on_blocks_list_json(const COMMAND_RPC_GET_BLOCKS_LIST::request& 
     m_core.getBlockSize(block_hash, tx_cumulative_block_size);
     size_t blokBlobSize = getObjectBinarySize(blk);
     size_t minerTxBlobSize = getObjectBinarySize(blk.baseTransaction);
-    difficulty_type blockDiff;
+    Difficulty blockDiff;
     m_core.getBlockDifficulty(static_cast<uint32_t>(i), blockDiff);
 
     block_short_response block_short;
@@ -1706,7 +1706,7 @@ bool RpcServer::on_alt_blocks_list_json(const COMMAND_RPC_GET_ALT_BLOCKS_LIST::r
       m_core.getBlockSize(block_hash, tx_cumulative_block_size);
       size_t blokBlobSize = getObjectBinarySize(b);
       size_t minerTxBlobSize = getObjectBinarySize(b.baseTransaction);
-      difficulty_type blockDiff;
+      Difficulty blockDiff;
       m_core.getBlockDifficulty(static_cast<uint32_t>(block_height), blockDiff);
 
       block_short_response block_short;
