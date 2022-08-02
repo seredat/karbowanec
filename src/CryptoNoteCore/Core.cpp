@@ -168,7 +168,7 @@ size_t Core::getAlternativeBlocksCount() {
   return m_blockchain.getAlternativeBlocksCount();
 }
 
-bool Core::getblockEntry(uint32_t height, uint64_t& block_cumulative_size, difficulty_type& difficulty, uint64_t& already_generated_coins, uint64_t& reward, uint64_t& transactions_count, uint64_t& timestamp) {
+bool Core::getblockEntry(uint32_t height, uint64_t& block_cumulative_size, Difficulty& difficulty, uint64_t& already_generated_coins, uint64_t& reward, uint64_t& transactions_count, uint64_t& timestamp) {
   return m_blockchain.getblockEntry(static_cast<size_t>(height), block_cumulative_size, difficulty, already_generated_coins, reward, transactions_count, timestamp);
 }
 
@@ -501,7 +501,7 @@ bool Core::add_new_tx(const Transaction& tx, const Crypto::Hash& tx_hash, size_t
   return m_mempool.add_tx(tx, tx_hash, blob_size, tvc, keeped_by_block);
 }
 
-bool Core::get_block_template(Block& b, const AccountKeys& acc, difficulty_type& diffic, uint32_t& height, const BinaryArray& ex_nonce) {
+bool Core::get_block_template(Block& b, const AccountKeys& acc, Difficulty& diffic, uint32_t& height, const BinaryArray& ex_nonce) {
   size_t median_size;
   uint64_t already_generated_coins;
 
@@ -1098,12 +1098,12 @@ bool Core::getBlockTimestamp(uint32_t height, uint64_t& timestamp) {
   return true;
 }
 
-bool Core::getBlockDifficulty(uint32_t height, difficulty_type& difficulty) {
+bool Core::getBlockDifficulty(uint32_t height, Difficulty& difficulty) {
   difficulty = m_blockchain.blockDifficulty(height);
   return true;
 }
 
-bool Core::getBlockCumulativeDifficulty(uint32_t height, difficulty_type& difficulty) {
+bool Core::getBlockCumulativeDifficulty(uint32_t height, Difficulty& difficulty) {
   difficulty = m_blockchain.blockCumulativeDifficulty(height);
   return true;
 }

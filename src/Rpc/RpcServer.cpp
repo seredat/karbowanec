@@ -1589,7 +1589,7 @@ bool RpcServer::on_get_explorer(const COMMAND_EXPLORER::request& req, COMMAND_EX
     struct tm* timeinfo;
     timeinfo = gmtime(&rawtime);
 
-    difficulty_type blockDifficulty;
+    Difficulty blockDifficulty;
     m_core.getBlockDifficulty(static_cast<uint32_t>(i), blockDifficulty);
     size_t tx_cumulative_block_size;
     m_core.getBlockSize(blockHash, tx_cumulative_block_size);
@@ -2425,7 +2425,7 @@ bool RpcServer::on_blocks_list_json(const COMMAND_RPC_GET_BLOCKS_LIST::request& 
     m_core.getBlockSize(block_hash, tx_cumulative_block_size);
     size_t blokBlobSize = getObjectBinarySize(blk);
     size_t minerTxBlobSize = getObjectBinarySize(blk.baseTransaction);
-    difficulty_type blockDiff;
+    Difficulty blockDiff;
     m_core.getBlockDifficulty(static_cast<uint32_t>(i), blockDiff);
 
     block_short_response block_short;
@@ -2457,7 +2457,7 @@ bool RpcServer::on_alt_blocks_list_json(const COMMAND_RPC_GET_ALT_BLOCKS_LIST::r
       m_core.getBlockSize(block_hash, tx_cumulative_block_size);
       size_t blokBlobSize = getObjectBinarySize(b);
       size_t minerTxBlobSize = getObjectBinarySize(b.baseTransaction);
-      difficulty_type blockDiff;
+      Difficulty blockDiff;
       m_core.getBlockDifficulty(static_cast<uint32_t>(block_height), blockDiff);
 
       block_short_response block_short;

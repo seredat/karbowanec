@@ -731,14 +731,14 @@ bool Blockchain::getTransactionHeight(const Crypto::Hash &txId, uint32_t& blockH
   return false;
 }
 
-difficulty_type Blockchain::getDifficultyForNextBlock(const Crypto::Hash &prevHash) {
+Difficulty Blockchain::getDifficultyForNextBlock(const Crypto::Hash &prevHash) {
   if (prevHash == NULL_HASH) {
     return 1;
   }
 
   std::lock_guard<decltype(m_blockchain_lock)> lk(m_blockchain_lock);
   std::vector<uint64_t> timestamps;
-  std::vector<difficulty_type> cumulative_difficulties;
+  std::vector<Difficulty> cumulative_difficulties;
 
   uint32_t height = static_cast<uint32_t>(m_blocks.size());
   uint8_t BlockMajorVersion = getBlockMajorVersionForHeight(height);
@@ -1176,13 +1176,13 @@ bool Blockchain::getHashingBlob(const uint32_t height, BinaryArray& blob) {
   return true;
 }
 
-bool Blockchain::checkProofOfWork(Crypto::cn_context& context, const Block& block, difficulty_type currentDiffic, Crypto::Hash& proofOfWork) {
+bool Blockchain::checkProofOfWork(Crypto::cn_context& context, const Block& block, Difficulty currentDiffic, Crypto::Hash& proofOfWork) {
   std::list<Crypto::Hash> dummy_alt_chain;
 
   return checkProofOfWork(context, block, currentDiffic, proofOfWork, dummy_alt_chain, m_no_blobs);
 }
 
-bool Blockchain::checkProofOfWork(Crypto::cn_context& context, const Block& block, difficulty_type currentDiffic, Crypto::Hash& proofOfWork, const std::list<Crypto::Hash>& alt_chain, bool no_blobs) {
+bool Blockchain::checkProofOfWork(Crypto::cn_context& context, const Block& block, Difficulty currentDiffic, Crypto::Hash& proofOfWork, const std::list<Crypto::Hash>& alt_chain, bool no_blobs) {
   if (block.majorVersion < CryptoNote::BLOCK_MAJOR_VERSION_5)
     return m_currency.checkProofOfWork(context, block, currentDiffic, proofOfWork);
 
@@ -1398,7 +1398,7 @@ bool Blockchain::handle_alternative_block(const Block& b, const Crypto::Hash& id
     }
 
     // Check the block's hash against the difficulty target for its alt chain
-    difficulty_type current_diff = getDifficultyForNextBlock(bei.bl.previousBlockHash);
+    Difficulty current_diff = getDifficultyForNextBlock(bei.bl.previousBlockHash);
     if (!current_diff) {
       logger(ERROR, BRIGHT_RED) << "!!!!!!! DIFFICULTY OVERHEAD !!!!!!!";
       return false;
@@ -1700,7 +1700,7 @@ uint64_t Blockchain::blockCumulativeDifficulty(size_t i) {
   return m_blocks[i].cumulative_difficulty;
 }
 
-bool Blockchain::getblockEntry(size_t i, uint64_t& block_cumulative_size, difficulty_type& difficulty, uint64_t& already_generated_coins, uint64_t& reward, uint64_t& transactions_count, uint64_t& timestamp) {
+bool Blockchain::getblockEntry(size_t i, uint64_t& block_cumulative_size, Difficulty& difficulty, uint64_t& already_generated_coins, uint64_t& reward, uint64_t& transactions_count, uint64_t& timestamp) {
   std::lock_guard<decltype(m_blockchain_lock)> lk(m_blockchain_lock);
   if (!(i < m_blocks.size())) { logger(ERROR, BRIGHT_RED) << "wrong block index i = " << i << " at Blockchain::get_block_entry()"; return false; }
 
@@ -2247,7 +2247,7 @@ bool Blockchain::pushBlock(const Block& blockData, const std::vector<Transaction
   }
 
   auto targetTimeStart = std::chrono::steady_clock::now();
-  difficulty_type currentDifficulty = getDifficultyForNextBlock(blockData.previousBlockHash);
+  Difficulty currentDifficulty = getDifficultyForNextBlock(blockData.previousBlockHash);
   auto target_calculating_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - targetTimeStart).count();
 
   if (!(currentDifficulty)) {
