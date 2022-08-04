@@ -39,18 +39,11 @@ struct TransactionOutputToKeyDetails {
   Crypto::PublicKey txOutKey;
 };
 
-struct TransactionOutputMultisignatureDetails {
-  std::vector<Crypto::PublicKey> keys;
-  uint32_t requiredSignatures;
-};
-
 struct TransactionOutputDetails {
   uint64_t amount;
   uint32_t globalIndex;
 
-  boost::variant<
-    TransactionOutputToKeyDetails,
-    TransactionOutputMultisignatureDetails> output;
+  boost::variant<TransactionOutputToKeyDetails> output;
 };
 
 struct TransactionOutputReferenceDetails {
@@ -79,8 +72,7 @@ struct TransactionInputDetails {
 
   boost::variant<
     TransactionInputGenerateDetails,
-    TransactionInputToKeyDetails,
-    TransactionInputMultisignatureDetails> input;
+    TransactionInputToKeyDetails> input;
 };
 
 struct TransactionExtraDetails {
@@ -106,12 +98,7 @@ struct KeyInputDetails {
   std::vector<TransactionOutputReferenceDetails> outputs;
 };
 
-struct MultisignatureInputDetails {
-  MultisignatureInput input;
-  TransactionOutputReferenceDetails output;
-};
-
-typedef boost::variant<BaseInputDetails, KeyInputDetails, MultisignatureInputDetails> transactionInputDetails2;
+typedef boost::variant<BaseInputDetails, KeyInputDetails> transactionInputDetails2;
 
 struct TransactionExtraDetails2 {
   std::vector<size_t> padding;

@@ -45,9 +45,6 @@ size_t getRequiredSignaturesCount(const TransactionInput& in) {
   if (in.type() == typeid(KeyInput)) {
     return boost::get<KeyInput>(in).outputIndexes.size();
   }
-  if (in.type() == typeid(MultisignatureInput)) {
-    return boost::get<MultisignatureInput>(in).signatureCount;
-  }
   return 0;
 }
 
@@ -55,18 +52,12 @@ uint64_t getTransactionInputAmount(const TransactionInput& in) {
   if (in.type() == typeid(KeyInput)) {
     return boost::get<KeyInput>(in).amount;
   }
-  if (in.type() == typeid(MultisignatureInput)) {
-    return boost::get<MultisignatureInput>(in).amount;
-  }
   return 0;
 }
 
 TransactionTypes::InputType getTransactionInputType(const TransactionInput& in) {
   if (in.type() == typeid(KeyInput)) {
     return TransactionTypes::InputType::Key;
-  }
-  if (in.type() == typeid(MultisignatureInput)) {
-    return TransactionTypes::InputType::Multisignature;
   }
   if (in.type() == typeid(BaseInput)) {
     return TransactionTypes::InputType::Generating;
@@ -94,9 +85,6 @@ const TransactionInput& getInputChecked(const CryptoNote::TransactionPrefix& tra
 TransactionTypes::OutputType getTransactionOutputType(const TransactionOutputTarget& out) {
   if (out.type() == typeid(KeyOutput)) {
     return TransactionTypes::OutputType::Key;
-  }
-  if (out.type() == typeid(MultisignatureOutput)) {
-    return TransactionTypes::OutputType::Multisignature;
   }
   return TransactionTypes::OutputType::Invalid;
 }
@@ -139,21 +127,13 @@ bool findOutputsToAccount(const CryptoNote::TransactionPrefix& transaction, cons
   generate_key_derivation(txPubKey, keys.viewSecretKey, derivation);
 
   for (const TransactionOutput& o : transaction.outputs) {
-    assert(o.target.type() == typeid(KeyOutput) || o.target.type() == typeid(MultisignatureOutput));
+    assert(o.target.type() == typeid(KeyOutput));
     if (o.target.type() == typeid(KeyOutput)) {
       if (is_out_to_acc(keys, boost::get<KeyOutput>(o.target), derivation, keyIndex)) {
         out.push_back(outputIndex);
         amount += o.amount;
       }
       ++keyIndex;
-    } else if (o.target.type() == typeid(MultisignatureOutput)) {
-      const auto& target = boost::get<MultisignatureOutput>(o.target);
-      for (const auto& key : target.keys) {
-        if (isOutToKey(keys.address.spendPublicKey, key, derivation, static_cast<size_t>(outputIndex))) {
-          out.push_back(outputIndex);
-        }
-        ++keyIndex;
-      }
     }
     ++outputIndex;
   }

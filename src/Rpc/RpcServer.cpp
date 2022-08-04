@@ -1924,16 +1924,6 @@ bool RpcServer::on_get_explorer_tx_by_hash(const COMMAND_EXPLORER_GET_TRANSACTIO
         body.pop_back();
         body += "    </td>\n";
       }
-      else if (in.type() == typeid(MultisignatureInputDetails)) {
-        MultisignatureInputDetails m = boost::get<MultisignatureInputDetails>(in);
-        body += m_core.currency().formatAmount(m.input.amount);
-        body += "</td>\n    <td>multisig</td>\n    ";
-        body += "output index: " + std::to_string(m.input.outputIndex) + ", ";
-        body += "signature count: " + std::to_string(m.input.signatureCount) + ", ";
-        body += "output number: " + std::to_string(m.output.number) + ", ";
-        body += "output tx hash: <span class=\"wrap\">" + Common::podToHex(m.output.transactionHash) + "</span>";
-        body += "    </td>\n";
-      }
       body += "  </tr>\n";
     }
     body += "</tbody>\n";
@@ -1958,16 +1948,6 @@ bool RpcServer::on_get_explorer_tx_by_hash(const COMMAND_EXPLORER_GET_TRANSACTIO
       if (o.output.target.type() == typeid(KeyOutput)) {
         KeyOutput ko = boost::get<KeyOutput>(o.output.target);
         body += Common::podToHex(ko);
-      }
-      else if (o.output.target.type() == typeid(MultisignatureOutput)) {
-        body += "multisig\n";
-        MultisignatureOutput mo = boost::get<MultisignatureOutput>(o.output.target);
-        body += "keys: \n";
-        for (const auto& k : mo.keys) {
-          body += Common::podToHex(k) + "\n";
-        }
-        body += "required signature count: ";
-        body += std::to_string(mo.requiredSignatureCount);
       }
       body += "</td>\n    <td>";
       body += std::to_string(o.globalIndex);
