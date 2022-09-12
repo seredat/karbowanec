@@ -181,7 +181,7 @@ void WalletLegacy::removeObserver(IWalletLegacyObserver* observer) {
   m_observerManager.remove(observer);
 }
 
-void WalletLegacy::initAndGenerate(const std::string& password) {
+void WalletLegacy::initAndGenerateNonDeterministic(const std::string& password) {
   {
     std::unique_lock<std::mutex> stateLock(m_cacheMutex);
 

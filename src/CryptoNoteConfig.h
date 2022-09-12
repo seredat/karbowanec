@@ -113,6 +113,7 @@ const uint32_t UPGRADE_HEIGHT_V4_1                           = 300000; // LWMA3
 const uint32_t UPGRADE_HEIGHT_V4_2                           = 500000; // Fee per-byte for extra, ban unmixable denominations
 const uint32_t UPGRADE_HEIGHT_V4_3                           = 667000; // Fixed min fee + fee per-byte for extra
 const uint32_t UPGRADE_HEIGHT_V5                             = 700000; // Block v5, back to LWMA1+, Alt. Signed Proof-of-Work
+const uint32_t UPGRADE_HEIGHT_V6                             = 4294967294; // Block v6
 
 const unsigned UPGRADE_VOTING_THRESHOLD                      = 90; // percent
 const uint32_t UPGRADE_VOTING_WINDOW                         = EXPECTED_NUMBER_OF_BLOCKS_PER_DAY;  // blocks
@@ -130,7 +131,20 @@ const char     MINER_CONFIG_FILE_NAME[]                      = "miner_conf.json"
 } // parameters
 
 const char     CRYPTONOTE_NAME[]                             = "karbowanec";
-const char     GENESIS_COINBASE_TX_HEX[]                     = "010a01ff0001fac484c69cd608029b2e4c0281c0b02e7c53291a94d1d0cbff8883f8024f5142ee494ffbbd0880712101f904925cc23f86f9f3565188862275dc556a9bdfb6aec22c5aca7f0177c45ba8";
+const char     CRYPTONOTE_TICKER[]                           = "KRB";
+const char     GENESIS_COINBASE_TX_HEX[]                     = 
+"01"                                                                // tx version
+"0a"                                                                // unlock time
+"01"                                                                // vin length
+"ff"                                                                // vin type
+"00"                                                                // height
+"01"                                                                // vout length
+"fac484c69cd608"                                                    // output #1 amount
+"02"                                                                // output #1 type
+"9b2e4c0281c0b02e7c53291a94d1d0cbff8883f8024f5142ee494ffbbd088071"  // output #1 key (stealth address)
+"21"                                                                // extra length in bytes
+"01"                                                                // extra pubkey tag
+"f904925cc23f86f9f3565188862275dc556a9bdfb6aec22c5aca7f0177c45ba8"; // tx pubkey
 const char     DNS_CHECKPOINTS_HOST[]                        = "checkpoints.karbo.org";
 
 const uint8_t  CURRENT_TRANSACTION_VERSION                   =  1;
@@ -139,6 +153,7 @@ const uint8_t  BLOCK_MAJOR_VERSION_2                         =  2;
 const uint8_t  BLOCK_MAJOR_VERSION_3                         =  3;
 const uint8_t  BLOCK_MAJOR_VERSION_4                         =  4;
 const uint8_t  BLOCK_MAJOR_VERSION_5                         =  5;
+const uint8_t  BLOCK_MAJOR_VERSION_6                         =  6;
 const uint8_t  BLOCK_MINOR_VERSION_0                         =  0;
 const uint8_t  BLOCK_MINOR_VERSION_1                         =  1;
 
@@ -155,7 +170,6 @@ const int      GATE_RPC_DEFAULT_PORT                         =  16000;
 const int      GATE_RPC_DEFAULT_SSL_PORT                     =  16100;
 const char     RPC_DEFAULT_CHAIN_FILE[]                      = "rpc_server.crt";
 const char     RPC_DEFAULT_KEY_FILE[]                        = "rpc_server.key";
-const char     RPC_DEFAULT_DH_FILE[]                         = "rpc_server.pem";
 
 const size_t   P2P_LOCAL_WHITE_PEERLIST_LIMIT                =  1000;
 const size_t   P2P_LOCAL_GRAY_PEERLIST_LIMIT                 =  5000;
@@ -205,7 +219,7 @@ const char* const SEED_NODES[] = {
   "108.61.198.115:32347",
   "45.32.232.11:32347",
   "46.149.182.151:32347",
-  "144.91.94.65:32347"
+  "185.185.83.26:32347"
 };
 
 } // CryptoNote

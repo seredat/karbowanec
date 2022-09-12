@@ -58,10 +58,12 @@ namespace CryptoNote
     m_last_hr_merge_time(0),
     m_hashes(0),
     m_do_print_hashrate(false),
+    m_do_log_hashrate(false),
     m_do_mining(false),
     m_current_hash_rate(0),
     m_update_block_template_interval(5),
-    m_update_merge_hr_interval(2)
+    m_update_merge_hr_interval(2),
+    m_update_log_hr_interval(60)
   {
   }
   //-----------------------------------------------------------------------------------------------------
@@ -129,7 +131,12 @@ namespace CryptoNote
     });
 
     m_update_merge_hr_interval.call([&](){
-      merge_hr();
+      merge_hr(false);
+      return true;
+    });
+    
+    m_update_log_hr_interval.call([&](){
+      merge_hr(true);
       return true;
     });
 
@@ -147,7 +154,7 @@ namespace CryptoNote
   }
 
   //-----------------------------------------------------------------------------------------------------
-  void miner::merge_hr()
+  void miner::merge_hr(bool do_log)
   {
     if(m_last_hr_merge_time && is_mining()) {
       m_current_hash_rate = m_hashes * 1000 / (millisecondsSinceEpoch() - m_last_hr_merge_time + 1);
@@ -156,13 +163,16 @@ namespace CryptoNote
       if(m_last_hash_rates.size() > 19)
         m_last_hash_rates.pop_front();
 
-      if(m_do_print_hashrate) {
-        uint64_t total_hr = std::accumulate(m_last_hash_rates.begin(), m_last_hash_rates.end(), static_cast<uint64_t>(0));
-        float hr = static_cast<float>(total_hr) / static_cast<float>(m_last_hash_rates.size());
+      uint64_t total_hr = std::accumulate(m_last_hash_rates.begin(), m_last_hash_rates.end(), (uint64_t)0);
+      float hr = static_cast<float>(total_hr) / static_cast<float>(m_last_hash_rates.size());
+
+      if(m_do_print_hashrate)
         std::cout << "Hashrate: " << std::setprecision(2) << std::fixed << hr << " H/s" << "        \r";
-      }
+
+      if (do_log && m_do_log_hashrate)
+        logger(INFO, BRIGHT_WHITE) << "Hashrate: " << std::setprecision(2) << std::fixed << hr << " H/s";
     }
-    
+
     m_last_hr_merge_time = millisecondsSinceEpoch();
     m_hashes = 0;
   }
@@ -222,6 +232,7 @@ namespace CryptoNote
     }
 
     m_do_print_hashrate = config.printHashrate;
+    m_do_log_hashrate = config.logHashrate;
 
     return true;
   }
@@ -282,8 +293,16 @@ namespace CryptoNote
   //-----------------------------------------------------------------------------------------------------
   bool miner::stop()
   {
-    send_stop_signal();
     std::lock_guard<std::mutex> lk(m_threads_lock);
+
+    bool mining = !m_threads.empty();
+    if (!mining)
+    {
+      logger(TRACE) << "Not mining - nothing to stop";
+      return false;
+    }
+
+    send_stop_signal();
 
     for (auto& th : m_threads) {
       th.join();
@@ -316,7 +335,7 @@ namespace CryptoNote
           for (uint32_t nonce = startNonce + i; !found; nonce += nthreads) {
             lb.nonce = nonce;
 
-            if (!m_handler.get_block_long_hash(localctx, lb, h)) {
+            if (!m_handler.getBlockLongHash(localctx, lb, h)) {
               return;
             }
 
@@ -341,7 +360,7 @@ namespace CryptoNote
     } else {
       for (; bl.nonce != std::numeric_limits<uint32_t>::max(); bl.nonce++) {
         Crypto::Hash h;
-        if (!m_handler.get_block_long_hash(context, bl, h)) {
+        if (!m_handler.getBlockLongHash(context, bl, h)) {
           return false;
         }
 
@@ -448,7 +467,7 @@ namespace CryptoNote
       // step 2: get long hash
       Crypto::Hash pow;
       if (!m_stop) {
-        if (!m_handler.get_block_long_hash(context, b, pow)) {
+        if (!m_handler.getBlockLongHash(context, b, pow)) {
           logger(ERROR) << "getBlockLongHash failed.";
           m_stop = true;
         }

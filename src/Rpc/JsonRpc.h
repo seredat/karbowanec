@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
-// Copyright (c) 2016-2020, The Karbo developers
+// Copyright (c) 2016-2022, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -23,7 +23,10 @@
 #include <functional>
 
 #include "CoreRpcServerCommandsDefinitions.h"
-#include <Common/JsonValue.h>
+#include "Common/JsonValue.h"
+#include "Common/base64.hpp"
+#include "Common/StringTools.h"
+#include "HTTP/httplib.h"
 #include "Serialization/ISerializer.h"
 #include "Serialization/SerializationTools.h"
 
@@ -186,10 +189,10 @@ private:
 };
 
 
-void invokeJsonRpcCommand(HttpClient& httpClient, JsonRpcRequest& req, JsonRpcResponse& res, const std::string& user = "", const std::string& password = "");
+void invokeJsonRpcCommand(httplib::Client& httpClient, JsonRpcRequest& req, JsonRpcResponse& res, const std::string& user = "", const std::string& password = "");
 
 template <typename Request, typename Response>
-void invokeJsonRpcCommand(HttpClient& httpClient, const std::string& method, const Request& req, Response& res, const std::string& user = "", const std::string& password = "") {
+void invokeJsonRpcCommand(httplib::Client& httpClient, const std::string& method, const Request& req, Response& res, const std::string& user = "", const std::string& password = "") {
   JsonRpcRequest jsReq;
   JsonRpcResponse jsRes;
 
@@ -199,6 +202,27 @@ void invokeJsonRpcCommand(HttpClient& httpClient, const std::string& method, con
   invokeJsonRpcCommand(httpClient, jsReq, jsRes, user, password);
 
   jsRes.getResult(res);
+}
+
+template <typename Request, typename Response>
+void invokeJsonCommand(httplib::Client& client, const std::string& url, const Request& req, Response& res, const std::string& user = "", const std::string& password = "") {
+  httplib::Request hreq;
+  httplib::Response hres;
+
+
+  if (!user.empty() || !password.empty()) {
+    client.set_basic_auth(user.c_str(), password.c_str());
+  }
+
+  auto rsp = client.Post(url.c_str(), storeToJson(req), "application/json");
+
+  if (!rsp || rsp->status != 200) {
+    throw std::runtime_error("JSON-RPC call failed");
+  }
+
+  if (!loadFromJson(res, rsp->body)) {
+    throw std::runtime_error("Failed to parse JSON response");
+  }
 }
 
 template <typename Request, typename Response, typename Handler>

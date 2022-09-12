@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2016, The Forknote developers
-// Copyright (c) 2016-2020, The Karbo developers
+// Copyright (c) 2016-2022, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -19,17 +19,22 @@
 
 #pragma once
 
-#include "HttpServer.h"
-
+#include <thread>
 #include <functional>
 #include <unordered_map>
 
-#include <Logging/LoggerRef.h>
+#include "HTTP/httplib.h"
+#include "HTTP/TaskQueue.h"
+#include "Logging/LoggerRef.h"
 #include "ITransaction.h"
 #include "CoreRpcServerCommandsDefinitions.h"
 #include "BlockchainExplorer/BlockchainExplorerDataBuilder.h"
 #include "CryptoNoteCore/Core.h"
 #include "Common/Math.h"
+#include "Rpc/RpcServerConfig.h"
+#include "Rpc/JsonRpc.h"
+#include "System/Dispatcher.h"
+#include "System/RemoteContext.h"
 
 namespace CryptoNote {
 
@@ -38,19 +43,24 @@ class NodeServer;
 class BlockchainExplorer;
 class ICryptoNoteProtocolQuery;
 
-class RpcServer : public HttpServer {
+class RpcServer {
 public:
-  RpcServer(System::Dispatcher& dispatcher, Logging::ILogger& log, Core& core, NodeServer& p2p, ICryptoNoteProtocolQuery& protocolQuery);
+  RpcServer(
+    RpcServerConfig& config,
+    System::Dispatcher& dispatcher,
+    Logging::ILogger& log,
+    Core& core,
+    NodeServer& p2p,
+    ICryptoNoteProtocolQuery& protocolQuery
+  );
 
-  typedef std::function<bool(RpcServer*, const HttpRequest& request, HttpResponse& response)> HandlerFunction;
-  bool restrictRpc(const bool is_resctricted);
-  bool enableCors(const std::string domain);
-  bool setFeeAddress(const std::string& fee_address, const AccountPublicAddress& fee_acc);
-  bool setFeeAmount(const uint64_t fee_amount);
-  bool setViewKey(const std::string& view_key);
-  bool setContactInfo(const std::string& contact);
-  bool checkIncomingTransactionForFee(const BinaryArray& tx_blob);
+  ~RpcServer();
+  
+  void start();
+  void stop();
+  typedef std::function<bool(RpcServer*, const httplib::Request& req, httplib::Response& res)> HandlerFunction;
   std::string getCorsDomain();
+  size_t getRpcConnectionsCount();
 
 private:
 
@@ -60,19 +70,18 @@ private:
     const bool allowBusyCore;
   };
 
-  typedef void (RpcServer::*HandlerPtr)(const HttpRequest& request, HttpResponse& response);
+  typedef void (RpcServer::* HandlerPtr)(const httplib::Request& request, httplib::Response& response);
   static std::unordered_map<std::string, RpcHandler<HandlerFunction>> s_handlers;
 
-  virtual void processRequest(const HttpRequest& request, HttpResponse& response) override;
-  bool processJsonRpcRequest(const HttpRequest& request, HttpResponse& response);
-  bool isCoreReady();
-
+  void processRequest(const httplib::Request& request, httplib::Response& response);
+  bool processJsonRpcRequest(const httplib::Request& request, httplib::Response& response);
+  
   // binary handlers
   bool on_get_blocks(const COMMAND_RPC_GET_BLOCKS_FAST::request& req, COMMAND_RPC_GET_BLOCKS_FAST::response& res);
   bool on_query_blocks(const COMMAND_RPC_QUERY_BLOCKS::request& req, COMMAND_RPC_QUERY_BLOCKS::response& res);
   bool on_query_blocks_lite(const COMMAND_RPC_QUERY_BLOCKS_LITE::request& req, COMMAND_RPC_QUERY_BLOCKS_LITE::response& res);
   bool on_get_indexes(const COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::request& req, COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::response& res);
-  bool on_get_random_outs(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response& res);
+  bool on_get_random_outs_bin(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response& res);
   bool on_get_pool_changes(const COMMAND_RPC_GET_POOL_CHANGES::request& req, COMMAND_RPC_GET_POOL_CHANGES::response& rsp);
   bool on_get_pool_changes_lite(const COMMAND_RPC_GET_POOL_CHANGES_LITE::request& req, COMMAND_RPC_GET_POOL_CHANGES_LITE::response& rsp);
 
@@ -81,10 +90,18 @@ private:
   bool on_get_supply(const COMMAND_HTTP::request& req, COMMAND_HTTP::response& res);
   bool on_get_payment_id(const COMMAND_HTTP::request& req, COMMAND_HTTP::response& res);
 
+  // explorer
+  bool on_get_explorer(const COMMAND_EXPLORER::request& req, COMMAND_EXPLORER::response& res);
+  bool on_get_explorer_block_by_hash(const COMMAND_EXPLORER_GET_BLOCK_DETAILS_BY_HASH::request& req, COMMAND_EXPLORER_GET_BLOCK_DETAILS_BY_HASH::response& res);
+  bool on_get_explorer_tx_by_hash(const COMMAND_EXPLORER_GET_TRANSACTION_DETAILS_BY_HASH::request& req, COMMAND_EXPLORER_GET_TRANSACTION_DETAILS_BY_HASH::response& res);
+  bool on_get_explorer_txs_by_payment_id(const COMMAND_EXPLORER_GET_TRANSACTIONS_BY_PAYMENT_ID::request& req, COMMAND_EXPLORER_GET_TRANSACTIONS_BY_PAYMENT_ID::response& res);
+  bool on_explorer_search(const COMMAND_RPC_EXPLORER_SEARCH::request& req, COMMAND_RPC_EXPLORER_SEARCH::response& res);
+
   // json handlers
   bool on_get_info(const COMMAND_RPC_GET_INFO::request& req, COMMAND_RPC_GET_INFO::response& res);
   bool on_get_height(const COMMAND_RPC_GET_HEIGHT::request& req, COMMAND_RPC_GET_HEIGHT::response& res);
   bool on_get_transactions(const COMMAND_RPC_GET_TRANSACTIONS::request& req, COMMAND_RPC_GET_TRANSACTIONS::response& res);
+  bool on_get_random_outs_json(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_JSON::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_JSON::response& res);
   bool on_send_raw_transaction(const COMMAND_RPC_SEND_RAW_TRANSACTION::request& req, COMMAND_RPC_SEND_RAW_TRANSACTION::response& res);
   bool on_start_mining(const COMMAND_RPC_START_MINING::request& req, COMMAND_RPC_START_MINING::response& res);
   bool on_stop_mining(const COMMAND_RPC_STOP_MINING::request& req, COMMAND_RPC_STOP_MINING::response& res);
@@ -133,19 +150,35 @@ private:
   bool on_check_payment(const COMMAND_RPC_CHECK_PAYMENT_BY_PAYMENT_ID::request& req, COMMAND_RPC_CHECK_PAYMENT_BY_PAYMENT_ID::response& rsp);
 
   void fill_block_header_response(const Block& blk, bool orphan_status, uint32_t height, const Crypto::Hash& hash, block_header_response& responce);
+  void listen(const std::string address, const uint16_t port);
+  void listen_ssl(const std::string address, const uint16_t port);
+  bool isCoreReady();
+  bool checkIncomingTransactionForFee(const BinaryArray& tx_blob);
 
+
+  RpcServerConfig m_config;
+  System::Dispatcher& m_dispatcher;
   Logging::LoggerRef logger;
   CryptoNote::Core& m_core;
   CryptoNote::NodeServer& m_p2p;
   CryptoNote::BlockchainExplorerDataBuilder blockchainExplorerDataBuilder;
   const ICryptoNoteProtocolQuery& m_protocolQuery;
+  httplib::SSLServer* https;
+  httplib::Server* http;
+
   bool m_restricted_rpc;
   std::string m_cors_domain;
   std::string m_fee_address;
   uint64_t    m_fee_amount;
   std::string m_contact_info;
-  Crypto::SecretKey m_view_key = NULL_SECRET_KEY;
+  Crypto::SecretKey m_view_key;
   CryptoNote::AccountPublicAddress m_fee_acc;
+
+  std::vector<std::unique_ptr<System::RemoteContext<void>>> m_workers;
+
+  RpcThreadPool* m_http_queue;
+  RpcThreadPool* m_https_queue;
+
 };
 
 }

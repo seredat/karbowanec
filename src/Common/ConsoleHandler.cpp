@@ -1,7 +1,8 @@
 // Copyright (c) 2011-2016 The Cryptonote developers
 // Copyright (c) 2014-2016 XDN developers
 // Copyright (c) 2006-2013 Andrey N.Sabelnikov, www.sabelnikov.net
-// Copyright (c) 2016-2017 The Karbowanec developers
+// Copyright (c) 2020-2022, The Talleo developers
+// Copyright (c) 2016-2012 The Karbowanec developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -136,7 +137,7 @@ bool AsyncConsoleReader::waitInput() {
 #else
   while (!m_stop.load(std::memory_order_relaxed))
   {
-    int retval = ::WaitForSingleObject(::GetStdHandle(STD_INPUT_HANDLE), 100);
+    DWORD retval = ::WaitForSingleObject(::GetStdHandle(STD_INPUT_HANDLE), 100);
     switch (retval)
     {
       case WAIT_FAILED:
@@ -187,7 +188,7 @@ void ConsoleHandler::unpause() {
 void ConsoleHandler::wait() {
 
   try {
-    if (m_thread.joinable()) {
+    if (m_thread.joinable() && m_thread.get_id() != std::this_thread::get_id()) {
       m_thread.join();
     }
   } catch (std::exception& e) {

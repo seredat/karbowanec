@@ -37,6 +37,7 @@ public:
   std::string miningViewKey;
   uint32_t miningThreads;
   bool printHashrate = false;
+  bool logHashrate = false;
 };
 
 } //namespace CryptoNote

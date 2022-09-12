@@ -118,7 +118,7 @@ bool BlockchainExplorerDataBuilder::fillBlockDetails(const Block &block, BlockDe
   blockDetails.proofOfWork = boost::value_initialized<Crypto::Hash>();
   if (calculate_pow) {
     Crypto::cn_context context;
-    if (!m_core.get_block_long_hash(context, block, blockDetails.proofOfWork)) {
+    if (!m_core.getBlockLongHash(context, block, blockDetails.proofOfWork)) {
       return false;
     }
   }
@@ -271,8 +271,10 @@ bool BlockchainExplorerDataBuilder::fillTransactionDetails(const Transaction& tr
   Crypto::Hash paymentId;
   if (getPaymentId(transaction, paymentId)) {
     transactionDetails.paymentId = paymentId;
+    transactionDetails.hasPaymentId = true;
   } else {
     transactionDetails.paymentId = boost::value_initialized<Crypto::Hash>();
+    transactionDetails.hasPaymentId = false;
   }
   fillTxExtra(transaction.extra, transactionDetails.extra);
   transactionDetails.signatures.reserve(transaction.signatures.size());

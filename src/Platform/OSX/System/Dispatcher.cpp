@@ -343,22 +343,22 @@ int Dispatcher::getKqueue() const {
 
 NativeContext& Dispatcher::getReusableContext() {
   if(firstReusableContext == nullptr) {
-   uctx* newlyCreatedContext = new uctx;
-   uint8_t* stackPointer = new uint8_t[STACK_SIZE];
-   static_cast<uctx*>(newlyCreatedContext)->uc_stack.ss_sp = stackPointer;
-   static_cast<uctx*>(newlyCreatedContext)->uc_stack.ss_size = STACK_SIZE;
+    uctx* newlyCreatedContext = new uctx;
+    uint8_t* stackPointer = new uint8_t[STACK_SIZE];
+    static_cast<uctx*>(newlyCreatedContext)->uc_stack.ss_sp = stackPointer;
+    static_cast<uctx*>(newlyCreatedContext)->uc_stack.ss_size = STACK_SIZE;
 
-   ContextMakingData makingData{ newlyCreatedContext, this};
-   makecontext(static_cast<uctx*>(newlyCreatedContext), reinterpret_cast<void(*)()>(contextProcedureStatic), reinterpret_cast<intptr_t>(&makingData));
+    ContextMakingData makingData{ newlyCreatedContext, this};
+    makecontext(static_cast<uctx*>(newlyCreatedContext), reinterpret_cast<void(*)()>(contextProcedureStatic), reinterpret_cast<intptr_t>(&makingData));
 
-   uctx* oldContext = static_cast<uctx*>(currentContext->uctx);
-   if (swapcontext(oldContext, newlyCreatedContext) == -1) {
-     throw std::runtime_error("Dispatcher::getReusableContext, swapcontext failed, " + lastErrorMessage());
-   }
+    uctx* oldContext = static_cast<uctx*>(currentContext->uctx);
+    if (swapcontext(oldContext, newlyCreatedContext) == -1) {
+      throw std::runtime_error("Dispatcher::getReusableContext, swapcontext failed, " + lastErrorMessage());
+    }
 
-   assert(firstReusableContext != nullptr);
-   assert(firstReusableContext->uctx == newlyCreatedContext);
-   firstReusableContext->stackPtr = stackPointer;
+    assert(firstReusableContext != nullptr);
+    assert(firstReusableContext->uctx == newlyCreatedContext);
+    firstReusableContext->stackPtr = stackPointer;
   }
 
   NativeContext* context = firstReusableContext;

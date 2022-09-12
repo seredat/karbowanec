@@ -1,4 +1,5 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2016-2022 The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -31,11 +32,6 @@ public:
 
   std::string m_daemon_host;
   uint16_t m_daemon_port;
-  uint16_t m_daemon_port_ssl;
-  bool m_enable_ssl;
-  std::string m_chain_file = "";
-  std::string m_key_file = "";
-  std::string m_dh_file = "";
 };
 
 } //namespace PaymentService

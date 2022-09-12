@@ -9,7 +9,9 @@
 
 #include <Common/StringTools.h>
 
+#include <chrono>
 #include <iostream>
+#include <thread>
 
 #include <Common/ColouredMsg.h>
 #include <GreenWallet/CommandImplementations.h>
@@ -17,6 +19,8 @@
 #include <GreenWallet/Tools.h>
 #include <GreenWallet/Types.h>
 #include <GreenWallet/WalletConfig.h>
+
+#define _GLIBCXX_USE_NANOSLEEP 1
 
 void checkForNewTransactions(std::shared_ptr<WalletInfo> walletInfo)
 {

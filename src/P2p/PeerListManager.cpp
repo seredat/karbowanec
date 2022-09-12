@@ -166,7 +166,7 @@ bool PeerlistManager::is_ip_allowed(uint32_t ip) const
 bool PeerlistManager::get_peerlist_head(std::vector<PeerlistEntry>& bs_head, uint32_t depth) const
 {
   const peers_indexed::index<by_time>::type& by_time_index = m_peers_white.get<by_time>();
-  uint32_t cnt = 0;
+  //uint32_t cnt = 0;
 
   BOOST_REVERSE_FOREACH(const peers_indexed::value_type& vl, by_time_index)
   {

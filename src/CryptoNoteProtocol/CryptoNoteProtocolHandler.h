@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
-// Copyright (c) 2016-2020, The Karbo developers
+// Copyright (c) 2016-2022, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -68,7 +68,7 @@ namespace CryptoNote
       std::lock_guard<std::recursive_mutex> lk(m_stempool_mutex);
       auto r = m_stempool.insert(tx_blob_by_hash::value_type(txid, tx_blob));
 
-      return true;
+      return r.second;
     }
 
     bool removeTransaction(const Crypto::Hash& txid) {
@@ -148,6 +148,9 @@ namespace CryptoNote
     void requestMissingPoolTransactions(const CryptoNoteConnectionContext& context);
     bool select_dandelion_stem();
     bool fluffStemPool();
+    void printDandelions() const override;
+
+    std::atomic<bool> m_init_select_dandelion_called;
 
   private:
     //----------------- commands handlers ----------------------------------------------

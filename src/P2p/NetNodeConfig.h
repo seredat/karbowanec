@@ -38,7 +38,8 @@ namespace CryptoNote {
                                                                                                " If this option is given the options add-priority-node and seed-node are ignored" };
   const command_line::arg_descriptor<std::vector<std::string> > arg_p2p_seed_node          = { "seed-node", "Connect to a node to retrieve peer addresses, and disconnect" };
   const command_line::arg_descriptor<std::string> arg_ban_list                             = { "ban-list", "Specify ban list file, one IP address per line", "", true };
-  const command_line::arg_descriptor<bool> arg_p2p_hide_my_port                            = { "hide-my-port", "Do not announce yourself as peerlist candidate", false, true };
+  const command_line::arg_descriptor<bool>        arg_p2p_hide_my_port                     = { "hide-my-port", "Do not announce yourself as peerlist candidate", false, true };
+  const command_line::arg_descriptor<uint32_t>    arg_connections_count                    = { "connections", "Set number of connected peers", CryptoNote::P2P_DEFAULT_CONNECTIONS_COUNT };
 
 class NetNodeConfig {
 public:
@@ -59,6 +60,7 @@ public:
   std::vector<uint32_t> getBanList() const;
   bool getHideMyPort() const;
   std::string getConfigFolder() const;
+  uint32_t getConnectionsCount() const;
 
   void setP2pStateFilename(const std::string& filename);
   void setTestnet(bool isTestnet);
@@ -72,6 +74,7 @@ public:
   void setSeedNodes(const std::vector<NetworkAddress>& addresses);
   void setHideMyPort(bool hide);
   void setConfigFolder(const std::string& folder);
+  void setConnectionsCount(uint32_t count);
 
 private:
   std::string bindIp;
@@ -87,6 +90,7 @@ private:
   std::string configFolder;
   std::string p2pStateFilename;
   bool testnet;
+  uint32_t connectionsCount;
 };
 
 } //namespace nodetool

@@ -69,15 +69,14 @@ private:
   friend class Core;
 };
 
-Core::Core(const Currency& currency, i_cryptonote_protocol* pprotocol, Logging::ILogger& logger, System::Dispatcher& dispatcher, bool blockchainIndexesEnabled) :
+Core::Core(const Currency& currency, i_cryptonote_protocol* pprotocol, Logging::ILogger& logger, System::Dispatcher& dispatcher, bool blockchainIndexesEnabled, bool allowDeepReorg, bool noBlobs) :
   m_dispatcher(dispatcher),
   m_currency(currency),
   logger(logger, "Core"),
   m_mempool(currency, m_blockchain, *this, m_timeProvider, logger, blockchainIndexesEnabled),
-  m_blockchain(currency, m_mempool, logger, blockchainIndexesEnabled),
+  m_blockchain(currency, m_mempool, logger, blockchainIndexesEnabled, allowDeepReorg, noBlobs),
   m_miner(new miner(currency, *this, logger)),
-  m_starter_message_showed(false),
-  m_checkpoints(logger) {
+  m_checkpoints(logger, allowDeepReorg) {
     set_cryptonote_protocol(pprotocol);
     m_blockchain.addObserver(this);
     m_mempool.addObserver(this);
@@ -512,7 +511,7 @@ bool Core::get_block_template(Block& b, const AccountKeys& acc, difficulty_type&
     b = boost::value_initialized<Block>();
     b.majorVersion = m_blockchain.getBlockMajorVersionForHeight(height);
     b.previousBlockHash = get_tail_id();
-    b.timestamp = time(NULL);
+    b.timestamp = time(nullptr);
     diffic = m_blockchain.getDifficultyForNextBlock(b.previousBlockHash);
     if (!(diffic)) {
       logger(ERROR, BRIGHT_RED) << "difficulty overhead.";
@@ -863,8 +862,8 @@ bool Core::getBlockHeight(const Crypto::Hash& blockId, uint32_t& blockHeight) {
   return m_blockchain.getBlockHeight(blockId, blockHeight);
 }
 
-bool Core::get_block_long_hash(Crypto::cn_context &context, const Block& b, Crypto::Hash& res) {
-  return m_blockchain.get_block_long_hash(context, b, res);
+bool Core::getBlockLongHash(Crypto::cn_context &context, const Block& b, Crypto::Hash& res) {
+  return m_blockchain.getBlockLongHash(context, b, res);
 }
 
 //void Core::get_all_known_block_ids(std::list<Crypto::Hash> &main, std::list<Crypto::Hash> &alt, std::list<Crypto::Hash> &invalid) {
@@ -880,19 +879,6 @@ bool Core::update_miner_block_template() {
 }
 
 bool Core::on_idle() {
-  if (!m_starter_message_showed) {
-    std::cout << ENDL << "**********************************************************************" << ENDL
-      << "The daemon will start synchronizing with the network. It may take up to several hours." << ENDL
-      << ENDL
-      << "You can set the level of process detailization* through \"set_log <level>\" command*, where <level> is between 0 (no details) and 4 (very verbose)." << ENDL
-      << ENDL
-      << "Use \"help\" command to see the list of available commands." << ENDL
-      << ENDL
-      << "Note: in case you need to interrupt the process, use \"exit\" command. Otherwise, the current progress won't be saved." << ENDL
-      << "**********************************************************************" << ENDL;
-    m_starter_message_showed = true;
-  }
-
   m_miner->on_idle();
   m_mempool.on_idle();
   return true;
@@ -1049,6 +1035,8 @@ bool Core::queryBlocksLite(const std::vector<Crypto::Hash>& knownBlockIds, uint6
       std::list<Transaction> txs;
       std::list<Crypto::Hash> missedTxs;
       lbs->getTransactions(b.transactionHashes, txs, missedTxs);
+
+      b.majorVersion = BLOCK_MAJOR_VERSION_4; // Workaround backward compatible with old wallets, i.e. serialize without signature
 
       item.block = asString(toBinaryArray(b));
 

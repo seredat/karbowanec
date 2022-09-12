@@ -109,6 +109,7 @@
 #endif
 
 
+
 // -----------------------------------------------------------------------------
 // Compiler Feature Checks
 // -----------------------------------------------------------------------------
@@ -119,15 +120,41 @@
     #define PHMAP_HAVE_BUILTIN(x) 0
 #endif
 
+#if (defined(_MSVC_LANG) && _MSVC_LANG >= 201703) || __cplusplus >= 201703
+    #define PHMAP_HAVE_CC17 1
+#else
+    #define PHMAP_HAVE_CC17 0
+#endif
+
+#define PHMAP_BRANCHLESS 1
+
+#ifdef __has_feature
+#define PHMAP_HAVE_FEATURE(f) __has_feature(f)
+#else
+#define PHMAP_HAVE_FEATURE(f) 0
+#endif
+
+// Portable check for GCC minimum version:
+// https://gcc.gnu.org/onlinedocs/cpp/Common-Predefined-Macros.html
+#if defined(__GNUC__) && defined(__GNUC_MINOR__)
+    #define PHMAP_INTERNAL_HAVE_MIN_GNUC_VERSION(x, y) (__GNUC__ > (x) || __GNUC__ == (x) && __GNUC_MINOR__ >= (y))
+#else
+    #define PHMAP_INTERNAL_HAVE_MIN_GNUC_VERSION(x, y) 0
+#endif
+
+#if defined(__clang__) && defined(__clang_major__) && defined(__clang_minor__)
+    #define PHMAP_INTERNAL_HAVE_MIN_CLANG_VERSION(x, y) (__clang_major__ > (x) || __clang_major__ == (x) && __clang_minor__ >= (y))
+#else
+    #define PHMAP_INTERNAL_HAVE_MIN_CLANG_VERSION(x, y) 0
+#endif
+
 // ----------------------------------------------------------------
 // Checks whether `std::is_trivially_destructible<T>` is supported.
 // ----------------------------------------------------------------
 #ifdef PHMAP_HAVE_STD_IS_TRIVIALLY_DESTRUCTIBLE
     #error PHMAP_HAVE_STD_IS_TRIVIALLY_DESTRUCTIBLE cannot be directly set
-#elif defined(_LIBCPP_VERSION) ||                                        \
-    (!defined(__clang__) && defined(__GNUC__) && defined(__GLIBCXX__) && \
-     (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 8))) ||        \
-    defined(_MSC_VER)
+#elif defined(_LIBCPP_VERSION) || defined(_MSC_VER) ||                     \
+    (!defined(__clang__) && defined(__GNUC__) && defined(__GLIBCXX__) &&  PHMAP_INTERNAL_HAVE_MIN_GNUC_VERSION(4, 8))
     #define PHMAP_HAVE_STD_IS_TRIVIALLY_DESTRUCTIBLE 1
 #endif
 
@@ -141,7 +168,7 @@
     #error PHMAP_HAVE_STD_IS_TRIVIALLY_ASSIGNABLE cannot directly set
 #elif (defined(__clang__) && defined(_LIBCPP_VERSION)) ||        \
     (!defined(__clang__) && defined(__GNUC__) &&                 \
-     (__GNUC__ > 5 || (__GNUC__ == 5 && __GNUC_MINOR__ >= 1)) && \
+     PHMAP_INTERNAL_HAVE_MIN_GNUC_VERSION(5, 1) && \
      (defined(_LIBCPP_VERSION) || defined(__GLIBCXX__))) ||      \
     (defined(_MSC_VER) && !defined(__NVCC__))
     #define PHMAP_HAVE_STD_IS_TRIVIALLY_CONSTRUCTIBLE 1
@@ -304,8 +331,7 @@
 
 // #pragma message(PHMAP_VAR_NAME_VALUE(_MSVC_LANG))
 
-#if defined(_MSC_VER) && _MSC_VER >= 1910 && \
-    ((defined(_MSVC_LANG) && _MSVC_LANG >= 201703) || __cplusplus >= 201703)
+#if defined(_MSC_VER) && _MSC_VER >= 1910 && PHMAP_HAVE_CC17
     // #define PHMAP_HAVE_STD_ANY 1
     #define PHMAP_HAVE_STD_OPTIONAL 1
     #define PHMAP_HAVE_STD_VARIANT 1
@@ -314,7 +340,7 @@
     #endif
 #endif
 
-#if (defined(_MSVC_LANG) && _MSVC_LANG >= 201703) || __cplusplus >= 201703
+#if PHMAP_HAVE_CC17
     #define PHMAP_HAVE_SHARED_MUTEX 1
 #endif
 
@@ -330,6 +356,13 @@
     #define PHMAP_INTERNAL_MSVC_2017_DBG_MODE
 #endif
 
+// ---------------------------------------------------------------------------
+// Checks whether wchar_t is treated as a native type
+// (MSVC: /Zc:wchar_t- treats wchar_t as unsigned short)
+// ---------------------------------------------------------------------------
+#if !defined(_MSC_VER) || defined(_NATIVE_WCHAR_T_DEFINED)
+#define PHMAP_HAS_NATIVE_WCHAR_T
+#endif
 
 // -----------------------------------------------------------------------------
 // Sanitizer Attributes
@@ -610,7 +643,7 @@
 #endif
 
 #ifndef PHMAP_HAVE_SSSE3
-    #ifdef __SSSE3__
+    #if defined(__SSSE3__) || defined(__AVX2__)
         #define PHMAP_HAVE_SSSE3 1
     #else
         #define PHMAP_HAVE_SSSE3 0
@@ -633,7 +666,7 @@
 // ----------------------------------------------------------------------
 // constexpr if
 // ----------------------------------------------------------------------
-#if __cplusplus >= 201703 || (defined(_MSVC_LANG) && _MSVC_LANG >= 201703)
+#if PHMAP_HAVE_CC17
     #define PHMAP_IF_CONSTEXPR(expr) if constexpr ((expr))
 #else 
     #define PHMAP_IF_CONSTEXPR(expr) if ((expr))

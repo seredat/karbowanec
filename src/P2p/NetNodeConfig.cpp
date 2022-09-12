@@ -61,6 +61,7 @@ void NetNodeConfig::initOptions(boost::program_options::options_description& des
   command_line::add_arg(desc, arg_p2p_seed_node);
   command_line::add_arg(desc, arg_ban_list);
   command_line::add_arg(desc, arg_p2p_hide_my_port);
+  command_line::add_arg(desc, arg_connections_count);
 }
 
 NetNodeConfig::NetNodeConfig() {
@@ -71,6 +72,7 @@ NetNodeConfig::NetNodeConfig() {
   hideMyPort = false;
   configFolder = Tools::getDefaultDataDirectory();
   testnet = false;
+  connectionsCount = CryptoNote::P2P_DEFAULT_CONNECTIONS_COUNT;
 }
 
 bool NetNodeConfig::init(const boost::program_options::variables_map& vm)
@@ -148,6 +150,10 @@ bool NetNodeConfig::init(const boost::program_options::variables_map& vm)
     }
   }
 
+  if (command_line::has_arg(vm, CryptoNote::arg_connections_count)) {
+    connectionsCount = command_line::get_arg(vm, arg_connections_count);
+  }
+
   return true;
 }
 
@@ -211,6 +217,10 @@ std::string NetNodeConfig::getConfigFolder() const {
   return configFolder;
 }
 
+uint32_t NetNodeConfig::getConnectionsCount() const {
+  return connectionsCount;
+}
+
 void NetNodeConfig::setP2pStateFilename(const std::string& filename) {
   p2pStateFilename = filename;
 }
@@ -255,5 +265,8 @@ void NetNodeConfig::setConfigFolder(const std::string& folder) {
   configFolder = folder;
 }
 
+void NetNodeConfig::setConnectionsCount(uint32_t count) {
+  connectionsCount = count;
+}
 
 } //namespace nodetool

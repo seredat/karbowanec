@@ -130,7 +130,7 @@ TcpConnection TcpListener::accept() {
   if (connection == INVALID_SOCKET) {
     message = "socket failed, " + errorMessage(WSAGetLastError());
   } else {
-    uint8_t addresses[sizeof sockaddr_in * 2 + 32];
+    uint8_t addresses[sizeof(sockaddr_in) * 2 + 32];
     DWORD received;
     TcpListenerContext context2;
     context2.hEvent = NULL;
@@ -185,7 +185,7 @@ TcpConnection TcpListener::accept() {
         } else {
           assert(transferred == 0);
           assert(flags == 0);
-          if (setsockopt(connection, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, reinterpret_cast<char*>(&listener), sizeof listener) != 0) {
+          if (setsockopt(connection, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, reinterpret_cast<char*>(&listener), sizeof(listener)) != 0) {
             message = "setsockopt failed, " + errorMessage(WSAGetLastError());
           } else {
             if (CreateIoCompletionPort(reinterpret_cast<HANDLE>(connection), dispatcher->getCompletionPort(), 0, 0) != dispatcher->getCompletionPort()) {

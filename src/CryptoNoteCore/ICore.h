@@ -143,7 +143,7 @@ public:
   virtual void rollbackBlockchain(const uint32_t height) = 0;
   virtual bool saveBlockchain() = 0;
 
-  virtual bool get_block_long_hash(Crypto::cn_context &context, const Block& b, Crypto::Hash& res) = 0;
+  virtual bool getBlockLongHash(Crypto::cn_context &context, const Block& b, Crypto::Hash& res) = 0;
 
   virtual bool getMixin(const Transaction& transaction, uint64_t& mixin) = 0;
   virtual bool isInCheckpointZone(uint32_t height) const = 0;

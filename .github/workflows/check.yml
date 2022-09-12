@@ -12,7 +12,7 @@ on:
 jobs:
   build-windows:
     name: Windows
-    runs-on: windows-latest
+    runs-on: windows-2019
     env:
       BOOST_ROOT: C:\thirdparties\boost-1.72.0
     steps:
@@ -66,9 +66,63 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  build-mingw:
+    name: MinGW
+    runs-on: windows-2019
+    steps:
+      - uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          install: >-
+            git
+            base-devel
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-boost
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-openssl
+
+      - uses: actions/checkout@master
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref }}
+
+      - name: Prepare version
+        shell: powershell
+        id: setup
+        run: |
+          $krb_ver="${{ github.sha }}".SubString(0,7)
+          $release_name="karbo-cli-win64-mingw-$krb_ver"
+          echo "::set-output name=release_name::${release_name}"
+      - name: Build
+        shell: msys2 {0}
+        id: build
+        run: |
+          ls
+          mkdir build
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DSTATIC=ON
+          cmake --build . --config Release
+      - name: Prepare release
+        shell: msys2 {0}
+        run: |
+          mkdir build/karbo
+          mv build/src/karbowanecd.exe build/karbo
+          mv build/src/simplewallet.exe build/karbo
+          mv build/src/greenwallet.exe build/karbo
+          mv build/src/optimizer.exe build/karbo
+          mv build/src/walletd.exe build/karbo
+          mv build/src/vanitygen.exe build/karbo
+      - name: Upload To GH Artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${{ steps.setup.outputs.release_name }}
+          path: build/karbo
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   build-macos:
     name: macOS
-    runs-on: macos-latest
+    runs-on: macos-11
     steps:
       - uses: actions/checkout@master
         with:

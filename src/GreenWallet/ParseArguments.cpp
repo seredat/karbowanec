@@ -13,28 +13,11 @@
 #include <initializer_list>
 #include <iostream>
 
-#include <boost/filesystem.hpp>
-
 #include "version.h"
 
 #include <Common/UrlTools.h>
+#include <Common/PathTools.h>
 #include <GreenWallet/WalletConfig.h>
-
-bool validateCertPath(std::string &path) {
-  bool res = false;
-  boost::system::error_code ec;
-  boost::filesystem::path data_dir_path(boost::filesystem::current_path());
-  boost::filesystem::path cert_file_path(path);
-  if (!cert_file_path.has_parent_path()) cert_file_path = data_dir_path / cert_file_path;
-  if (boost::filesystem::exists(cert_file_path, ec)) {
-    path = boost::filesystem::canonical(cert_file_path).string();
-    res = true;
-  } else {
-    path.clear();
-    res = false;
-  }
-  return res;
-}
 
 /* Thanks to https://stackoverflow.com/users/85381/iain for this small command
    line parsing snippet! https://stackoverflow.com/a/868894/8737306 */
@@ -156,7 +139,7 @@ Config parseArguments(int argc, char **argv)
         {
             config.daemonCert = certPath;
 
-            if (!validateCertPath(config.daemonCert)) {
+            if (!Common::validateCertPath(config.daemonCert)) {
 
                 std::cout << "Custom cert file could not be found!" << std::endl;
             }

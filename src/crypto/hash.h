@@ -61,7 +61,7 @@ namespace Crypto {
   };
 
   inline void cn_slow_hash(cn_context &context, const void *data, size_t length, Hash &hash) {
-	cn_slow_hash(data, length, reinterpret_cast<char *>(&hash));
+    cn_slow_hash(data, length, reinterpret_cast<char *>(&hash));
   }
 
   inline bool y_slow_hash(const void* data, size_t length, const Hash& seed, Hash& hash) {

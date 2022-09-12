@@ -360,11 +360,11 @@ std::string timeIntervalToString(uint64_t intervalInSeconds) {
   auto seconds = tail;
 
   std::stringstream ss;
-  ss << "d" << days <<
-    std::setfill('0') <<
-    ".h" << std::setw(2) << hours <<
-    ".m" << std::setw(2) << minutes <<
-    ".s" << std::setw(2) << seconds;
+  ss << std::setfill('0')
+     << std::setw(2) << days << "d "
+     << std::setw(2) << hours << "h "
+     << std::setw(2) << minutes << "m "
+     << std::setw(2) << seconds << "s";
 
   return ss.str();
 }
