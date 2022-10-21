@@ -1882,9 +1882,7 @@ void simple_wallet::connectionStatusUpdated(bool connected) {
           << "The node's fee for sending transactions is "
           << (remote_node_fee_amount == 0 ? "0.25% of transaction amount, but no more than "
             + m_currency.formatAmount(CryptoNote::parameters::MAXIMUM_FEE) : m_currency.formatAmount(remote_node_fee_amount))
-          << " " << CryptoNote::CRYPTONOTE_TICKER << "." << std::endl
-          << "If you don't want to pay the node fee, please run your own node."
-          << std::endl;
+          << " " << CryptoNote::CRYPTONOTE_TICKER << "." << std::endl;
         std::cout << InformationMsg(feemsg.str()) << std::endl;
       }
       m_initial_remote_fee_mess = true;
