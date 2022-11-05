@@ -353,7 +353,7 @@ struct TransferCommand {
 #endif
           std::string remote_node_fee_address = m_node.feeAddress();
           if (!remote_node_fee_address.empty()) {
-            destination.address = m_node.feeAddress().empty();
+            destination.address = m_node.feeAddress();
             int64_t remote_node_fee_amount = (int64_t)m_node.feeAmount();
             destination.amount = std::min<int64_t>((remote_node_fee_amount == 0 ? static_cast<int64_t>(de.amount * 0.0025) : remote_node_fee_amount),
               (int64_t)CryptoNote::parameters::MAXIMUM_FEE);
