@@ -1,6 +1,6 @@
 // Copyright (c) 2018, The TurtleCoin Developers
 // Copyright (c) 2018-2019, The Karbo Developers
-// 
+//
 // Please see the included LICENSE file for more information.
 
 ///////////////////////////
@@ -30,10 +30,10 @@ void checkForNewTransactions(std::shared_ptr<WalletInfo> walletInfo)
 
     if (newTransactionCount != walletInfo->knownTransactionCount)
     {
-        for (size_t i = walletInfo->knownTransactionCount; 
+        for (size_t i = walletInfo->knownTransactionCount;
                     i < newTransactionCount; i++)
         {
-            const CryptoNote::WalletTransaction t 
+            const CryptoNote::WalletTransaction t
                 = walletInfo->wallet.getTransaction(i);
 
             /* Don't print outgoing or fusion transfers */
