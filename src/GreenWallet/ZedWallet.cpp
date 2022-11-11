@@ -1,6 +1,6 @@
 // Copyright (c) 2018, The TurtleCoin Developers
 // Copyright (c) 2018-2019, The Karbo Developers
-// 
+//
 // Please see the included LICENSE file for more information.
 
 ////////////////////////////////
@@ -28,7 +28,7 @@
 
 int main(int argc, char **argv)
 {
-	/* Fix wallet not responding when enter cyrillic (non-latin) characters 
+	/* Fix wallet not responding when enter cyrillic (non-latin) characters
 	   by setting operating system default locale.
 	   Set cyrillic locale on Windows explicitly - this is Karbovanets after all. */
 	setlocale(LC_CTYPE, "");
@@ -55,7 +55,7 @@ int main(int argc, char **argv)
     Logging::LoggerManager logManager;
 
     /* Currency contains our coin parameters, such as decimal places, supply */
-    const CryptoNote::Currency currency 
+    const CryptoNote::Currency currency
         = CryptoNote::CurrencyBuilder(logManager).currency();
 
 	System::Dispatcher dispatcher;
@@ -110,7 +110,7 @@ int main(int argc, char **argv)
 	  for using that node to send transactions.
 	*/
 	if (!node->feeAddress().empty()) {
-		
+
     uint64_t nodeFee = node->feeAmount();
 
     std::stringstream feemsg;
@@ -118,7 +118,7 @@ int main(int argc, char **argv)
 		feemsg << std::endl << "You have connected to a node that charges " <<
 			"a fee to send transactions." << std::endl << std::endl
 			<< "The fee for sending transactions is " <<
-      (nodeFee == 0 ? "0.25% of transaction amount, but no more than " + 
+      (nodeFee == 0 ? "0.25% of transaction amount, but no more than " +
         formatAmount(CryptoNote::parameters::COIN) : formatAmount(nodeFee)) <<
 			std::endl << std::endl <<
 			"If you don't want to pay the node fee, please " <<

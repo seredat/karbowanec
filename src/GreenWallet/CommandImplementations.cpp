@@ -1,6 +1,6 @@
 // Copyright (c) 2018, The TurtleCoin Developers
 // Copyright (c) 2018-2019, The Karbo Developers
-// 
+//
 // Please see the included LICENSE file for more information.
 
 /////////////////////////////////////////////
@@ -123,7 +123,7 @@ void printPrivateKeys(CryptoNote::WalletGreen &wallet, bool viewWallet)
     {
         std::string mnemonicSeed;
 
-        Crypto::ElectrumWords::bytes_to_words(privateSpendKey, 
+        Crypto::ElectrumWords::bytes_to_words(privateSpendKey,
                                               mnemonicSeed,
                                               "English");
 
@@ -161,7 +161,7 @@ void balance(CryptoNote::INode &node, CryptoNote::WalletGreen &wallet,
 
     if (viewWallet)
     {
-        std::cout << std::endl 
+        std::cout << std::endl
                   << InformationMsg("Please note that view only wallets "
                                     "can only track incoming transactions,")
                   << std::endl
@@ -554,7 +554,7 @@ void printIncomingTransfer(CryptoNote::WalletTransaction t,
     std::cout << std::endl;
 }
 
-void listTransfers(bool incoming, bool outgoing, 
+void listTransfers(bool incoming, bool outgoing,
                    CryptoNote::WalletGreen &wallet, CryptoNote::INode &node)
 {
     const size_t numTransactions = wallet.getTransactionCount();
@@ -580,7 +580,7 @@ void listTransfers(bool incoming, bool outgoing,
 
     if (incoming)
     {
-        std::cout << SuccessMsg("Total received: " 
+        std::cout << SuccessMsg("Total received: "
                               + formatAmount(totalReceived))
                   << std::endl;
     }
@@ -650,19 +650,19 @@ void txSecretKey(CryptoNote::WalletGreen &wallet)
         if (std::cin.fail() || std::cin.eof()) {
             std::cin.clear();
             break;
-        }        
+        }
     }
 
     Crypto::SecretKey txSecretKey = wallet.getTransactionSecretKey(txid);
 
     if (txSecretKey == CryptoNote::NULL_SECRET_KEY) {
-        std::cout << WarningMsg("Transaction ") 
+        std::cout << WarningMsg("Transaction ")
                   << WarningMsg(hashStr)
                   << WarningMsg(" secret key is not available")
                   << std::endl;
         return;
     }
-		
+
     std::cout << SuccessMsg("Transaction secret key: ")
               << std::endl
               << SuccessMsg(Common::podToHex(txSecretKey))
@@ -694,7 +694,7 @@ void txProof(CryptoNote::WalletGreen &wallet)
             break;
         }
     }
-	  
+
     Crypto::SecretKey txSecretKey = wallet.getTransactionSecretKey(txid);
 
     if (txSecretKey == CryptoNote::NULL_SECRET_KEY) {
@@ -711,7 +711,7 @@ void txProof(CryptoNote::WalletGreen &wallet)
         while (true)
         {
             std::string keyStr;
-			
+
             std::getline(std::cin, keyStr);
             boost::algorithm::trim(keyStr);
 
@@ -724,7 +724,7 @@ void txProof(CryptoNote::WalletGreen &wallet)
                           << WarningMsg(keyStr) << std::endl;
                 return;
             }
-            else {     
+            else {
                 txSecretKey = *(struct Crypto::SecretKey *) &tx_key_hash;
 				break;
             }
@@ -860,8 +860,8 @@ void reserveProof(std::shared_ptr<WalletInfo> walletInfo, bool viewWallet)
 
     try
     {
-        const std::string sig = 
-            walletInfo->wallet.getReserveProof(amount, 
+        const std::string sig =
+            walletInfo->wallet.getReserveProof(amount,
                                                walletInfo->walletAddress,
                                                message.empty() ? "" : message);
 
@@ -896,11 +896,11 @@ void reserveProof(std::shared_ptr<WalletInfo> walletInfo, bool viewWallet)
             boost::filesystem::remove(fileName, ec);
         }
 
-        std::ofstream proofFile(fileName, 
-                                std::ios::out | 
-                                std::ios::trunc | 
+        std::ofstream proofFile(fileName,
+                                std::ios::out |
+                                std::ios::trunc |
                                 std::ios::binary);
-          
+
         if (!proofFile.good())
         {
             std::cout << WarningMsg("Failed to save reserve proof to file")
@@ -910,7 +910,7 @@ void reserveProof(std::shared_ptr<WalletInfo> walletInfo, bool viewWallet)
 
         proofFile << sig;
 
-        std::cout << SuccessMsg("Proof signature saved to file: ") 
+        std::cout << SuccessMsg("Proof signature saved to file: ")
                   << SuccessMsg(fileName)
                   << std::endl;
     }
@@ -958,7 +958,7 @@ void signMessage(std::shared_ptr<WalletInfo> walletInfo, bool viewWallet)
 
         std::string signature = walletInfo->wallet.signMessage(message, walletAddress);
 
-        std::cout << SuccessMsg("Signature: ") 
+        std::cout << SuccessMsg("Signature: ")
                   << InformationMsg(signature)
                   << std::endl;
     }
@@ -978,7 +978,7 @@ void verifyMessage(CryptoNote::WalletGreen &wallet)
         std::cout << InformationMsg("Enter address: ");
 
         CryptoNote::AccountPublicAddress address;
-        
+
         uint64_t prefix;
 
         std::getline(std::cin, addrStr);
@@ -1026,7 +1026,7 @@ void verifyMessage(CryptoNote::WalletGreen &wallet)
         std::cout << InformationMsg("Enter signature: ");
 
         std::getline(std::cin, signature);
-        boost::algorithm::trim(signature);       
+        boost::algorithm::trim(signature);
 
         if (!signature.empty())
         {
@@ -1045,7 +1045,7 @@ void verifyMessage(CryptoNote::WalletGreen &wallet)
 
         if (r)
         {
-            std::cout << SuccessMsg("Signature is valid") 
+            std::cout << SuccessMsg("Signature is valid")
                       << std::endl;
         }
         else
