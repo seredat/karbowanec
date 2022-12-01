@@ -5,21 +5,21 @@
 // Copyright (c) 2016-2022, The Karbo developers
 //
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without modification, are
 // permitted provided that the following conditions are met:
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice, this list of
 //    conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice, this list
 //    of conditions and the following disclaimer in the documentation and/or other
 //    materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its contributors may be
 //    used to endorse or promote products derived from this software without specific
 //    prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
 // EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
 // MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
@@ -333,7 +333,7 @@ struct TransferCommand {
 #endif
           std::string remote_node_fee_address = m_node.feeAddress();
           if (!remote_node_fee_address.empty()) {
-            destination.address = m_node.feeAddress().empty();
+            destination.address = m_node.feeAddress();
             int64_t remote_node_fee_amount = (int64_t)m_node.feeAmount();
             destination.amount = std::min<int64_t>((remote_node_fee_amount == 0 ? static_cast<int64_t>(de.amount * 0.0025) : remote_node_fee_amount),
               (int64_t)CryptoNote::parameters::MAXIMUM_FEE);
@@ -444,7 +444,7 @@ std::string tryToOpenWalletOrLoadKeysOrThrow(LoggerRef& logger, std::unique_ptr<
       } else { // no keys, wallet error loading
         throw std::runtime_error("can't load wallet file '" + walletFileName + "', check password");
       }
-    } else { //new wallet ok 
+    } else { //new wallet ok
       return walletFileName;
     }
   } else if (keysExists) { //wallet not exists but keys presented
@@ -625,10 +625,10 @@ simple_wallet::simple_wallet(System::Dispatcher& dispatcher, const CryptoNote::C
   m_daemon_no_verify(false),
   m_dump_keys_file(false),
   m_scan_height(0),
-  m_currency(currency), 
+  m_currency(currency),
   m_logManager(log),
   logger(log, "simplewallet"),
-  m_refresh_progress_reporter(*this), 
+  m_refresh_progress_reporter(*this),
   m_initResultPromise(nullptr),
   m_walletSynchronized(false),
   m_trackingWallet(false),
@@ -775,7 +775,7 @@ bool simple_wallet::get_tx_proof(const std::vector<std::string> &args)
       return true;
     }
     tx_key2 = *(struct Crypto::SecretKey *) &tx_key_hash;
-  
+
     if (r) {
       if (args.size() == 3 && tx_key != tx_key2) {
         fail_msg_writer() << "Tx secret key was found for the given txid, but you've also provided another tx secret key which doesn't match the found one.";
@@ -789,7 +789,7 @@ bool simple_wallet::get_tx_proof(const std::vector<std::string> &args)
       return true;
     }
   }
- 
+
   if (m_wallet->getTxProof(txid, address, tx_key, sig_str)) {
     success_msg_writer() << "Signature: " << sig_str << std::endl;
   }
@@ -1059,7 +1059,7 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
       seedLoader(m_mnemonic_seed_file.c_str(), m_mnemonic_seed);
     }
 
-    if (!m_mnemonic_seed.empty() && m_view_key.empty() && m_spend_key.empty()) {     
+    if (!m_mnemonic_seed.empty() && m_view_key.empty() && m_spend_key.empty()) {
       Crypto::SecretKey private_spend_key;
       std::string languageName;
       if (!Crypto::ElectrumWords::words_to_bytes(m_mnemonic_seed, private_spend_key, languageName)) {
@@ -1885,9 +1885,7 @@ void simple_wallet::connectionStatusUpdated(bool connected) {
           << "The node's fee for sending transactions is "
           << (remote_node_fee_amount == 0 ? "0.25% of transaction amount, but no more than "
             + m_currency.formatAmount(CryptoNote::parameters::MAXIMUM_FEE) : m_currency.formatAmount(remote_node_fee_amount))
-          << " " << CryptoNote::CRYPTONOTE_TICKER << "." << std::endl
-          << "If you don't want to pay the node fee, please run your own node."
-          << std::endl;
+          << " " << CryptoNote::CRYPTONOTE_TICKER << "." << std::endl;
         std::cout << InformationMsg(feemsg.str()) << std::endl;
       }
       m_initial_remote_fee_mess = true;
@@ -1900,7 +1898,7 @@ void simple_wallet::connectionStatusUpdated(bool connected) {
 void simple_wallet::externalTransactionCreated(CryptoNote::TransactionId transactionId)  {
   WalletLegacyTransaction txInfo;
   m_wallet->getTransaction(transactionId, txInfo);
-  
+
   std::stringstream logPrefix;
   if (txInfo.blockHeight == WALLET_LEGACY_UNCONFIRMED_TRANSACTION_HEIGHT) {
     logPrefix << "Unconfirmed";
@@ -2249,7 +2247,7 @@ bool simple_wallet::transfer(const std::vector<std::string> &args) {
       }
       txFile << raw_tx;
 
-      success_msg_writer(true) << "Raw transaction prepared successfully and saved to file : " << filename 
+      success_msg_writer(true) << "Raw transaction prepared successfully and saved to file : " << filename
         << ", id: " << Common::podToHex(txInfo.hash) << ", key: " << Common::podToHex(tx_key);
       m_do_not_relay_tx = false;
     }
@@ -2295,7 +2293,7 @@ bool simple_wallet::estimate_fusion(const std::vector<std::string>& args) {
         ", minimum threshold " << m_currency.formatAmount(m_currency.defaultDustThreshold() + 1);
     }
   }
-  try {  
+  try {
     size_t fusionReadyCount = m_wallet->estimateFusion(fusionThreshold);
     success_msg_writer() << "Fusion ready outputs count: " << fusionReadyCount;
   }
@@ -2474,7 +2472,7 @@ bool simple_wallet::verify_message(const std::vector<std::string> &args) {
     fail_msg_writer() << "failed to parse address " << address_string;
     return true;
   }
-  
+
   bool r = m_wallet->verify_message(message, address, signature);
   if (!r) {
     fail_msg_writer() << "Invalid signature from " << address_string;
@@ -2587,7 +2585,7 @@ int main(int argc, char* argv[]) {
 
   if (!r)
     return 1;
-  
+
   auto modulePath = Common::NativePathToGeneric(argv[0]);
   auto cfgLogFile = Common::NativePathToGeneric(command_line::get_arg(vm, arg_log_file));
   if (cfgLogFile.empty()) {
@@ -2716,7 +2714,7 @@ int main(int argc, char* argv[]) {
     m_stopComplete.wait();
 
     logger(INFO) << "Stopped wallet rpc server";
-    
+
     try {
       logger(INFO) << "Storing wallet...";
       CryptoNote::WalletHelper::storeWallet(*wallet, walletFileName);
@@ -2728,10 +2726,10 @@ int main(int argc, char* argv[]) {
   } else {
     //runs wallet with console interface
     CryptoNote::simple_wallet wal(dispatcher, currency, logManager);
-    
+
     if (!wal.init(vm)) {
-      //logger(ERROR, BRIGHT_RED) << "Failed to initialize wallet"; 
-      return 1; 
+      //logger(ERROR, BRIGHT_RED) << "Failed to initialize wallet";
+      return 1;
     }
 
     std::vector<std::string> command = command_line::get_arg(vm, arg_command);
@@ -2741,7 +2739,7 @@ int main(int argc, char* argv[]) {
     Tools::SignalHandler::install([&wal] {
       wal.stop();
     });
-    
+
     wal.run();
 
     if (!wal.deinit()) {

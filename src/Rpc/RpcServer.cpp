@@ -1490,6 +1490,7 @@ bool RpcServer::on_get_explorer(const COMMAND_EXPLORER::request& req, COMMAND_EX
     " &bull; " + "Difficulty: <b>" + std::to_string(m_core.getNextBlockDifficulty()) + "</b>" +
     " &bull; " + "Alt. blocks: <b>" + std::to_string(m_core.getAlternativeBlocksCount()) + "</b>" +
     " &bull; " + "Transactions: <b>" + std::to_string(m_core.getBlockchainTotalTransactions() - top_block_index + 1) + "</b>" +
+    " &bull; " + "Next reward: <b>" + m_core.currency().formatAmount(m_core.currency().calculateReward(m_core.getTotalGeneratedAmount())) + "</b>" +
     "</p>\n";
 
   const uint32_t print_blocks_count = 10;
