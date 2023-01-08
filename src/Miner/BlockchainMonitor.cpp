@@ -25,7 +25,7 @@
 
 #include "Rpc/CoreRpcServerCommandsDefinitions.h"
 #include "Rpc/JsonRpc.h"
-#include "Rpc/HttpClient.h"
+#include "HTTP/httplib.h"
 
 #if defined(WIN32)
 #undef ERROR
@@ -82,7 +82,7 @@ Crypto::Hash BlockchainMonitor::requestLastBlockHash() {
   m_logger(Logging::DEBUGGING) << "Requesting last block hash";
 
   try {
-    CryptoNote::HttpClient client(m_dispatcher, m_daemonHost, m_daemonPort, false);
+    httplib::Client client(m_daemonHost, m_daemonPort);
 
     CryptoNote::COMMAND_RPC_GET_LAST_BLOCK_HEADER::request request;
     CryptoNote::COMMAND_RPC_GET_LAST_BLOCK_HEADER::response response;

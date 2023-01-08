@@ -26,7 +26,7 @@
 #include "CryptoNoteCore/CryptoNoteTools.h"
 #include "CryptoNoteCore/CryptoNoteFormatUtils.h"
 #include "CryptoNoteCore/TransactionExtra.h"
-#include "Rpc/HttpClient.h"
+#include "HTTP/httplib.h"
 #include "Rpc/CoreRpcServerCommandsDefinitions.h"
 #include "Rpc/JsonRpc.h"
 
@@ -94,8 +94,8 @@ void MinerManager::start() {
     m_logger(Logging::INFO) << "requesting mining parameters";
 
     try {
-      params = requestMiningParameters(m_dispatcher, m_config.daemonHost, m_config.daemonPort, m_config.miningAddress);
-    } catch (ConnectException& e) {
+      params = requestMiningParameters(m_dispatcher, m_config.daemonHost, m_config.daemonPort, m_config.miningSpendKey, m_config.miningViewKey);
+    } catch (const std::exception& e) {
       m_logger(Logging::WARNING) << "Couldn't connect to daemon: " << e.what();
       System::Timer timer(m_dispatcher);
       timer.sleep(std::chrono::seconds(m_config.scanPeriod));
@@ -133,7 +133,7 @@ void MinerManager::eventLoop() {
           }
         }
 
-        BlockMiningParameters params = requestMiningParameters(m_dispatcher, m_config.daemonHost, m_config.daemonPort, m_config.miningAddress);
+        BlockMiningParameters params = requestMiningParameters(m_dispatcher, m_config.daemonHost, m_config.daemonPort, m_config.miningSpendKey, m_config.miningViewKey);
         adjustBlockTemplate(params.blockTemplate);
 
         startBlockchainMonitoring();
@@ -145,7 +145,7 @@ void MinerManager::eventLoop() {
         m_logger(Logging::DEBUGGING) << "got BLOCKCHAIN_UPDATED event";
         stopMining();
         stopBlockchainMonitoring();
-        BlockMiningParameters params = requestMiningParameters(m_dispatcher, m_config.daemonHost, m_config.daemonPort, m_config.miningAddress);
+        BlockMiningParameters params = requestMiningParameters(m_dispatcher, m_config.daemonHost, m_config.daemonPort, m_config.miningSpendKey, m_config.miningViewKey);
         adjustBlockTemplate(params.blockTemplate);
 
         startBlockchainMonitoring();
@@ -211,7 +211,7 @@ void MinerManager::stopBlockchainMonitoring() {
 
 bool MinerManager::submitBlock(const Block& minedBlock, const std::string& daemonHost, uint16_t daemonPort) {
   try {
-    HttpClient client(m_dispatcher, daemonHost, daemonPort, false);
+    httplib::Client client(daemonHost, daemonPort);
 
     COMMAND_RPC_SUBMITBLOCK::request request;
     request.emplace_back(Common::toHex(toBinaryArray(minedBlock)));
@@ -229,12 +229,13 @@ bool MinerManager::submitBlock(const Block& minedBlock, const std::string& daemo
   }
 }
 
-BlockMiningParameters MinerManager::requestMiningParameters(System::Dispatcher& dispatcher, const std::string& daemonHost, uint16_t daemonPort, const std::string& miningAddress) {
+BlockMiningParameters MinerManager::requestMiningParameters(System::Dispatcher& dispatcher, const std::string& daemonHost, uint16_t daemonPort, const std::string& miningSpendKey, const std::string& miningViewKey) {
   try {
-    HttpClient client(dispatcher, daemonHost, daemonPort, false);
+    httplib::Client client(daemonHost, daemonPort);
 
     COMMAND_RPC_GETBLOCKTEMPLATE::request request;
-    request.wallet_address = miningAddress;
+    request.miner_spend_key = miningSpendKey;
+    request.miner_view_key = miningViewKey;
     request.reserve_size = 0;
 
     COMMAND_RPC_GETBLOCKTEMPLATE::response response;

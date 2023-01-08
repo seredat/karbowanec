@@ -28,7 +28,8 @@ struct MiningConfig {
   void parse(int argc, char** argv);
   void printHelp();
 
-  std::string miningAddress;
+  std::string miningSpendKey;
+  std::string miningViewKey;
   std::string daemonHost;
   uint16_t daemonPort;
   size_t threadCount;
