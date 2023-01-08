@@ -61,6 +61,7 @@ namespace CryptoNote {
      virtual bool get_block_template(Block& b, const AccountKeys& acc, difficulty_type& diffic, uint32_t& height, const BinaryArray& ex_nonce) override;
      virtual bool getBlockLongHash(Crypto::cn_context &context, const Block& b, Crypto::Hash& res) override;
      virtual bool getHashingBlob(const uint32_t height, BinaryArray& blob) override;
+     virtual std::vector<BinaryArray> getHashingBlobs() override;
 
      bool addObserver(ICoreObserver* observer) override;
      bool removeObserver(ICoreObserver* observer) override;

@@ -1458,4 +1458,18 @@ struct COMMAND_RPC_GET_HASHING_BLOB {
   };
 };
 
+struct COMMAND_RPC_GET_HASHING_BLOBS {
+  typedef EMPTY_STRUCT request;
+
+  struct response {
+    std::vector<BinaryArray> blobs;
+    std::string status;
+
+    void serialize(ISerializer& s) {
+      KV_MEMBER(blobs)
+      KV_MEMBER(status)
+    }
+  };
+};
+
 }

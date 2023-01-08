@@ -1181,6 +1181,10 @@ bool Blockchain::getHashingBlob(const uint32_t height, BinaryArray& blob) {
   return true;
 }
 
+std::vector<BinaryArray> Blockchain::getHashingBlobs() {
+  return m_blobs;
+}
+
 bool Blockchain::checkProofOfWork(Crypto::cn_context& context, const Block& block, difficulty_type currentDiffic, Crypto::Hash& proofOfWork) {
   std::list<Crypto::Hash> dummy_alt_chain;
 

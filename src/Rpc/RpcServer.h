@@ -85,6 +85,7 @@ private:
   bool on_get_pool_changes(const COMMAND_RPC_GET_POOL_CHANGES::request& req, COMMAND_RPC_GET_POOL_CHANGES::response& rsp);
   bool on_get_pool_changes_lite(const COMMAND_RPC_GET_POOL_CHANGES_LITE::request& req, COMMAND_RPC_GET_POOL_CHANGES_LITE::response& rsp);
   bool on_get_hashing_blob(const COMMAND_RPC_GET_HASHING_BLOB::request& req, COMMAND_RPC_GET_HASHING_BLOB::response& res);
+  bool on_get_hashing_blobs(const COMMAND_RPC_GET_HASHING_BLOBS::request& req, COMMAND_RPC_GET_HASHING_BLOBS::response& res);
 
   // http handlers
   bool on_get_index(const COMMAND_HTTP::request& req, COMMAND_HTTP::response& res);
