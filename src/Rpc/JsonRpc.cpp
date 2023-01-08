@@ -41,8 +41,6 @@ JsonRpcError::JsonRpcError(int c, const std::string& msg) : code(c), message(msg
 }
 
 void invokeJsonRpcCommand(httplib::Client& httpClient, JsonRpcRequest& jsReq, JsonRpcResponse& jsRes, const std::string& user, const std::string& password) {
-  httplib::Response httpRes;
-
   if (!user.empty() || !password.empty()) {
     httpClient.set_basic_auth(user.c_str(), password.c_str());
   }
@@ -53,7 +51,7 @@ void invokeJsonRpcCommand(httplib::Client& httpClient, JsonRpcRequest& jsReq, Js
     throw std::runtime_error("JSON-RPC call failed");
   }
 
-  jsRes.parse(httpRes.body);
+  jsRes.parse(rsp->body);
 
   JsonRpcError err;
   if (jsRes.getError(err)) {
