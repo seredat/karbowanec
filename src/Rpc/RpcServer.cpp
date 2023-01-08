@@ -178,7 +178,6 @@ std::unordered_map<std::string, RpcServer::RpcHandler<RpcServer::HandlerFunction
   { "/queryblocks", { jsonMethod<COMMAND_RPC_QUERY_BLOCKS>(&RpcServer::on_query_blocks), false } },
   { "/queryblockslite", { jsonMethod<COMMAND_RPC_QUERY_BLOCKS_LITE>(&RpcServer::on_query_blocks_lite), false } },
   { "/get_hashing_blob", { jsonMethod<COMMAND_RPC_GET_HASHING_BLOB>(&RpcServer::on_get_hashing_blob), false } },
-  { "/get_hashing_blobs", { jsonMethod<COMMAND_RPC_GET_HASHING_BLOBS>(&RpcServer::on_get_hashing_blobs), false } },
   { "/get_o_indexes", { jsonMethod<COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES>(&RpcServer::on_get_indexes), false } },
   { "/getrandom_outs", { jsonMethod<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_JSON>(&RpcServer::on_get_random_outs_json), false } },
   { "/get_pool_changes", { jsonMethod<COMMAND_RPC_GET_POOL_CHANGES>(&RpcServer::on_get_pool_changes), true } },
@@ -614,7 +613,6 @@ bool RpcServer::processJsonRpcRequest(const httplib::Request& request, httplib::
       { "getblockcount", { makeMemberMethod(&RpcServer::on_getblockcount), true } },
       { "getblockhash", { makeMemberMethod(&RpcServer::on_getblockhash), true } },
       { "getblocktemplate", { makeMemberMethod(&RpcServer::on_getblocktemplate), true } },
-      { "get_hashing_blobs", { makeMemberMethod(&RpcServer::on_get_hashing_blobs), true } },
       { "getblockheaderbyhash", { makeMemberMethod(&RpcServer::on_get_block_header_by_hash), true } },
       { "getblockheaderbyheight", { makeMemberMethod(&RpcServer::on_get_block_header_by_height), true } },
       { "getblocktimestamp", { makeMemberMethod(&RpcServer::on_get_block_timestamp_by_height), true } },
@@ -887,10 +885,8 @@ bool RpcServer::on_get_hashing_blobs(const COMMAND_RPC_GET_HASHING_BLOBS::reques
   }
 
   try {
-    std::vector<BinaryArray> bas = m_core.getHashingBlobs();
-    for (const auto& b : bas) {
-      res.blobs.emplace_back(Common::asString(b));
-    }
+    std::vector<BinaryArray> blobs = m_core.getHashingBlobs();
+    res.blobs = std::move(blobs);
   }
   catch (std::system_error& e) {
     throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_INTERNAL_ERROR, e.what() };
