@@ -45,7 +45,7 @@ void invokeJsonRpcCommand(httplib::Client& httpClient, JsonRpcRequest& jsReq, Js
     httpClient.set_basic_auth(user.c_str(), password.c_str());
   }
 
-  auto rsp = httpClient.Post("/json_rpc", storeToJson(jsReq.getBody()), "application/json");
+  auto rsp = httpClient.Post("/json_rpc", jsReq.getBody(), "application/json");
 
   if (!rsp || rsp->status != 200) {
     throw std::runtime_error("JSON-RPC call failed");
