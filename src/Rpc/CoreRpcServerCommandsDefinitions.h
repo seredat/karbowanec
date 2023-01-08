@@ -1449,9 +1449,11 @@ struct COMMAND_RPC_GET_HASHING_BLOB {
 
   struct response {
     BinaryArray blob;
+    std::string status;
 
     void serialize(ISerializer& s) {
       KV_MEMBER(blob)
+      KV_MEMBER(status)
     }
   };
 };

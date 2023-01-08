@@ -155,7 +155,7 @@ std::unordered_map<std::string, RpcServer::RpcHandler<RpcServer::HandlerFunction
   { "/getrandom_outs.bin", { binMethod<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS>(&RpcServer::on_get_random_outs_bin), true } },
   { "/get_pool_changes.bin", { binMethod<COMMAND_RPC_GET_POOL_CHANGES>(&RpcServer::on_get_pool_changes), true } },
   { "/get_pool_changes_lite.bin", { binMethod<COMMAND_RPC_GET_POOL_CHANGES_LITE>(&RpcServer::on_get_pool_changes_lite), true } },
-  { "/get_hashing_blob.bin", { binMethod<COMMAND_RPC_GET_HASHING_BLOB>(&RpcServer::on_get_hashing_blob), true } },
+  { "/get_hashing_blob.bin", { binMethod<COMMAND_RPC_GET_HASHING_BLOB>(&RpcServer::on_get_hashing_blob), false } },
 
   // plain text/html handlers
   { "/", { httpMethod<COMMAND_HTTP>(&RpcServer::on_get_index), true } },
@@ -859,11 +859,19 @@ bool RpcServer::on_get_pool_changes_lite(const COMMAND_RPC_GET_POOL_CHANGES_LITE
 }
 
 bool RpcServer::on_get_hashing_blob(const COMMAND_RPC_GET_HASHING_BLOB::request& req, COMMAND_RPC_GET_HASHING_BLOB::response& res) {
+  if (m_restricted_rpc) {
+    res.status = "Method disabled";
+    return false;
+  }
+
   BinaryArray blob;
 
   if (!m_core.getHashingBlob(req.height, blob)) {
     throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_INTERNAL_ERROR, "Internal error: can't get hashing blob." };
   }
+
+  res.blob = blob;
+  res.status = CORE_RPC_STATUS_OK;
 
   return true;
 }
