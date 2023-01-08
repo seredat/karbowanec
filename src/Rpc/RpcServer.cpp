@@ -614,6 +614,7 @@ bool RpcServer::processJsonRpcRequest(const httplib::Request& request, httplib::
       { "getblockcount", { makeMemberMethod(&RpcServer::on_getblockcount), true } },
       { "getblockhash", { makeMemberMethod(&RpcServer::on_getblockhash), true } },
       { "getblocktemplate", { makeMemberMethod(&RpcServer::on_getblocktemplate), true } },
+      { "get_hashing_blobs", { makeMemberMethod(&RpcServer::on_get_hashing_blobs), true } },
       { "getblockheaderbyhash", { makeMemberMethod(&RpcServer::on_get_block_header_by_hash), true } },
       { "getblockheaderbyheight", { makeMemberMethod(&RpcServer::on_get_block_header_by_height), true } },
       { "getblocktimestamp", { makeMemberMethod(&RpcServer::on_get_block_timestamp_by_height), true } },
@@ -885,9 +886,11 @@ bool RpcServer::on_get_hashing_blobs(const COMMAND_RPC_GET_HASHING_BLOBS::reques
     return false;
   }
 
-  std::vector<BinaryArray> blobs;
   try {
-    blobs = m_core.getHashingBlobs();
+    std::vector<BinaryArray> bas = m_core.getHashingBlobs();
+    for (const auto& b : bas) {
+      res.blobs.emplace_back(Common::asString(b));
+    }
   }
   catch (std::system_error& e) {
     throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_INTERNAL_ERROR, e.what() };
@@ -898,7 +901,6 @@ bool RpcServer::on_get_hashing_blobs(const COMMAND_RPC_GET_HASHING_BLOBS::reques
     return false;
   }
 
-  res.blobs = blobs;
   res.status = CORE_RPC_STATUS_OK;
 
   return true;
