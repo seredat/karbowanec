@@ -230,8 +230,9 @@ bool MinerManager::submitBlock(const Block& minedBlock, const std::string& daemo
 }
 
 BlockMiningParameters MinerManager::requestMiningParameters(System::Dispatcher& dispatcher, const std::string& daemonHost, uint16_t daemonPort, const std::string& miningSpendKey, const std::string& miningViewKey) {
+  httplib::Client client(daemonHost, daemonPort);
+  BlockMiningParameters params;
   try {
-    httplib::Client client(daemonHost, daemonPort);
 
     COMMAND_RPC_GETBLOCKTEMPLATE::request request;
     request.miner_spend_key = miningSpendKey;
@@ -247,7 +248,6 @@ BlockMiningParameters MinerManager::requestMiningParameters(System::Dispatcher& 
       throw std::runtime_error("Core responded with wrong status: " + response.status);
     }
 
-    BlockMiningParameters params;
     params.difficulty = response.difficulty;
 
     if(!fromBinaryArray(params.blockTemplate, Common::fromHex(response.blocktemplate_blob))) {
@@ -255,11 +255,32 @@ BlockMiningParameters MinerManager::requestMiningParameters(System::Dispatcher& 
     }
 
     m_logger(Logging::DEBUGGING) << "Requested block template with previous block hash: " << Common::podToHex(params.blockTemplate.previousBlockHash);
-    return params;
+
   } catch (std::exception& e) {
     m_logger(Logging::WARNING) << "Couldn't get block template: " << e.what();
     throw;
   }
+  try {
+    COMMAND_RPC_GET_HASHING_BLOBS::request request;
+    COMMAND_RPC_GET_HASHING_BLOBS::response response;
+
+    System::EventLock lk(m_httpEvent);
+    JsonRpc::invokeJsonRpcCommand(client, "get_hashing_blobs", request, response);
+
+    if (response.status != CORE_RPC_STATUS_OK) {
+      throw std::runtime_error("Core responded with wrong status: " + response.status);
+    }
+
+    for (const auto& b : response.blobs) {
+      params.blobs.emplace_back(Common::asBinaryArray(b));
+    }
+  }
+  catch (std::exception& e) {
+    m_logger(Logging::WARNING) << "Couldn't get hashing blobs: " << e.what();
+    throw;
+  }
+
+  return params;
 }
 
 

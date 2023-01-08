@@ -34,6 +34,7 @@ namespace CryptoNote {
 struct BlockMiningParameters {
   Block blockTemplate;
   difficulty_type difficulty;
+  std::vector<BinaryArray> blobs;
 };
 
 class Miner {
