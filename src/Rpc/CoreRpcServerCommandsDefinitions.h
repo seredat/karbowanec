@@ -1438,4 +1438,22 @@ struct COMMAND_RPC_CHECK_PAYMENT_BY_PAYMENT_ID {
   };
 };
 
+struct COMMAND_RPC_GET_HASHING_BLOB {
+  struct request {
+    uint32_t height;
+  
+    void serialize(ISerializer& s) {
+      KV_MEMBER(height)
+    }
+  };
+
+  struct response {
+    BinaryArray blob;
+
+    void serialize(ISerializer& s) {
+      KV_MEMBER(blob)
+    }
+  };
+};
+
 }
