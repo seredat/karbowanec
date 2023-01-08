@@ -1172,7 +1172,7 @@ uint64_t Blockchain::getCurrentCumulativeBlocksizeLimit() {
 
 bool Blockchain::getHashingBlob(const uint32_t height, BinaryArray& blob) {
   if (height > m_blobs.size()) {
-    logger(ERROR, BRIGHT_RED) << "internal error in getHashingBlob: requested height " << height << " is bigger than blobs height" << m_blobs.size();
+    logger(DEBUGGING) << "internal error in getHashingBlob: requested height " << height << " is bigger than blobs height" << m_blobs.size();
     return false;
   }
 
