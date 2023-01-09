@@ -18,6 +18,7 @@
 #pragma once
 
 #include <atomic>
+#include <list>
 #include <thread>
 
 #include <System/Dispatcher.h>
