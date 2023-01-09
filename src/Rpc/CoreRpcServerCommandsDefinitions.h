@@ -1462,8 +1462,8 @@ struct COMMAND_RPC_GET_HASHING_BLOBS {
   typedef EMPTY_STRUCT request;
 
   struct response {
-    std::vector<BinaryArray> blobs;
-    //std::vector<std::string> blobs;
+    //std::vector<BinaryArray> blobs;
+    std::vector<std::string> blobs;
     std::string status;
 
     void serialize(ISerializer& s) {

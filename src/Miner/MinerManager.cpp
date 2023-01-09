@@ -283,7 +283,12 @@ BlockMiningParameters MinerManager::requestMiningParameters(System::Dispatcher& 
         if (response.blobs.size() == 0) {
           throw std::runtime_error("No hashing blobs");
         }
-        params.blobs = response.blobs;
+
+        //params.blobs = response.blobs;
+
+        for (const auto& b : response.blobs) {
+          params.blobs.emplace_back(Common::asBinaryArray(b));
+        }
       }
     }
   }

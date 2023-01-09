@@ -886,7 +886,10 @@ bool RpcServer::on_get_hashing_blobs(const COMMAND_RPC_GET_HASHING_BLOBS::reques
 
   try {
     std::vector<BinaryArray> blobs = m_core.getHashingBlobs();
-    res.blobs = std::move(blobs);
+    //res.blobs = std::move(blobs);
+    for (const auto& b : blobs) {
+      res.blobs.emplace_back(Common::asString(b));
+    }
   }
   catch (std::system_error& e) {
     throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_INTERNAL_ERROR, e.what() };
