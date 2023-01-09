@@ -230,8 +230,12 @@ bool MinerManager::submitBlock(const Block& minedBlock, const std::string& daemo
 }
 
 BlockMiningParameters MinerManager::requestMiningParameters(System::Dispatcher& dispatcher, const std::string& daemonHost, uint16_t daemonPort, const std::string& miningSpendKey, const std::string& miningViewKey) {
-  httplib::Client client(daemonHost, daemonPort);
+  std::string daemon_url = "http://" + daemonHost + ":" + std::to_string(daemonPort);
+
+  httplib::Client client(daemon_url);
+
   BlockMiningParameters params;
+
   try {
 
     COMMAND_RPC_GETBLOCKTEMPLATE::request request;
@@ -242,6 +246,7 @@ BlockMiningParameters MinerManager::requestMiningParameters(System::Dispatcher& 
     COMMAND_RPC_GETBLOCKTEMPLATE::response response;
 
     System::EventLock lk(m_httpEvent);
+
     JsonRpc::invokeJsonRpcCommand(client, "getblocktemplate", request, response);
 
     if (response.status != CORE_RPC_STATUS_OK) {
@@ -265,14 +270,15 @@ BlockMiningParameters MinerManager::requestMiningParameters(System::Dispatcher& 
     COMMAND_RPC_GET_HASHING_BLOBS::response response;
 
     System::EventLock lk(m_httpEvent);
-    JsonRpc::invokeJsonRpcCommand(client, "get_hashing_blobs", request, response);
 
-    if (response.status != CORE_RPC_STATUS_OK) {
-      throw std::runtime_error("Core responded with wrong status: " + response.status);
-    }
-
-    for (const auto& b : response.blobs) {
-      params.blobs.emplace_back(Common::asBinaryArray(b));
+    const auto rsp = client.Post("/get_hashing_blobs.bin", storeToBinaryKeyValue(request), "application/octet-stream");
+    if (rsp) {
+      if (rsp->status == 200) {
+        if (!loadFromBinaryKeyValue(response, rsp->body)) {
+          throw std::runtime_error("Failed to parse binary response");
+        }
+        params.blobs = response.blobs;
+      }
     }
   }
   catch (std::exception& e) {
