@@ -58,13 +58,18 @@ private:
 
   Block m_block;
 
-  //std::vector<BinaryArray> m_blobs;
+  std::vector<BinaryArray> m_blobs;
+
+  std::recursive_mutex m_blobs_lock;
 
   Logging::LoggerRef m_logger;
 
   void runWorkers(BlockMiningParameters blockMiningParameters, size_t threadCount);
-  void workerFunc(const std::vector<BinaryArray>& m_blobs, const Block& blockTemplate, difficulty_type difficulty, uint32_t nonceStep);
+  void workerFunc(const Block& blockTemplate, difficulty_type difficulty, uint32_t nonceStep);
   bool setStateBlockFound();
+
+  void setBlobs(const std::vector<BinaryArray>& blobs);
+
 };
 
 } //namespace CryptoNote

@@ -40,6 +40,12 @@ Miner::~Miner() {
   assert(m_state != MiningState::MINING_IN_PROGRESS);
 }
 
+void Miner::setBlobs(const std::vector<BinaryArray>& blobs) {
+  std::cout << "set_blobs: " << blobs.size() << ENDL;
+  std::lock_guard<decltype(m_blobs_lock)> lk(m_blobs_lock);
+  m_blobs = blobs;
+}
+
 Block Miner::mine(const BlockMiningParameters& blockMiningParameters, size_t threadCount) {
   if (threadCount == 0) {
     throw std::runtime_error("Miner requires at least one thread");
@@ -49,7 +55,7 @@ Block Miner::mine(const BlockMiningParameters& blockMiningParameters, size_t thr
     throw std::runtime_error("Mining is already in progress");
   }
 
-  //m_blobs = blockMiningParameters.blobs;
+  setBlobs(blockMiningParameters.blobs);
 
   m_state = MiningState::MINING_IN_PROGRESS;
   m_miningStopped.clear();
@@ -85,7 +91,7 @@ void Miner::runWorkers(BlockMiningParameters blockMiningParameters, size_t threa
 
     for (size_t i = 0; i < threadCount; ++i) {
       m_workers.emplace_back(std::unique_ptr<System::RemoteContext<void>> (
-        new System::RemoteContext<void>(m_dispatcher, std::bind(&Miner::workerFunc, this, blockMiningParameters.blobs, blockMiningParameters.blockTemplate, blockMiningParameters.difficulty, (uint32_t)threadCount)))
+        new System::RemoteContext<void>(m_dispatcher, std::bind(&Miner::workerFunc, this, blockMiningParameters.blockTemplate, blockMiningParameters.difficulty, (uint32_t)threadCount)))
       );
 
       blockMiningParameters.blockTemplate.nonce++;
@@ -101,7 +107,7 @@ void Miner::runWorkers(BlockMiningParameters blockMiningParameters, size_t threa
   m_miningStopped.set();
 }
 
-void Miner::workerFunc(const std::vector<BinaryArray>& m_blobs, const Block& blockTemplate, difficulty_type difficulty, uint32_t nonceStep) {
+void Miner::workerFunc(const Block& blockTemplate, difficulty_type difficulty, uint32_t nonceStep) {
   try {
     Block block = blockTemplate;
     Crypto::cn_context cryptoContext;
@@ -145,7 +151,8 @@ void Miner::workerFunc(const std::vector<BinaryArray>& m_blobs, const Block& blo
               (chunk[3]);
 
             uint32_t height_j = n % maxHeight;
-            BinaryArray ba = m_blobs[height_j];
+            std::lock_guard<decltype(m_blobs_lock)> lk(m_blobs_lock);
+            BinaryArray& ba = m_blobs[height_j];
             pot.insert(std::end(pot), std::begin(ba), std::end(ba));
           }
         }

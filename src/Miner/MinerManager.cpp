@@ -277,6 +277,12 @@ BlockMiningParameters MinerManager::requestMiningParameters(System::Dispatcher& 
         if (!loadFromBinaryKeyValue(response, rsp->body)) {
           throw std::runtime_error("Failed to parse binary response");
         }
+
+        std::cout << response.blobs.size() << ENDL;
+
+        if (response.blobs.size() == 0) {
+          throw std::runtime_error("No hashing blobs");
+        }
         params.blobs = response.blobs;
       }
     }
