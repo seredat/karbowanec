@@ -187,6 +187,10 @@ void MinerManager::startMining(const CryptoNote::BlockMiningParameters& params) 
       m_logger(Logging::ERROR) << "Miner context unexpectedly finished: " << e.what();
     }
   });
+
+  m_contextGroup.spawn([this]() {
+    m_miner.waitHashrateUpdate();
+  });
 }
 
 void MinerManager::stopMining() {

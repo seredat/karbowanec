@@ -19,6 +19,7 @@
 #include "Miner.h"
 
 #include <functional>
+#include <numeric>
 
 #include "crypto/crypto.h"
 #include "crypto/random.h"
@@ -26,6 +27,7 @@
 #include "CryptoNoteConfig.h"
 
 #include <System/InterruptedException.h>
+#include <System/Timer.h>
 
 namespace CryptoNote {
 
@@ -33,7 +35,12 @@ Miner::Miner(System::Dispatcher& dispatcher, Logging::ILogger& logger) :
   m_dispatcher(dispatcher),
   m_miningStopped(dispatcher),
   m_state(MiningState::MINING_STOPPED),
-  m_logger(logger, "Miner") {
+  m_logger(logger, "Miner"),
+  m_last_hr_merge_time(0),
+  m_hashes(0),
+  m_current_hash_rate(0),
+  m_sleepingContext(dispatcher)
+{
 }
 
 Miner::~Miner() {
@@ -79,6 +86,8 @@ void Miner::stop() {
     m_miningStopped.wait();
     m_miningStopped.clear();
   }
+
+  stopHashrateUpdate();
 }
 
 void Miner::runWorkers(BlockMiningParameters blockMiningParameters, size_t threadCount) {
@@ -178,6 +187,7 @@ void Miner::workerFunc(const Block& blockTemplate, difficulty_type difficulty, u
       }
 
       block.nonce += nonceStep;
+      ++m_hashes;
     }
   } catch (std::exception& e) {
     m_logger(Logging::ERROR) << "Miner got error: " << e.what();
@@ -207,6 +217,52 @@ bool Miner::setStateBlockFound() {
         return false;
     }
   }
+}
+
+uint64_t millisecondsSinceEpoch() {
+  auto now = std::chrono::steady_clock::now();
+  return std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+}
+
+void Miner::merge_hr()
+{
+  if (m_last_hr_merge_time && m_state.load() == MiningState::MINING_IN_PROGRESS) {
+    m_current_hash_rate = m_hashes * 1000 / (millisecondsSinceEpoch() - m_last_hr_merge_time + 1);
+    std::lock_guard<std::mutex> lk(m_last_hash_rates_lock);
+    m_last_hash_rates.push_back(m_current_hash_rate);
+    if (m_last_hash_rates.size() > 19)
+      m_last_hash_rates.pop_front();
+
+    uint64_t total_hr = std::accumulate(m_last_hash_rates.begin(), m_last_hash_rates.end(), (uint64_t)0);
+    float hr = static_cast<float>(total_hr) / static_cast<float>(m_last_hash_rates.size());
+
+    m_logger(Logging::INFO, Logging::BRIGHT_WHITE) << "Hashrate: " << std::setprecision(2) << std::fixed << hr << " H/s";
+  }
+
+  m_last_hr_merge_time = millisecondsSinceEpoch();
+  m_hashes = 0;
+}
+
+void Miner::waitHashrateUpdate() {
+  m_stopped = false;
+
+  while (!m_stopped) {
+    m_sleepingContext.spawn([this]() {
+      System::Timer timer(m_dispatcher);
+    timer.sleep(std::chrono::seconds(10));
+      });
+
+    m_sleepingContext.wait();
+
+    merge_hr();
+  }
+}
+
+void Miner::stopHashrateUpdate() {
+  m_stopped = true;
+
+  m_sleepingContext.interrupt();
+  m_sleepingContext.wait();
 }
 
 } //namespace CryptoNote

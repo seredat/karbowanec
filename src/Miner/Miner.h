@@ -27,6 +27,8 @@
 #include "CryptoNote.h"
 #include "CryptoNoteCore/Difficulty.h"
 
+#include <System/ContextGroup.h>
+
 #include "Logging/LoggerRef.h"
 
 namespace CryptoNote {
@@ -47,12 +49,23 @@ public:
   //NOTE! this is blocking method
   void stop();
 
+  void merge_hr();
+  void waitHashrateUpdate();
+
 private:
   System::Dispatcher& m_dispatcher;
   System::Event m_miningStopped;
 
   enum class MiningState : uint8_t { MINING_STOPPED, BLOCK_FOUND, MINING_IN_PROGRESS};
   std::atomic<MiningState> m_state;
+
+  std::atomic<uint64_t> m_last_hr_merge_time;
+  std::atomic<uint64_t> m_hashes;
+  std::atomic<uint64_t> m_current_hash_rate;
+  std::mutex m_last_hash_rates_lock;
+  std::list<uint64_t> m_last_hash_rates;
+  System::ContextGroup m_sleepingContext;
+  bool m_stopped;
 
   std::vector<std::unique_ptr<System::RemoteContext<void>>>  m_workers;
 
@@ -69,6 +82,8 @@ private:
   bool setStateBlockFound();
 
   void setBlobs(const std::vector<BinaryArray>& blobs);
+
+  void stopHashrateUpdate();
 
 };
 
