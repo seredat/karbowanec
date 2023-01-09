@@ -49,8 +49,9 @@ public:
   //NOTE! this is blocking method
   void stop();
 
-  void merge_hr();
+  void merge_hr(bool do_log = false);
   void waitHashrateUpdate();
+  void waitHashrateLog();
 
 private:
   System::Dispatcher& m_dispatcher;
@@ -64,7 +65,8 @@ private:
   std::atomic<uint64_t> m_current_hash_rate;
   std::mutex m_last_hash_rates_lock;
   std::list<uint64_t> m_last_hash_rates;
-  System::ContextGroup m_sleepingContext;
+  System::ContextGroup m_hashRateUpdateContext;
+  System::ContextGroup m_hashRateLogContext;
   bool m_stopped;
 
   std::vector<std::unique_ptr<System::RemoteContext<void>>>  m_workers;

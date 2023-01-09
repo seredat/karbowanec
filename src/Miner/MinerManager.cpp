@@ -191,6 +191,10 @@ void MinerManager::startMining(const CryptoNote::BlockMiningParameters& params) 
   m_contextGroup.spawn([this]() {
     m_miner.waitHashrateUpdate();
   });
+  
+  m_contextGroup.spawn([this]() {
+    m_miner.waitHashrateLog();
+  });
 }
 
 void MinerManager::stopMining() {
@@ -282,13 +286,9 @@ BlockMiningParameters MinerManager::requestMiningParameters(System::Dispatcher& 
           throw std::runtime_error("Failed to parse binary response");
         }
 
-        std::cout << response.blobs.size() << ENDL;
-
         if (response.blobs.size() == 0) {
           throw std::runtime_error("No hashing blobs");
         }
-
-        //params.blobs = response.blobs;
 
         for (const auto& b : response.blobs) {
           params.blobs.emplace_back(Common::asBinaryArray(b));

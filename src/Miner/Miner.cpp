@@ -39,7 +39,8 @@ Miner::Miner(System::Dispatcher& dispatcher, Logging::ILogger& logger) :
   m_last_hr_merge_time(0),
   m_hashes(0),
   m_current_hash_rate(0),
-  m_sleepingContext(dispatcher)
+  m_hashRateUpdateContext(dispatcher),
+  m_hashRateLogContext(dispatcher)
 {
 }
 
@@ -48,7 +49,6 @@ Miner::~Miner() {
 }
 
 void Miner::setBlobs(const std::vector<BinaryArray>& blobs) {
-  std::cout << "set_blobs: " << blobs.size() << ENDL;
   std::lock_guard<decltype(m_blobs_lock)> lk(m_blobs_lock);
   m_blobs = blobs;
 }
@@ -224,7 +224,7 @@ uint64_t millisecondsSinceEpoch() {
   return std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
 }
 
-void Miner::merge_hr()
+void Miner::merge_hr(bool do_log)
 {
   if (m_last_hr_merge_time && m_state.load() == MiningState::MINING_IN_PROGRESS) {
     m_current_hash_rate = m_hashes * 1000 / (millisecondsSinceEpoch() - m_last_hr_merge_time + 1);
@@ -236,7 +236,10 @@ void Miner::merge_hr()
     uint64_t total_hr = std::accumulate(m_last_hash_rates.begin(), m_last_hash_rates.end(), (uint64_t)0);
     float hr = static_cast<float>(total_hr) / static_cast<float>(m_last_hash_rates.size());
 
-    m_logger(Logging::INFO, Logging::BRIGHT_WHITE) << "Hashrate: " << std::setprecision(2) << std::fixed << hr << " H/s";
+    if (do_log)
+      m_logger(Logging::INFO, Logging::BRIGHT_WHITE) << "Hashrate: " << std::setprecision(2) << std::fixed << hr << " H/s";
+    else
+      std::cout << "Hashrate: " << std::setprecision(2) << std::fixed << hr << " H/s" << "        \r";
   }
 
   m_last_hr_merge_time = millisecondsSinceEpoch();
@@ -247,22 +250,40 @@ void Miner::waitHashrateUpdate() {
   m_stopped = false;
 
   while (!m_stopped) {
-    m_sleepingContext.spawn([this]() {
+    m_hashRateUpdateContext.spawn([this]() {
       System::Timer timer(m_dispatcher);
-    timer.sleep(std::chrono::seconds(10));
-      });
+      timer.sleep(std::chrono::seconds(2));
+    });
 
-    m_sleepingContext.wait();
+    m_hashRateUpdateContext.wait();
 
     merge_hr();
+  }
+}
+
+void Miner::waitHashrateLog() {
+  m_stopped = false;
+
+  while (!m_stopped) {
+    m_hashRateLogContext.spawn([this]() {
+      System::Timer timer(m_dispatcher);
+      timer.sleep(std::chrono::seconds(30));
+    });
+
+    m_hashRateLogContext.wait();
+
+    merge_hr(true);
   }
 }
 
 void Miner::stopHashrateUpdate() {
   m_stopped = true;
 
-  m_sleepingContext.interrupt();
-  m_sleepingContext.wait();
+  m_hashRateUpdateContext.interrupt();
+  m_hashRateUpdateContext.wait();
+
+  m_hashRateLogContext.interrupt();
+  m_hashRateLogContext.wait();
 }
 
 } //namespace CryptoNote
