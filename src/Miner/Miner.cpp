@@ -23,6 +23,7 @@
 #include "crypto/crypto.h"
 #include "crypto/random.h"
 #include "CryptoNoteCore/CryptoNoteFormatUtils.h"
+#include "CryptoNoteConfig.h"
 
 #include <System/InterruptedException.h>
 
@@ -47,6 +48,8 @@ Block Miner::mine(const BlockMiningParameters& blockMiningParameters, size_t thr
   if (m_state == MiningState::MINING_IN_PROGRESS) {
     throw std::runtime_error("Mining is already in progress");
   }
+
+  //m_blobs = blockMiningParameters.blobs;
 
   m_state = MiningState::MINING_IN_PROGRESS;
   m_miningStopped.clear();
@@ -82,7 +85,7 @@ void Miner::runWorkers(BlockMiningParameters blockMiningParameters, size_t threa
 
     for (size_t i = 0; i < threadCount; ++i) {
       m_workers.emplace_back(std::unique_ptr<System::RemoteContext<void>> (
-        new System::RemoteContext<void>(m_dispatcher, std::bind(&Miner::workerFunc, this, blockMiningParameters.blockTemplate, blockMiningParameters.difficulty, (uint32_t)threadCount)))
+        new System::RemoteContext<void>(m_dispatcher, std::bind(&Miner::workerFunc, this, blockMiningParameters.blobs, blockMiningParameters.blockTemplate, blockMiningParameters.difficulty, (uint32_t)threadCount)))
       );
 
       blockMiningParameters.blockTemplate.nonce++;
@@ -98,18 +101,61 @@ void Miner::runWorkers(BlockMiningParameters blockMiningParameters, size_t threa
   m_miningStopped.set();
 }
 
-void Miner::workerFunc(const Block& blockTemplate, difficulty_type difficulty, uint32_t nonceStep) {
+void Miner::workerFunc(const std::vector<BinaryArray>& m_blobs, const Block& blockTemplate, difficulty_type difficulty, uint32_t nonceStep) {
   try {
     Block block = blockTemplate;
     Crypto::cn_context cryptoContext;
 
     while (m_state == MiningState::MINING_IN_PROGRESS) {
       Crypto::Hash hash;
-      if (!get_block_longhash(cryptoContext, block, hash)) {
-        //error occured
-        m_logger(Logging::DEBUGGING) << "calculating long hash error occured";
-        m_state = MiningState::MINING_STOPPED;
-        return;
+      if (blockTemplate.majorVersion < CryptoNote::BLOCK_MAJOR_VERSION_5) {
+        if (!get_block_longhash(cryptoContext, block, hash)) {
+          //error occured
+          m_logger(Logging::DEBUGGING) << "calculating long hash error occured";
+          m_state = MiningState::MINING_STOPPED;
+          return;
+        }
+      }
+      else {
+        BinaryArray pot;
+        if (!get_signed_block_hashing_blob(blockTemplate, pot)) {
+          m_state = MiningState::MINING_STOPPED;
+          return;
+        }
+
+        Crypto::Hash hash_1, hash_2;
+        uint32_t currentHeight = boost::get<BaseInput>(blockTemplate.baseTransaction.inputs[0]).blockIndex;
+        uint32_t maxHeight = currentHeight - 1 - 10;
+
+#define ITER 128
+        for (uint32_t i = 0; i < ITER; i++) {
+          cn_fast_hash(pot.data(), pot.size(), hash_1);
+
+          for (uint8_t j = 1; j <= 8; j++) {
+            uint8_t chunk[4] = {
+              hash_1.data[j * 4 - 4],
+              hash_1.data[j * 4 - 3],
+              hash_1.data[j * 4 - 2],
+              hash_1.data[j * 4 - 1]
+            };
+
+            uint32_t n = (chunk[0] << 24) |
+              (chunk[1] << 16) |
+              (chunk[2] << 8) |
+              (chunk[3]);
+
+            uint32_t height_j = n % maxHeight;
+            BinaryArray ba = m_blobs[height_j];
+            pot.insert(std::end(pot), std::begin(ba), std::end(ba));
+          }
+        }
+
+        if (!Crypto::y_slow_hash(pot.data(), pot.size(), hash_1, hash_2)) {
+          m_state = MiningState::MINING_STOPPED;
+          return;
+        }
+
+        hash = hash_2;
       }
 
       if (check_hash(hash, difficulty)) {
