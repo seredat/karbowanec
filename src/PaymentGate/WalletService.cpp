@@ -1,7 +1,7 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2018, The TurtleCoin Developers
 // Copyright (c) 2018-2019 The Cash2 developers
-// Copyright (c) 2016-2022, Karbo developers
+// Copyright (c) 2016-2019, Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -87,9 +87,7 @@ Crypto::Hash parsePaymentId(const std::string& paymentIdStr) {
 
   Crypto::Hash paymentId;
   bool r = Common::podFromHex(paymentIdStr, paymentId);
-  if (!r) {
-    throw std::system_error(make_error_code(CryptoNote::error::WalletServiceErrorCode::WRONG_PAYMENT_ID_FORMAT));
-  }
+  assert(r);
 
   return paymentId;
 }
