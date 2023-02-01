@@ -93,7 +93,7 @@ Dispatcher::Dispatcher() {
 }
 
 Dispatcher::~Dispatcher() {
-  //assert(GetCurrentThreadId() == threadId);
+  assert(GetCurrentThreadId() == threadId);
   for (NativeContext* context = contextGroup.firstContext; context != nullptr; context = context->groupNext) {
     interrupt(context);
   }
@@ -120,7 +120,7 @@ Dispatcher::~Dispatcher() {
 }
 
 void Dispatcher::clear() {
-  //assert(GetCurrentThreadId() == threadId);
+  assert(GetCurrentThreadId() == threadId);
   while (firstReusableContext != nullptr) {
     void* fiber = firstReusableContext->fiber;
     firstReusableContext = firstReusableContext->next;
@@ -129,7 +129,7 @@ void Dispatcher::clear() {
 }
 
 void Dispatcher::dispatch() {
-  //assert(GetCurrentThreadId() == threadId);
+  assert(GetCurrentThreadId() == threadId);
   NativeContext* context;
   for (;;) {
 
@@ -192,7 +192,7 @@ void Dispatcher::dispatch() {
 }
 
 NativeContext* Dispatcher::getCurrentContext() const {
-  //assert(GetCurrentThreadId() == threadId);
+  assert(GetCurrentThreadId() == threadId);
   return currentContext;
 }
 
@@ -201,7 +201,7 @@ void Dispatcher::interrupt() {
 }
 
 void Dispatcher::interrupt(NativeContext* context) {
-  //assert(GetCurrentThreadId() == threadId);
+  assert(GetCurrentThreadId() == threadId);
   assert(context != nullptr);
   if (!context->interrupted) {
     if (context->interruptProcedure != nullptr) {
@@ -223,7 +223,7 @@ bool Dispatcher::interrupted() {
 }
 
 void Dispatcher::pushContext(NativeContext* context) {
-  //assert(GetCurrentThreadId() == threadId);
+  assert(GetCurrentThreadId() == threadId);
   assert(context != nullptr);
   if (context->inExecutionQueue) {
     return;
@@ -255,7 +255,7 @@ void Dispatcher::remoteSpawn(std::function<void()>&& procedure) {
 }
 
 void Dispatcher::spawn(std::function<void()>&& procedure) {
-  //assert(GetCurrentThreadId() == threadId);
+  assert(GetCurrentThreadId() == threadId);
   NativeContext* context = &getReusableContext();
   if (contextGroup.firstContext != nullptr) {
     context->groupPrev = contextGroup.lastContext;
@@ -276,7 +276,7 @@ void Dispatcher::spawn(std::function<void()>&& procedure) {
 }
 
 void Dispatcher::yield() {
-  //assert(GetCurrentThreadId() == threadId);
+  assert(GetCurrentThreadId() == threadId);
   for (;;) {
     LARGE_INTEGER frequency;
     LARGE_INTEGER ticks;
@@ -331,7 +331,7 @@ void Dispatcher::yield() {
 }
 
 void Dispatcher::addTimer(uint64_t time, NativeContext* context) {
-  //assert(GetCurrentThreadId() == threadId);
+  assert(GetCurrentThreadId() == threadId);
   timers.insert(std::make_pair(time, context));
 }
 
@@ -363,7 +363,7 @@ void Dispatcher::pushReusableContext(NativeContext& context) {
 }
 
 void Dispatcher::interruptTimer(uint64_t time, NativeContext* context) {
-  //assert(GetCurrentThreadId() == threadId);
+  assert(GetCurrentThreadId() == threadId);
   if (context->inExecutionQueue) {
     return;
   }
@@ -379,7 +379,7 @@ void Dispatcher::interruptTimer(uint64_t time, NativeContext* context) {
 }
 
 void Dispatcher::contextProcedure() {
-  //assert(GetCurrentThreadId() == threadId);
+  assert(GetCurrentThreadId() == threadId);
   assert(firstReusableContext == nullptr);
   NativeContext context;
   context.interrupted = false;
