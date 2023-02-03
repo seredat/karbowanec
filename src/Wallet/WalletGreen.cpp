@@ -2332,11 +2332,16 @@ void WalletGreen::sendTransaction(const CryptoNote::Transaction& cryptoNoteTrans
   std::error_code ec;
 
   throwIfStopped();
-  m_node.relayTransaction(cryptoNoteTransaction, [&ec, &completion, this](std::error_code error) {
-    ec = error;
-    this->m_dispatcher.remoteSpawn(std::bind(asyncRequestCompletion, std::ref(completion)));
-  });
-  completion.wait();
+  try {
+    m_node.relayTransaction(cryptoNoteTransaction, [&ec, &completion, this](std::error_code error) {
+      ec = error;
+      //this->m_dispatcher.remoteSpawn(std::bind(asyncRequestCompletion, std::ref(completion)));
+    });
+    //completion.wait();
+  }
+  catch (...) {
+    m_logger(ERROR, BRIGHT_RED) << "Failed to relay transaction...";
+  }
 
   if (ec) {
     m_logger(ERROR, BRIGHT_RED) << "Failed to relay transaction: " << ec << ", " << ec.message() <<
@@ -3230,14 +3235,22 @@ void WalletGreen::stopBlockchainSynchronizer() {
 }
 
 void WalletGreen::addUnconfirmedTransaction(const ITransactionReader& transaction) {
-  System::RemoteContext<std::error_code> context(m_dispatcher, [this, &transaction] {
-    return m_blockchainSynchronizer.addUnconfirmedTransaction(transaction).get();
-  });
+  try {
+    //System::RemoteContext<std::error_code> context(m_dispatcher, [this, &transaction] {
+    //  return m_blockchainSynchronizer.addUnconfirmedTransaction(transaction).get();
+    //});
 
-  auto ec = context.get();
-  if (ec) {
-    m_logger(ERROR, BRIGHT_RED) << "Failed to add unconfirmed transaction: " << ec << ", " << ec.message();
-    throw std::system_error(ec, "Failed to add unconfirmed transaction");
+    //auto ec = context.get();
+
+    auto ec = m_blockchainSynchronizer.addUnconfirmedTransaction(transaction).get();
+
+    if (ec) {
+      m_logger(ERROR, BRIGHT_RED) << "Failed to add unconfirmed transaction: " << ec << ", " << ec.message();
+      throw std::system_error(ec, "Failed to add unconfirmed transaction");
+    }
+  }
+  catch (...) {
+    m_logger(ERROR, BRIGHT_RED) << "Failed to add unconfirmed transaction...";
   }
 
   m_logger(DEBUGGING) << "Unconfirmed transaction added to BlockchainSynchronizer, hash " << transaction.getTransactionHash();
