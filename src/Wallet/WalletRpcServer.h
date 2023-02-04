@@ -1,7 +1,7 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2014-2016, XDN developers
 // Copyright (c) 2014-2016, The Monero Project
-// Copyright (c) 2016-2022, Karbo developers
+// Copyright (c) 2016-2023, Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -21,12 +21,11 @@
 #pragma  once
 
 #include <future>
-#include <thread>
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/variables_map.hpp>
 
 #include "Common/CommandLine.h"
-#include "HTTP/httplib.h"
+#include "HTTP/HttpServer.h"
 #include "Rpc/JsonRpc.h"
 #include "Logging/LoggerRef.h"
 #include "WalletRpcServerCommandsDefinitions.h"
@@ -34,10 +33,11 @@
 
 namespace Tools
 {
-class wallet_rpc_server
+  class wallet_rpc_server : CryptoNote::HttpServer
 {
 public:
   wallet_rpc_server(
+    System::Dispatcher& dispatcher,
     Logging::ILogger& log,
     CryptoNote::IWalletLegacy &w, 
     CryptoNote::INode &n, 
@@ -47,8 +47,6 @@ public:
   ~wallet_rpc_server();
 
   static const command_line::arg_descriptor<uint16_t>    arg_rpc_bind_port;
-  static const command_line::arg_descriptor<uint16_t>    arg_rpc_bind_ssl_port;
-  static const command_line::arg_descriptor<bool>        arg_rpc_bind_ssl_enable;
   static const command_line::arg_descriptor<std::string> arg_rpc_bind_ip;
   static const command_line::arg_descriptor<std::string> arg_rpc_user;
   static const command_line::arg_descriptor<std::string> arg_rpc_password;
@@ -57,13 +55,13 @@ public:
 
   static void init_options(boost::program_options::options_description& desc);
   bool init(const boost::program_options::variables_map& vm);
-  void getServerConf(std::string &bind_address, std::string &bind_address_ssl, bool &enable_ssl);
+  void getServerConf(std::string &bind_address);
     
   bool run();
-  void stop();
+  void send_stop_signal();
 
 private:
-  void processRequest(const httplib::Request& request, httplib::Response& response);
+  virtual void processRequest(const CryptoNote::HttpRequest& request, CryptoNote::HttpResponse& response) override;
 
   //json_rpc
   bool on_get_balance(const wallet_rpc::COMMAND_RPC_GET_BALANCE::request& req, wallet_rpc::COMMAND_RPC_GET_BALANCE::response& res);
@@ -90,22 +88,16 @@ private:
   bool on_reset(const wallet_rpc::COMMAND_RPC_RESET::request& req, wallet_rpc::COMMAND_RPC_RESET::response& res);
 
   bool handle_command_line(const boost::program_options::variables_map& vm);
-  void listen(const std::string address, const uint16_t port);
-  void listen_ssl(const std::string address, const uint16_t port);
-  bool authenticate(const httplib::Request& request) const;
+  bool authenticate(const CryptoNote::HttpRequest& request) const;
 
   CryptoNote::Currency& m_currency;
   CryptoNote::IWalletLegacy& m_wallet;
   CryptoNote::INode& m_node;
-  httplib::Server* http;
-  httplib::SSLServer* https;
   Logging::LoggerRef logger;
-  std::list<std::thread> m_workers;
+  System::Dispatcher& m_dispatcher;
+  System::Event m_stopComplete;
 
-  bool m_enable_ssl;
-  bool m_run_ssl;
   uint16_t m_port;
-  uint16_t m_port_ssl;
   std::string m_bind_ip;
   std::string m_rpcUser;
   std::string m_rpcPassword;
