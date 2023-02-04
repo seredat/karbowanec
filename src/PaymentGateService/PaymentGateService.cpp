@@ -49,27 +49,6 @@
 
 using namespace PaymentService;
 
-bool validateCertPath(const std::string& rootPath,
-                      const std::string& config_chain_file,
-                      const std::string& config_key_file,
-                      std::string& chain_file,
-                      std::string& key_file) {
-  bool res = false;
-  boost::system::error_code ec;
-  boost::filesystem::path data_dir_path(rootPath);
-  boost::filesystem::path chain_file_path(config_chain_file);
-  boost::filesystem::path key_file_path(config_key_file);
-  if (!chain_file_path.has_parent_path()) chain_file_path = data_dir_path / chain_file_path;
-  if (!key_file_path.has_parent_path()) key_file_path = data_dir_path / key_file_path;
-  if (boost::filesystem::exists(chain_file_path, ec) &&
-      boost::filesystem::exists(key_file_path, ec)) {
-        chain_file = boost::filesystem::canonical(chain_file_path).string();
-        key_file = boost::filesystem::canonical(key_file_path).string();
-        res = true;
-  }
-  return res;
-}
-
 void changeDirectory(const std::string& path) {
   if (chdir(path.c_str())) {
     throw std::runtime_error("Couldn't change directory to \'" + path + "\': " + strerror(errno));
@@ -303,6 +282,16 @@ void PaymentGateService::runRpcProxy(Logging::LoggerRef& log) {
   }
 }
 
+void PaymentGateService::runJsonRpcServer() {
+  PaymentService::PaymentServiceJsonRpcServer rpcServer(*dispatcher, *stopEvent, *service, logger);
+
+  rpcServer.init(config.gateConfiguration.m_rpcUser, config.gateConfiguration.m_rpcPassword);
+
+  rpcServer.start(config.gateConfiguration.m_bind_address, config.gateConfiguration.m_bind_port);
+
+  Logging::LoggerRef(logger, "PaymentGateService")(Logging::INFO, Logging::BRIGHT_WHITE) << "JSON-RPC server stopped, stopping wallet service...";
+}
+
 void PaymentGateService::runWalletService(const CryptoNote::Currency& currency, CryptoNote::INode& node) {
   PaymentService::WalletConfiguration walletConfiguration{
     config.gateConfiguration.containerFile,
@@ -329,33 +318,7 @@ void PaymentGateService::runWalletService(const CryptoNote::Currency& currency, 
     }
   } else {
 
-    PaymentService::PaymentServiceJsonRpcServer rpcServer(*dispatcher, *stopEvent, *service, logger);
-
-    bool rpc_run_ssl = false;
-    std::string rpc_chain_file = "";
-    std::string rpc_key_file = "";
-
-    if (config.gateConfiguration.m_enable_ssl) {
-      if (validateCertPath(config.coreConfig.configFolder,
-        config.gateConfiguration.m_chain_file,
-        config.gateConfiguration.m_key_file,
-        rpc_chain_file,
-        rpc_key_file)){
-        rpc_run_ssl = true;
-      } else {
-        Logging::LoggerRef(logger, "PaymentGateService")(Logging::ERROR, Logging::BRIGHT_RED) << "Start JSON-RPC SSL server was canceled because certificate file(s) could not be found" << std::endl;
-      }
-    }
-
-    rpcServer.init(rpc_chain_file, rpc_key_file, rpc_run_ssl);
-
-    rpcServer.setAuth(config.gateConfiguration.m_rpcUser, config.gateConfiguration.m_rpcPassword);
-
-    rpcServer.start(config.gateConfiguration.m_bind_address,
-                    config.gateConfiguration.m_bind_port,
-                    config.gateConfiguration.m_bind_port_ssl);
-
-    Logging::LoggerRef(logger, "PaymentGateService")(Logging::INFO, Logging::BRIGHT_WHITE) << "JSON-RPC server stopped, stopping wallet service...";
+    runJsonRpcServer();
 
     try {
       service->saveWallet();
