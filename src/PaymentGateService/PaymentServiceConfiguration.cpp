@@ -46,6 +46,7 @@ Configuration::Configuration() {
   printAddresses = false;
   logLevel = Logging::INFO;
   m_bind_address = "";
+  m_bind_port = 0;
   m_rpcUser = "";
   m_rpcPassword = "";
   secretViewKey = "";

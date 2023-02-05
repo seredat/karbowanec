@@ -122,7 +122,7 @@ void invokeBinaryCommand(HttpClient& client, const std::string& url, const Reque
   HttpResponse hres;
 
   if (!user.empty() || !password.empty()) {
-    hreq.addHeader("Authorization", "Basic " + Tools::Base64::encode(user + ":" + password));
+    hreq.addHeader("Authorization", "Basic " + base64::encode(Common::asBinaryArray(user + ":" + password)));
   }
   hreq.setUrl(url);
   hreq.setBody(storeToBinaryKeyValue(req));

@@ -51,10 +51,6 @@ const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_rpc_user 
   { "rpc-user"     , "Username to use with the RPC server. If empty, no server authorization will be done.", "" };
 const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_rpc_password = 
   { "rpc-password" , "Password to use with the RPC server. If empty, no server authorization will be done.", "" };
-const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_chain_file =
-  { "rpc-chain-file" , "SSL chain file", RPC_DEFAULT_CHAIN_FILE };
-const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_key_file =
-  { "rpc-key-file" , "SSL key file", RPC_DEFAULT_KEY_FILE };
 
 void wallet_rpc_server::init_options(boost::program_options::options_description& desc)
 {
@@ -62,8 +58,6 @@ void wallet_rpc_server::init_options(boost::program_options::options_description
   command_line::add_arg(desc, arg_rpc_bind_port);
   command_line::add_arg(desc, arg_rpc_user);
   command_line::add_arg(desc, arg_rpc_password);
-  command_line::add_arg(desc, arg_chain_file);
-  command_line::add_arg(desc, arg_key_file);
 }
 
 //------------------------------------------------------------------------------------------------------------------------------
@@ -84,11 +78,6 @@ wallet_rpc_server::wallet_rpc_server(
   m_currency(currency),
   m_walletFilename(walletFilename)
 {
-}
-
-//------------------------------------------------------------------------------------------------------------------------------
-
-wallet_rpc_server::~wallet_rpc_server() {  
 }
 
 //------------------------------------------------------------------------------------------------------------------------------

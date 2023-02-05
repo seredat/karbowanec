@@ -2696,10 +2696,7 @@ int main(int argc, char* argv[]) {
       wrpc.send_stop_signal();
     });
 
-    bool enable_ssl;
     std::string bind_address;
-    std::string bind_address_ssl;
-    std::string ssl_info;
     wrpc.getServerConf(bind_address);
     logger(INFO) << "Starting wallet rpc server on address " << bind_address;
     wrpc.run();

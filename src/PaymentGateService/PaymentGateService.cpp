@@ -287,6 +287,8 @@ void PaymentGateService::runJsonRpcServer() {
 
   rpcServer.init(config.gateConfiguration.m_rpcUser, config.gateConfiguration.m_rpcPassword);
 
+  Logging::LoggerRef(logger, "PaymentGateService")(Logging::INFO, Logging::BRIGHT_WHITE) << "Starting JSON-RPC server...";
+
   rpcServer.start(config.gateConfiguration.m_bind_address, config.gateConfiguration.m_bind_port);
 
   Logging::LoggerRef(logger, "PaymentGateService")(Logging::INFO, Logging::BRIGHT_WHITE) << "JSON-RPC server stopped, stopping wallet service...";

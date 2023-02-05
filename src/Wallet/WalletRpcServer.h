@@ -44,14 +44,10 @@ public:
     CryptoNote::Currency& currency,
     const std::string& walletFilename);
 
-  ~wallet_rpc_server();
-
   static const command_line::arg_descriptor<uint16_t>    arg_rpc_bind_port;
   static const command_line::arg_descriptor<std::string> arg_rpc_bind_ip;
   static const command_line::arg_descriptor<std::string> arg_rpc_user;
   static const command_line::arg_descriptor<std::string> arg_rpc_password;
-  static const command_line::arg_descriptor<std::string> arg_chain_file;
-  static const command_line::arg_descriptor<std::string> arg_key_file;
 
   static void init_options(boost::program_options::options_description& desc);
   bool init(const boost::program_options::variables_map& vm);
