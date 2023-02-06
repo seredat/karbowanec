@@ -63,9 +63,6 @@ void JsonRpcServer::start(const std::string& bindAddress, uint16_t bindPort, uin
   m_workingContextGroup.spawn(std::bind(&JsonRpcServer::listen, this, bindAddress, bindPort));
 
   stopEvent.wait();
-
-  m_workingContextGroup.interrupt();
-  m_workingContextGroup.wait();
 }
 
 void JsonRpcServer::stop() {
@@ -79,6 +76,9 @@ void JsonRpcServer::stop() {
   {
     stopEvent.set();
   });
+
+  m_workingContextGroup.interrupt();
+  m_workingContextGroup.wait();
 }
 
 void JsonRpcServer::init(const std::string& chain_file, const std::string& key_file, bool server_ssl_enable){
