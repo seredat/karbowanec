@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright(c) 2014 - 2017 XDN - project developers
-// Copyright(c) 2018 - 2022 The Karbo developers
+// Copyright(c) 2018 - 2023 The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -24,6 +24,7 @@
 #include "System/Dispatcher.h"
 #include "System/Event.h"
 #include "System/RemoteContext.h"
+#include "System/ContextGroup.h"
 #include "Logging/ILogger.h"
 #include "Logging/LoggerRef.h"
 #include "HTTP/httplib.h"
@@ -76,11 +77,10 @@ private:
 
   System::Dispatcher& m_dispatcher;
   System::Event& stopEvent;
+  System::ContextGroup m_workingContextGroup;
   Logging::LoggerRef logger;
   httplib::Server* http;
   httplib::SSLServer* https;
-
-  std::vector<std::unique_ptr<System::RemoteContext<void>>> m_workers;
 
   std::string m_chain_file;
   std::string m_key_file;

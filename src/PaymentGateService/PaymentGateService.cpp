@@ -355,6 +355,10 @@ void PaymentGateService::runWalletService(const CryptoNote::Currency& currency, 
                     config.gateConfiguration.m_bind_port,
                     config.gateConfiguration.m_bind_port_ssl);
 
+    Tools::SignalHandler::install([&rpcServer] {
+      rpcServer.stop();
+    });
+
     Logging::LoggerRef(logger, "PaymentGateService")(Logging::INFO, Logging::BRIGHT_WHITE) << "JSON-RPC server stopped, stopping wallet service...";
 
     try {
