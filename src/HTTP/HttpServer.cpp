@@ -127,22 +127,22 @@ void HttpServer::acceptLoop() {
 }
 
 bool HttpServer::authenticate(const HttpRequest& request) const {
-	if (!m_credentials.empty()) {
-		auto headerIt = request.getHeaders().find("authorization");
-		if (headerIt == request.getHeaders().end()) {
-			return false;
-		}
+  if (!m_credentials.empty()) {
+    auto headerIt = request.getHeaders().find("authorization");
+    if (headerIt == request.getHeaders().end()) {
+      return false;
+    }
 
-		if (headerIt->second.substr(0, 6) != "Basic ") {
-			return false;
-		}
+    if (headerIt->second.substr(0, 6) != "Basic ") {
+      return false;
+    }
 
-		if (headerIt->second.substr(6) != m_credentials) {
-			return false;
-		}
-	}
+    if (headerIt->second.substr(6) != m_credentials) {
+      return false;
+    }
+  }
 
-	return true;
+  return true;
 }
 
 size_t HttpServer::get_connections_count() const {
