@@ -2339,8 +2339,8 @@ void WalletGreen::sendTransaction(const CryptoNote::Transaction& cryptoNoteTrans
     });
     //completion.wait();
   }
-  catch (...) {
-    m_logger(ERROR, BRIGHT_RED) << "Failed to relay transaction...";
+  catch (const std::exception& e) {
+    m_logger(ERROR, BRIGHT_RED) << "Failed to relay transaction: " << e.what();
   }
 
   if (ec) {
@@ -2435,12 +2435,17 @@ void WalletGreen::requestMixinOuts(
   auto requestMixinCount = mixIn + 1; //+1 to allow to skip real output
 
   m_logger(DEBUGGING) << "Requesting random outputs";
-  m_node.getRandomOutsByAmounts(std::move(amounts), requestMixinCount, mixinResult, [&requestFinished, &mixinError, this] (std::error_code ec) {
-    mixinError = ec;
+  try {
+    m_node.getRandomOutsByAmounts(std::move(amounts), requestMixinCount, mixinResult, [&requestFinished, &mixinError, this](std::error_code ec) {
+      mixinError = ec;
     this->m_dispatcher.remoteSpawn(std::bind(asyncRequestCompletion, std::ref(requestFinished)));
-  });
+      });
 
-  requestFinished.wait();
+    requestFinished.wait();
+  }
+  catch (const std::exception& e) {
+    m_logger(ERROR, BRIGHT_RED) << "Failed to request random outputs: " << e.what();
+  }
 
   checkIfEnoughMixins(mixinResult, requestMixinCount);
 
@@ -3239,18 +3244,15 @@ void WalletGreen::addUnconfirmedTransaction(const ITransactionReader& transactio
     //System::RemoteContext<std::error_code> context(m_dispatcher, [this, &transaction] {
     //  return m_blockchainSynchronizer.addUnconfirmedTransaction(transaction).get();
     //});
-
     //auto ec = context.get();
-
     auto ec = m_blockchainSynchronizer.addUnconfirmedTransaction(transaction).get();
 
     if (ec) {
       m_logger(ERROR, BRIGHT_RED) << "Failed to add unconfirmed transaction: " << ec << ", " << ec.message();
       throw std::system_error(ec, "Failed to add unconfirmed transaction");
     }
-  }
-  catch (...) {
-    m_logger(ERROR, BRIGHT_RED) << "Failed to add unconfirmed transaction...";
+  } catch (const std::exception& e) {
+    m_logger(ERROR, BRIGHT_RED) << "Failed to add unconfirmed transaction: " << e.what();
   }
 
   m_logger(DEBUGGING) << "Unconfirmed transaction added to BlockchainSynchronizer, hash " << transaction.getTransactionHash();
