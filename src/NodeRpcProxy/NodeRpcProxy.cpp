@@ -90,17 +90,23 @@ NodeRpcProxy::NodeRpcProxy(const std::string& nodeHost, unsigned short nodePort,
     m_rpcConnectionsCount(0),
     m_whitePeerlistSize(0),
     m_greyPeerlistSize(0),
-    m_node_url((m_daemon_ssl ? "https://" : "http://") + m_nodeHost + ":" + std::to_string(m_nodePort))
+    m_node_url((m_daemon_ssl ? "https://" : "http://") + m_nodeHost + ":" + std::to_string(m_nodePort)) 
 {
   std::stringstream userAgent;
   userAgent << "NodeRpcProxy";
   m_requestHeaders = { {"User-Agent", userAgent.str()}, { "Connection", "keep-alive" } };
   resetInternalState();
+
+  m_httpClient = std::make_shared<httplib::Client>(m_node_url);
+  m_httpClient->enable_server_certificate_verification(false);
+  m_httpClient->set_connection_timeout(1000);
+  m_httpClient->set_keep_alive(true);
 }
 
 NodeRpcProxy::~NodeRpcProxy() {
   try {
     shutdown();
+
   } catch (std::exception&) {
   }
 }
@@ -983,11 +989,7 @@ std::error_code NodeRpcProxy::binaryCommand(const std::string& comm, const Reque
   try {
     EventLock eventLock(*m_httpEvent);
 
-    httplib::Client httpClient(m_node_url);
-    httpClient.enable_server_certificate_verification(false);
-    httpClient.set_connection_timeout(1000);
-
-    const auto rsp = httpClient.Post(rpc_url.c_str(), m_requestHeaders, storeToBinaryKeyValue(req), "application/octet-stream");
+    const auto rsp = m_httpClient->Post(rpc_url.c_str(), m_requestHeaders, storeToBinaryKeyValue(req), "application/octet-stream");
     if (rsp) {
       if (rsp->status == 200) {
         if (!loadFromBinaryKeyValue(res, rsp->body)) {
@@ -1013,11 +1015,7 @@ std::error_code NodeRpcProxy::jsonCommand(const std::string& comm, const Request
   try {
     EventLock eventLock(*m_httpEvent);
 
-    httplib::Client httpClient(m_node_url);
-    httpClient.enable_server_certificate_verification(false);
-    httpClient.set_connection_timeout(1000);
-
-    const auto rsp = httpClient.Post(rpc_url.c_str(), m_requestHeaders, storeToJson(req), "application/json");
+    const auto rsp = m_httpClient->Post(rpc_url.c_str(), m_requestHeaders, storeToJson(req), "application/json");
     if (rsp) {
       if (rsp->status == 200) {
         if (!loadFromJson(res, rsp->body)) {
@@ -1047,11 +1045,7 @@ std::error_code NodeRpcProxy::jsonRpcCommand(const std::string& method, const Re
     jsReq.setParams(req);
     JsonRpc::JsonRpcResponse jsRes;
 
-    httplib::Client httpClient(m_node_url);
-    httpClient.enable_server_certificate_verification(false);
-    httpClient.set_connection_timeout(1000);
-
-    const auto rsp = httpClient.Post(rpc_url.c_str(), m_requestHeaders, jsReq.getBody(), "application/json");
+    const auto rsp = m_httpClient->Post(rpc_url.c_str(), m_requestHeaders, jsReq.getBody(), "application/json");
     if (rsp) {
       if (rsp->status == 200) {
         jsRes.parse(rsp->body);
