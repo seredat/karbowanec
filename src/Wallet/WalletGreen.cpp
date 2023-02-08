@@ -1513,7 +1513,7 @@ WalletGreen::TransfersRange WalletGreen::getTransactionTransfersRange(size_t tra
 size_t WalletGreen::transfer(const TransactionParameters& transactionParameters, Crypto::SecretKey& txSecretKey) {
   size_t id = WALLET_INVALID_TRANSACTION_ID;
   Tools::ScopeExit releaseContext([this, &id] {
-    m_dispatcher.yield();
+    //m_dispatcher.yield();
 
     if (id != WALLET_INVALID_TRANSACTION_ID) {
       auto& tx = m_transactions[id];
@@ -1827,7 +1827,7 @@ size_t WalletGreen::doTransfer(const TransactionParameters& transactionParameter
 size_t WalletGreen::makeTransaction(const TransactionParameters& sendingTransaction) {
   size_t id = WALLET_INVALID_TRANSACTION_ID;
   Tools::ScopeExit releaseContext([this, &id] {
-    m_dispatcher.yield();
+    //m_dispatcher.yield();
 
     if (id != WALLET_INVALID_TRANSACTION_ID) {
       auto& tx = m_transactions[id];
@@ -1923,7 +1923,7 @@ void WalletGreen::commitTransaction(size_t transactionId) {
 
 void WalletGreen::rollbackUncommitedTransaction(size_t transactionId) {
   Tools::ScopeExit releaseContext([this] {
-    m_dispatcher.yield();
+    //m_dispatcher.yield();
   });
 
   System::EventLock lk(m_readyEvent);
@@ -3378,7 +3378,7 @@ size_t WalletGreen::createFusionTransaction(uint64_t threshold, uint64_t mixin,
 
   size_t id = WALLET_INVALID_TRANSACTION_ID;
   Tools::ScopeExit releaseContext([this, &id] {
-    m_dispatcher.yield();
+    //m_dispatcher.yield();
 
     if (id != WALLET_INVALID_TRANSACTION_ID) {
       auto& tx = m_transactions[id];
