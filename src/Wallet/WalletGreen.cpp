@@ -1923,7 +1923,7 @@ void WalletGreen::commitTransaction(size_t transactionId) {
 
 void WalletGreen::rollbackUncommitedTransaction(size_t transactionId) {
   Tools::ScopeExit releaseContext([this] {
-    //m_dispatcher.yield();
+    m_dispatcher.yield();
   });
 
   System::EventLock lk(m_readyEvent);
