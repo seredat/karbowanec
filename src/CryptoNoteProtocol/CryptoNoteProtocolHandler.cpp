@@ -1093,9 +1093,9 @@ void CryptoNoteProtocolHandler::relay_transactions(NOTIFY_NEW_TRANSACTIONS::requ
       if (!m_stemPool.hasTransaction(transactionHash)) {
         logger(Logging::DEBUGGING) << "Adding relayed transaction " << transactionHash << " to stempool";
         auto txblob = *tx_blob_it;
-        m_dispatcher.remoteSpawn([this, transactionHash, txblob] {
+        //m_dispatcher.remoteSpawn([this, transactionHash, txblob] {
           m_stemPool.addTransaction(transactionHash, txblob);
-        });
+        //});
         txHashes.push_back(transactionHash);
       }
     }
