@@ -2542,6 +2542,7 @@ int main(int argc, char* argv[]) {
   Logging::LoggerManager logManager;
   Logging::LoggerRef logger(logManager, "simplewallet");
   System::Dispatcher dispatcher;
+  System::Event m_stopComplete(dispatcher);
 
   po::variables_map vm;
 
@@ -2685,15 +2686,20 @@ int main(int argc, char* argv[]) {
       return 1;
     }
 
-    Tools::wallet_rpc_server wrpc(dispatcher, logManager, *wallet, *node, currency, walletFileName);
+    Tools::wallet_rpc_server wrpc(logManager, *wallet, *node, currency, walletFileName);
 
     if (!wrpc.init(vm)) {
       logger(ERROR, BRIGHT_RED) << "Failed to initialize wallet rpc server";
       return 1;
     }
 
-    Tools::SignalHandler::install([&wrpc, &wallet] {
+    Tools::SignalHandler::install([&m_stopComplete, &dispatcher, &wrpc, &wallet] {
       wrpc.stop();
+
+      dispatcher.remoteSpawn([&] {
+        m_stopComplete.set();
+      });
+
     });
 
     bool enable_ssl;
@@ -2704,6 +2710,8 @@ int main(int argc, char* argv[]) {
     if (enable_ssl) ssl_info += std::string(", SSL on address ") + bind_address_ssl;
     logger(INFO) << "Starting wallet rpc server on address " << bind_address << ssl_info;
     wrpc.run();
+
+    m_stopComplete.wait();
 
     logger(INFO) << "Stopped wallet rpc server";
 

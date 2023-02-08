@@ -21,6 +21,7 @@
 #pragma  once
 
 #include <future>
+#include <thread>
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/variables_map.hpp>
 
@@ -30,8 +31,6 @@
 #include "Logging/LoggerRef.h"
 #include "WalletRpcServerCommandsDefinitions.h"
 #include "WalletLegacy/WalletLegacy.h"
-#include "System/RemoteContext.h"
-#include "System/ContextGroup.h"
 
 namespace Tools
 {
@@ -39,7 +38,6 @@ class wallet_rpc_server
 {
 public:
   wallet_rpc_server(
-    System::Dispatcher& dispatcher,
     Logging::ILogger& log,
     CryptoNote::IWalletLegacy &w, 
     CryptoNote::INode &n, 
@@ -96,15 +94,13 @@ private:
   void listen_ssl(const std::string address, const uint16_t port);
   bool authenticate(const httplib::Request& request) const;
 
-  System::Dispatcher& m_dispatcher;
-  System::Event m_stopComplete;
-  System::ContextGroup m_workingContextGroup;
   CryptoNote::Currency& m_currency;
   CryptoNote::IWalletLegacy& m_wallet;
   CryptoNote::INode& m_node;
   httplib::Server* http;
   httplib::SSLServer* https;
   Logging::LoggerRef logger;
+  std::list<std::thread> m_workers;
 
   bool m_enable_ssl;
   bool m_run_ssl;

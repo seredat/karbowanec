@@ -75,16 +75,12 @@ void wallet_rpc_server::init_options(boost::program_options::options_description
 //------------------------------------------------------------------------------------------------------------------------------
 
 wallet_rpc_server::wallet_rpc_server(
-  System::Dispatcher& dispatcher,
   Logging::ILogger& log,
   CryptoNote::IWalletLegacy& w,
   CryptoNote::INode& n,
   CryptoNote::Currency& currency,
   const std::string& walletFilename) :
   logger(log, "WalletRpc"),
-  m_dispatcher(dispatcher),
-  m_stopComplete(dispatcher),
-  m_workingContextGroup(dispatcher),
   m_wallet(w),
   m_node(n),
   m_currency(currency),
@@ -102,14 +98,11 @@ wallet_rpc_server::~wallet_rpc_server() {
 
 bool wallet_rpc_server::run()
 {
-  m_workingContextGroup.spawn(std::bind(&wallet_rpc_server::listen, this, m_bind_ip, m_port));
   if (m_run_ssl) {
-    m_workingContextGroup.spawn(std::bind(&wallet_rpc_server::listen_ssl, this, m_bind_ip, m_port_ssl));
+    m_workers.push_back(std::thread(std::bind(&wallet_rpc_server::listen_ssl, this, m_bind_ip, m_port_ssl)));
   }
 
-  m_stopComplete.wait();
-  m_workingContextGroup.interrupt();
-  m_workingContextGroup.wait();
+  m_workers.push_back(std::thread(std::bind(&wallet_rpc_server::listen, this, m_bind_ip, m_port)));
 
   return true;
 }
@@ -123,10 +116,13 @@ void wallet_rpc_server::stop() {
 
   http->stop();
 
-  m_dispatcher.remoteSpawn([this]
-  {
-    m_stopComplete.set();
-  });
+  for (auto& th : m_workers) {
+    if (th.joinable()) {
+      th.join();
+    }
+  }
+
+  m_workers.clear();
 }
 
 //------------------------------------------------------------------------------------------------------------------------------
