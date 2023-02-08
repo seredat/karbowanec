@@ -45,7 +45,6 @@ namespace CryptoNote {
 JsonRpcServer::JsonRpcServer(System::Dispatcher& sys, System::Event& stopEvent, Logging::ILogger& loggerGroup) :
   m_dispatcher(sys),
   stopEvent(stopEvent),
-  m_workingContextGroup(sys),
   logger(loggerGroup, "JsonRpcServer"),
   m_enable_ssl(false)
 {
@@ -57,10 +56,14 @@ JsonRpcServer::~JsonRpcServer() {
 
 void JsonRpcServer::start(const std::string& bindAddress, uint16_t bindPort, uint16_t bindPortSSL) {
   if (m_enable_ssl) {
-    m_workingContextGroup.spawn(std::bind(&JsonRpcServer::listen_ssl, this, bindAddress, bindPortSSL));
+    m_workers.emplace_back(std::unique_ptr<System::RemoteContext<void>>(
+      new System::RemoteContext<void>(m_dispatcher, std::bind(&JsonRpcServer::listen_ssl, this, bindAddress, bindPortSSL)))
+    );
   }
 
-  m_workingContextGroup.spawn(std::bind(&JsonRpcServer::listen, this, bindAddress, bindPort));
+  m_workers.emplace_back(std::unique_ptr<System::RemoteContext<void>>(
+    new System::RemoteContext<void>(m_dispatcher, std::bind(&JsonRpcServer::listen, this, bindAddress, bindPort)))
+  );
 
   stopEvent.wait();
 }
@@ -77,8 +80,7 @@ void JsonRpcServer::stop() {
     stopEvent.set();
   });
 
-  m_workingContextGroup.interrupt();
-  m_workingContextGroup.wait();
+  m_workers.clear();
 }
 
 void JsonRpcServer::init(const std::string& chain_file, const std::string& key_file, bool server_ssl_enable){
