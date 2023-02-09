@@ -351,6 +351,10 @@ void PaymentGateService::runWalletService(const CryptoNote::Currency& currency, 
 
     rpcServer.setAuth(config.gateConfiguration.m_rpcUser, config.gateConfiguration.m_rpcPassword);
 
+    Tools::SignalHandler::install([&rpcServer] {
+      rpcServer.stop();
+    });
+
     rpcServer.start(config.gateConfiguration.m_bind_address,
                     config.gateConfiguration.m_bind_port,
                     config.gateConfiguration.m_bind_port_ssl);

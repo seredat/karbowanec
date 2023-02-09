@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright(c) 2014 - 2017 XDN - project developers
-// Copyright(c) 2018 - 2022 The Karbo developers
+// Copyright(c) 2018 - 2023 The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -74,6 +74,11 @@ void JsonRpcServer::stop() {
   }
 
   http->stop();
+
+  m_dispatcher.remoteSpawn([this]
+  {
+    stopEvent.set();
+  });
 
   m_workers.clear();
 }

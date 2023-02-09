@@ -24,7 +24,6 @@
 #include <unordered_map>
 
 #include "HTTP/httplib.h"
-#include "HTTP/TaskQueue.h"
 #include "Logging/LoggerRef.h"
 #include "ITransaction.h"
 #include "CoreRpcServerCommandsDefinitions.h"
@@ -175,9 +174,6 @@ private:
   CryptoNote::AccountPublicAddress m_fee_acc;
 
   std::vector<std::unique_ptr<System::RemoteContext<void>>> m_workers;
-
-  RpcThreadPool* m_http_queue;
-  RpcThreadPool* m_https_queue;
 
 };
 
