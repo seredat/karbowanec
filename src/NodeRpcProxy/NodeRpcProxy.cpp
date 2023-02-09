@@ -96,11 +96,6 @@ NodeRpcProxy::NodeRpcProxy(const std::string& nodeHost, unsigned short nodePort,
   userAgent << "NodeRpcProxy";
   m_requestHeaders = { {"User-Agent", userAgent.str()}, { "Connection", "keep-alive" } };
 
-  m_httpClient = std::make_shared<httplib::Client>(m_node_url);
-  m_httpClient->enable_server_certificate_verification(false);
-  m_httpClient->set_connection_timeout(1000);
-  m_httpClient->set_keep_alive(true);
-
   resetInternalState();
 }
 
@@ -188,7 +183,11 @@ void NodeRpcProxy::workerThread(const INode::Callback& initialized_callback) {
     m_dispatcher = &dispatcher;
     ContextGroup contextGroup(dispatcher);
     m_context_group = &contextGroup;
-
+    httplib::Client httpClient(m_node_url);
+    m_httpClient = &httpClient;
+    m_httpClient->enable_server_certificate_verification(false);
+    m_httpClient->set_connection_timeout(1000);
+    m_httpClient->set_keep_alive(true);
     Event httpEvent(dispatcher);
     m_httpEvent = &httpEvent;
     m_httpEvent->set();
@@ -220,6 +219,7 @@ void NodeRpcProxy::workerThread(const INode::Callback& initialized_callback) {
 
   m_dispatcher = nullptr;
   m_context_group = nullptr;
+  m_httpClient = nullptr;
   m_httpEvent = nullptr;
   m_connected = false;
   m_rpcProxyObserverManager.notify(&INodeRpcProxyObserver::connectionStatusUpdated, m_connected);
