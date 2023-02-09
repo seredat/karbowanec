@@ -90,17 +90,18 @@ NodeRpcProxy::NodeRpcProxy(const std::string& nodeHost, unsigned short nodePort,
     m_rpcConnectionsCount(0),
     m_whitePeerlistSize(0),
     m_greyPeerlistSize(0),
-    m_node_url((m_daemon_ssl ? "https://" : "http://") + m_nodeHost + ":" + std::to_string(m_nodePort)) 
+    m_node_url((m_daemon_ssl ? "https://" : "http://") + m_nodeHost + ":" + std::to_string(m_nodePort))
 {
   std::stringstream userAgent;
   userAgent << "NodeRpcProxy";
   m_requestHeaders = { {"User-Agent", userAgent.str()}, { "Connection", "keep-alive" } };
-  resetInternalState();
 
   m_httpClient = std::make_shared<httplib::Client>(m_node_url);
   m_httpClient->enable_server_certificate_verification(false);
   m_httpClient->set_connection_timeout(1000);
   m_httpClient->set_keep_alive(true);
+
+  resetInternalState();
 }
 
 NodeRpcProxy::~NodeRpcProxy() {
