@@ -233,15 +233,7 @@ void PaymentGateService::runInProcess(Logging::LoggerRef& log) {
 
   p2pStarted.wait();
 
-  if (config.gateConfiguration.generateNewContainer) {
-    generateNewWallet(currency, getWalletConfig(), logger, *dispatcher, *node);
-  }
-  else if (config.gateConfiguration.changePassword) {
-    changePassword(currency, getWalletConfig(), logger, *dispatcher, *node, config.gateConfiguration.newContainerPassword);
-  }
-  else {
-    runWalletService(currency, *node);
-  }
+  runWalletServiceOr(currency, *node);
 
   p2pNode.sendStopSignal();
   context.get();
@@ -271,15 +263,7 @@ void PaymentGateService::runRpcProxy(Logging::LoggerRef& log) {
       _daemon_path,
       _daemon_ssl));
 
-  if (config.gateConfiguration.generateNewContainer) {
-    generateNewWallet(currency, getWalletConfig(), logger, *dispatcher, *node);
-  }
-  else if (config.gateConfiguration.changePassword) {
-    changePassword(currency, getWalletConfig(), logger, *dispatcher, *node, config.gateConfiguration.newContainerPassword);
-  }
-  else {
-    runWalletService(currency, *node);
-  }
+  runWalletServiceOr(currency, *node);
 }
 
 void PaymentGateService::runJsonRpcServer() {
@@ -292,6 +276,18 @@ void PaymentGateService::runJsonRpcServer() {
   rpcServer.start(config.gateConfiguration.m_bind_address, config.gateConfiguration.m_bind_port);
 
   Logging::LoggerRef(logger, "PaymentGateService")(Logging::INFO, Logging::BRIGHT_WHITE) << "JSON-RPC server stopped, stopping wallet service...";
+}
+
+void PaymentGateService::runWalletServiceOr(const CryptoNote::Currency& currency, CryptoNote::INode& node) {
+  if (config.gateConfiguration.generateNewContainer) {
+    generateNewWallet(currency, getWalletConfig(), logger, *dispatcher, node);
+  }
+  else if (config.gateConfiguration.changePassword) {
+    changePassword(currency, getWalletConfig(), logger, *dispatcher, node, config.gateConfiguration.newContainerPassword);
+  }
+  else {
+    runWalletService(currency, node);
+  }
 }
 
 void PaymentGateService::runWalletService(const CryptoNote::Currency& currency, CryptoNote::INode& node) {
