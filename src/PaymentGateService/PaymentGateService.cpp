@@ -288,15 +288,7 @@ void PaymentGateService::runInProcess(Logging::LoggerRef& log) {
 
   p2pStarted.wait();
 
-  if (config.gateConfiguration.generateNewContainer) {
-    generateNewWallet(currency, getWalletConfig(), logger, *dispatcher, *node);
-  }
-  else if (config.gateConfiguration.changePassword) {
-    changePassword(currency, getWalletConfig(), logger, *dispatcher, *node, config.gateConfiguration.newContainerPassword);
-  }
-  else {
-    runWalletService(currency, *node);
-  }
+  runWalletServiceOr(currency, *node);
 
   log(Logging::INFO) << "Stopping core rpc server...";
   rpcServer.stop();
@@ -319,14 +311,18 @@ void PaymentGateService::runRpcProxy(Logging::LoggerRef& log) {
       "/", // TODO: need to add implementation after merge
       false));
 
+  runWalletServiceOr(currency, *node);
+}
+
+void PaymentGateService::runWalletServiceOr(const CryptoNote::Currency& currency, CryptoNote::INode& node) {
   if (config.gateConfiguration.generateNewContainer) {
-    generateNewWallet(currency, getWalletConfig(), logger, *dispatcher, *node);
+    generateNewWallet(currency, getWalletConfig(), logger, *dispatcher, node);
   }
   else if (config.gateConfiguration.changePassword) {
-    changePassword(currency, getWalletConfig(), logger, *dispatcher, *node, config.gateConfiguration.newContainerPassword);
+    changePassword(currency, getWalletConfig(), logger, *dispatcher, node, config.gateConfiguration.newContainerPassword);
   }
   else {
-    runWalletService(currency, *node);
+    runWalletService(currency, node);
   }
 }
 
