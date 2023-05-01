@@ -707,6 +707,8 @@ public:
 
   bool listen(const std::string &host, int port, int socket_flags = 0);
 
+  size_t connecions_count() const;
+
   bool is_running() const;
   void stop();
 
@@ -727,6 +729,7 @@ protected:
   time_t idle_interval_sec_ = CPPHTTPLIB_IDLE_INTERVAL_SECOND;
   time_t idle_interval_usec_ = CPPHTTPLIB_IDLE_INTERVAL_USECOND;
   size_t payload_max_length_ = CPPHTTPLIB_PAYLOAD_MAX_LENGTH;
+  size_t count_;
 
 private:
   using Handlers = std::vector<std::pair<std::regex, Handler>>;
@@ -4913,7 +4916,7 @@ inline const std::string &BufferStream::get_buffer() const { return buffer; }
 inline Server::Server()
     : new_task_queue(
           [] { return new ThreadPool(CPPHTTPLIB_THREAD_POOL_COUNT); }),
-      svr_sock_(INVALID_SOCKET), is_running_(false) {
+      svr_sock_(INVALID_SOCKET), is_running_(false), count_(0) {
 #ifndef _WIN32
   signal(SIGPIPE, SIG_IGN);
 #endif
@@ -5143,6 +5146,8 @@ inline void Server::stop() {
     detail::close_socket(sock);
   }
 }
+
+inline size_t Server::connecions_count() const { return count_; }
 
 inline bool Server::parse_request_line(const char *s, Request &req) {
   auto len = strlen(s);
@@ -5595,6 +5600,8 @@ inline bool Server::listen_internal() {
 #else
       task_queue->enqueue([=]() { process_and_close_socket(sock); });
 #endif
+
+      count_++;
     }
 
     task_queue->shutdown();
@@ -5973,6 +5980,7 @@ inline bool Server::process_and_close_socket(socket_t sock) {
 
   detail::shutdown_socket(sock);
   detail::close_socket(sock);
+  count_--;
   return ret;
 }
 
@@ -7673,6 +7681,7 @@ inline bool SSLServer::process_and_close_socket(socket_t sock) {
 
   detail::shutdown_socket(sock);
   detail::close_socket(sock);
+  count_--;
   return ret;
 }
 
