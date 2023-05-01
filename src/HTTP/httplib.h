@@ -707,7 +707,7 @@ public:
 
   bool listen(const std::string &host, int port, int socket_flags = 0);
 
-  size_t connecions_count() const;
+  size_t connections_count() const;
 
   bool is_running() const;
   void stop();
@@ -5147,7 +5147,7 @@ inline void Server::stop() {
   }
 }
 
-inline size_t Server::connecions_count() const { return count_; }
+inline size_t Server::connections_count() const { return count_; }
 
 inline bool Server::parse_request_line(const char *s, Request &req) {
   auto len = strlen(s);
