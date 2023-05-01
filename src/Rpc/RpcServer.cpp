@@ -310,7 +310,7 @@ void RpcServer::listen_ssl(const std::string address, const uint16_t port) {
 }
 
 size_t RpcServer::getRpcConnectionsCount() {
-  return 0; // Not implemented
+  return http->connecions_count() + https->connecions_count();
 }
 
 void RpcServer::processRequest(const httplib::Request& request, httplib::Response& response) {
