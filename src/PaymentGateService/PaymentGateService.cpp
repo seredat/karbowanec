@@ -325,7 +325,7 @@ void PaymentGateService::runWalletService(const CryptoNote::Currency& currency, 
     }
   } else {
 
-    PaymentService::PaymentServiceJsonRpcServer rpcServer(*dispatcher, *stopEvent, *service, logger);
+    PaymentService::PaymentServiceJsonRpcServer rpcServer(dispatcher, stopEvent, *service, logger);
 
     bool rpc_run_ssl = false;
     std::string rpc_chain_file = "";
