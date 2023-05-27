@@ -49,6 +49,7 @@ private:
   
   void runWalletService(const CryptoNote::Currency& currency, CryptoNote::INode& node);
   void runWalletServiceOr(const CryptoNote::Currency& currency, CryptoNote::INode& node);
+  void runJsonRpcServer();
 
   System::Dispatcher* dispatcher;
   System::Event* stopEvent;
