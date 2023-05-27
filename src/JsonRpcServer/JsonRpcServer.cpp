@@ -42,7 +42,7 @@
 
 namespace CryptoNote {
 
-JsonRpcServer::JsonRpcServer(System::Dispatcher& sys, System::Event& stopEvent, Logging::ILogger& loggerGroup) :
+JsonRpcServer::JsonRpcServer(System::Dispatcher* sys, System::Event* stopEvent, Logging::ILogger& loggerGroup) :
   m_dispatcher(sys),
   stopEvent(stopEvent),
   logger(loggerGroup, "JsonRpcServer"),
@@ -56,16 +56,12 @@ JsonRpcServer::~JsonRpcServer() {
 
 void JsonRpcServer::start(const std::string& bindAddress, uint16_t bindPort, uint16_t bindPortSSL) {
   if (m_enable_ssl) {
-    m_workers.emplace_back(std::unique_ptr<System::RemoteContext<void>>(
-      new System::RemoteContext<void>(m_dispatcher, std::bind(&JsonRpcServer::listen_ssl, this, bindAddress, bindPortSSL)))
-    );
+    m_workers.push_back(std::thread(std::bind(&JsonRpcServer::listen_ssl, this, bindAddress, bindPortSSL)));
   }
 
-  m_workers.emplace_back(std::unique_ptr<System::RemoteContext<void>>(
-    new System::RemoteContext<void>(m_dispatcher, std::bind(&JsonRpcServer::listen, this, bindAddress, bindPort)))
-  );
+  m_workers.push_back(std::thread(std::bind(&JsonRpcServer::listen, this, bindAddress, bindPort)));
 
-  stopEvent.wait();
+  stopEvent->wait();
 }
 
 void JsonRpcServer::stop() {
@@ -75,10 +71,19 @@ void JsonRpcServer::stop() {
 
   http->stop();
 
-  m_dispatcher.remoteSpawn([this]
-  {
-    stopEvent.set();
-  });
+  if (m_dispatcher != nullptr) {
+    m_dispatcher->remoteSpawn([&]() {
+      if (stopEvent != nullptr) {
+        stopEvent->set();
+      }
+    });
+  }
+
+  for (auto& th : m_workers) {
+    if (th.joinable()) {
+      th.join();
+    }
+  }
 
   m_workers.clear();
 }
