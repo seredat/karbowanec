@@ -1,7 +1,8 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2014-2018, The Monero Project
 // Copyright (c) 2016, The Forknote developers
-// Copyright (c) 2016-2022, The Karbo developers
+// Copyright (c) 2018-2023 Conceal Network & Conceal Devs
+// Copyright (c) 2016-2023, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -1010,6 +1011,11 @@ bool RpcServer::on_get_transactions_with_output_global_indexes_by_heights(const 
           std::string("The range is set to true but heights size is not equal to 2") };
       }
       std::vector<uint32_t> range = req.heights;
+
+      if (range.back() < range.front()) {
+        throw JsonRpc::JsonRpcError{CORE_RPC_ERROR_CODE_WRONG_PARAM,
+          std::string("Invalid heights range: ") + std::to_string(range.front()) + " must be < " + std::to_string(range.back())};
+      }
 
       if (range.back() - range.front() > BLOCK_LIST_MAX_COUNT) {
         throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_WRONG_PARAM,
