@@ -273,17 +273,13 @@ void RpcServer::start() {
     uint16_t ssl_port = m_config.getBindPortSSL(); // make sure to use separate port for SSL server
     logger(Logging::DEBUGGING, Logging::BRIGHT_MAGENTA) << "bind https to port " << ssl_port << ENDL;
 
-    m_workers.emplace_back(std::unique_ptr<System::RemoteContext<void>>(
-      new System::RemoteContext<void>(m_dispatcher, std::bind(&RpcServer::listen_ssl, this, address, ssl_port)))
-    );
+    m_workers.push_back(std::thread(std::bind(&RpcServer::listen_ssl, this, address, ssl_port)));
   }
 
   uint16_t port = m_config.getBindPort();
   logger(Logging::DEBUGGING, Logging::BRIGHT_MAGENTA) << "bind http to port " << port << ENDL;
 
-  m_workers.emplace_back(std::unique_ptr<System::RemoteContext<void>>(
-    new System::RemoteContext<void>(m_dispatcher, std::bind(&RpcServer::listen, this, address, port)))
-  );
+  m_workers.push_back(std::thread(std::bind(&RpcServer::listen, this, address, port)));
 }
 
 void RpcServer::stop() {
@@ -292,6 +288,12 @@ void RpcServer::stop() {
   }
 
   http->stop();
+
+  for (auto& th : m_workers) {
+    if (th.joinable()) {
+      th.join();
+    }
+  }
 
   m_workers.clear();
 }
