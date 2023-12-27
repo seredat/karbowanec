@@ -23,9 +23,6 @@ jobs:
       - name: Add msbuild to PATH
         uses: microsoft/setup-msbuild@v1.1
 
-      - name: Install OpenSSL
-        run: choco install openssl
-
       - name: Install Boost
         shell: powershell
         run: |
@@ -78,7 +75,6 @@ jobs:
             mingw-w64-x86_64-toolchain
             mingw-w64-x86_64-boost
             mingw-w64-x86_64-cmake
-            mingw-w64-x86_64-openssl
 
       - uses: actions/checkout@master
         with:
@@ -134,11 +130,10 @@ jobs:
           build_folder="build/"
           krb_ver=${GITHUB_SHA::7}
           release_name="Karbo-cli-macOS-$krb_ver"
-          brew install --force openssl boost gcc
-          brew link openssl boost --force
+          brew install --force boost gcc
           mkdir "$build_folder"
           cd "$build_folder"
-          cmake -DCMAKE_C_FLAGS="-mmacosx-version-min=10.12" -DCMAKE_CXX_FLAGS="-mmacosx-version-min=10.12" -DOPENSSL_USE_STATIC_LIBS=ON ..
+          cmake -DCMAKE_C_FLAGS="-mmacosx-version-min=10.12" -DCMAKE_CXX_FLAGS="-mmacosx-version-min=10.12" ..
           make
           mkdir "$release_name"
           exeFiles=()
@@ -162,6 +157,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+<<<<<<< HEAD
+=======
   build-ubuntu22:
     name: Ubuntu 22.04
     runs-on: ubuntu-22.04
@@ -198,6 +195,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+>>>>>>> b836925e (Update GA, remove Ubuntu 18.04 since it's deprecated)
   build-ubuntu20:
     name: Ubuntu 20.04
     runs-on: ubuntu-20.04

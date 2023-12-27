@@ -64,12 +64,6 @@ add_library(Wallet ${Wallet} ${WalletLegacy})
 add_library(PaymentGate ${PaymentGate})
 add_library(JsonRpcServer ${JsonRpcServer})
 
-list(APPEND KarboCommon Common)
-list(APPEND KarboCore Rpc Http CryptoNoteCore Logging Serialization Crypto System Checkpoints)
-list(APPEND KarboWallet Wallet Transfers NodeRpcProxy)
-list(APPEND KarboLink CryptoNoteProtocol P2P BlockchainExplorer)
-list(APPEND KarboPaymentGate PaymentGate JsonRpcServer InProcessNode)
-
 if (MSVC)
   add_executable(Daemon ${Daemon} BinaryInfo/daemon.rc)
   add_executable(SimpleWallet ${SimpleWallet} BinaryInfo/simplewallet.rc)
@@ -99,25 +93,6 @@ target_link_libraries(Optimizer PaymentGate Rpc Http CryptoNoteCore Logging Seri
 target_link_libraries(PaymentGateService PaymentGate JsonRpcServer InProcessNode Wallet Transfers NodeRpcProxy Rpc Http P2P CryptoNoteCore Logging Serialization Crypto System Checkpoints
                       CryptoNoteProtocol BlockchainExplorer Common upnpc-static ${Boost_LIBRARIES})
 target_link_libraries(AddressGenerator CryptoNoteCore Logging Serialization Crypto Mnemonics Common System ${Boost_LIBRARIES})
-
-if (OPENSSL_FOUND)
-    target_link_libraries(Daemon ${OPENSSL_LIBRARIES})
-    target_link_libraries(SimpleWallet ${OPENSSL_LIBRARIES})
-    target_link_libraries(GreenWallet ${OPENSSL_LIBRARIES})
-    target_link_libraries(Optimizer ${OPENSSL_LIBRARIES})
-    target_link_libraries(PaymentGateService ${OPENSSL_LIBRARIES})
-    target_link_libraries(AddressGenerator ${OPENSSL_LIBRARIES})
-
-  # prevent error LNK2019: unresolved external symbol _vsnprintf
-  if(MSVC AND NOT (MSVC_VERSION LESS 1900))
-    target_link_libraries(Daemon "legacy_stdio_definitions.lib")
-    target_link_libraries(SimpleWallet "legacy_stdio_definitions.lib")
-    target_link_libraries(GreenWallet "legacy_stdio_definitions.lib")
-    target_link_libraries(PaymentGateService "legacy_stdio_definitions.lib")
-    target_link_libraries(Optimizer "legacy_stdio_definitions.lib")
-    target_link_libraries(AddressGenerator "legacy_stdio_definitions.lib")
-  endif()
-endif ()
 
 if (MSVC OR MINGW)
   target_link_libraries(System crypt32 ws2_32)

@@ -383,24 +383,8 @@ int main(int argc, char* argv[])
       dch.start_handling();
     }
 
-    bool server_ssl_enable = false;
-    if (rpcConfig.isEnabledSSL()) {
-      if (boost::filesystem::exists(chain_file_path, ec) &&
-        boost::filesystem::exists(key_file_path, ec) &&
-        boost::filesystem::exists(dh_file_path, ec)) {
-        rpcServer.setCerts(boost::filesystem::canonical(chain_file_path).string(),
-          boost::filesystem::canonical(key_file_path).string(),
-          boost::filesystem::canonical(dh_file_path).string());
-        server_ssl_enable = true;
-      }
-      else {
-        logger(ERROR, BRIGHT_RED) << "Start RPC SSL server was canceled because certificate file(s) could not be found" << std::endl;
-      }
-    }
-    std::string ssl_info = "";
-    if (server_ssl_enable) ssl_info += ", SSL on address " + rpcConfig.getBindAddressSSL();
-    logger(INFO) << "Starting core rpc server on address " << rpcConfig.getBindAddress() << ssl_info;
-    rpcServer.start(rpcConfig.getBindIP(), rpcConfig.getBindPort(), rpcConfig.getBindPortSSL(), server_ssl_enable);
+    logger(INFO) << "Starting core rpc server on address " << rpcConfig.getBindAddress();
+    rpcServer.start(rpcConfig.getBindIP(), rpcConfig.getBindPort());
     rpcServer.restrictRpc(rpcConfig.restrictedRPC);
     rpcServer.enableCors(rpcConfig.enableCors);
     if (!rpcConfig.nodeFeeAddress.empty() && !rpcConfig.nodeFeeAmountStr.empty()) {
