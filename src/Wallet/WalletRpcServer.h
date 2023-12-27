@@ -43,18 +43,13 @@ public:
     const std::string& walletFilename);
 
   static const command_line::arg_descriptor<uint16_t>    arg_rpc_bind_port;
-  static const command_line::arg_descriptor<uint16_t>    arg_rpc_bind_ssl_port;
-  static const command_line::arg_descriptor<bool>    arg_rpc_bind_ssl_enable;
   static const command_line::arg_descriptor<std::string> arg_rpc_bind_ip;
   static const command_line::arg_descriptor<std::string> arg_rpc_user;
   static const command_line::arg_descriptor<std::string> arg_rpc_password;
-  static const command_line::arg_descriptor<std::string> arg_chain_file;
-  static const command_line::arg_descriptor<std::string> arg_key_file;
-  static const command_line::arg_descriptor<std::string> arg_dh_file;
 
   static void init_options(boost::program_options::options_description& desc);
   bool init(const boost::program_options::variables_map& vm);
-  void getServerConf(std::string &bind_address, std::string &bind_address_ssl, bool &enable_ssl);
+  void getServerConf(std::string &bind_address);
     
   bool run();
   void send_stop_signal();
@@ -93,16 +88,10 @@ private:
   CryptoNote::IWalletLegacy& m_wallet;
   CryptoNote::INode& m_node;
 
-  bool m_enable_ssl;
-  bool m_run_ssl;
   uint16_t m_port;
-  uint16_t m_port_ssl;
   std::string m_bind_ip;
   std::string m_rpcUser;
   std::string m_rpcPassword;
-  std::string m_chain_file;
-  std::string m_key_file;
-  std::string m_dh_file;
   CryptoNote::Currency& m_currency;
   const std::string m_walletFilename;
 

@@ -129,8 +129,10 @@ Config parseArguments(int argc, char **argv)
         {
             std::string urlString(url);
 
+            bool ssl = false;
+
             if (!Common::parseUrlAddress(urlString, config.host, config.port,
-                                         config.path, config.ssl)) {
+                                         config.path, ssl)) {
 
                 std::cout << "Failed to parse daemon address!" << std::endl;
                 config.exit = true;

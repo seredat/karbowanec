@@ -17,7 +17,7 @@
 // along with Karbo.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "JsonRpc.h"
-#include "HttpClient.h"
+#include "HTTP/HttpClient.h"
 #include "CryptoNoteCore/TransactionPool.h"
 
 namespace CryptoNote {

@@ -40,7 +40,7 @@
 #include "CryptoNoteCore/CryptoNoteFormatUtils.h"
 #include "CryptoNoteCore/CryptoNoteTools.h"
 #include "Rpc/CoreRpcServerCommandsDefinitions.h"
-#include "Rpc/HttpClient.h"
+#include "HTTP/HttpClient.h"
 #include "Rpc/JsonRpc.h"
 
 #ifndef AUTO_VAL_INIT
@@ -66,17 +66,13 @@ std::error_code interpretResponseStatus(const std::string& status) {
 
 }
 
-NodeRpcProxy::NodeRpcProxy(const std::string& nodeHost, unsigned short nodePort, const std::string &daemon_path, const bool &daemon_ssl) :
+NodeRpcProxy::NodeRpcProxy(const std::string& nodeHost, unsigned short nodePort) :
     m_rpcTimeout(10000),
     m_pullInterval(5000),
     m_nodeHost(nodeHost),
     m_nodePort(nodePort),
-    m_daemon_path(daemon_path),
     m_connected(false),
     m_initial(true),
-    m_daemon_ssl(daemon_ssl),
-    m_daemon_cert(""),
-    m_daemon_no_verify(false),
     m_peerCount(0),
     m_networkHeight(0),
     m_nodeHeight(0),
@@ -101,14 +97,6 @@ NodeRpcProxy::~NodeRpcProxy() {
     shutdown();
   } catch (std::exception&) {
   }
-}
-
-void NodeRpcProxy::setRootCert(const std::string &path) {
-  if (m_daemon_cert.empty()) m_daemon_cert = path;
-}
-
-void NodeRpcProxy::disableVerify() {
-  if (!m_daemon_no_verify) m_daemon_no_verify = true;
 }
 
 void NodeRpcProxy::resetInternalState() {
@@ -179,10 +167,8 @@ void NodeRpcProxy::workerThread(const INode::Callback& initialized_callback) {
     m_dispatcher = &dispatcher;
     ContextGroup contextGroup(dispatcher);
     m_context_group = &contextGroup;
-    HttpClient httpClient(dispatcher, m_nodeHost, m_nodePort, m_daemon_ssl);
+    HttpClient httpClient(dispatcher, m_nodeHost, m_nodePort);
     m_httpClient = &httpClient;
-    if (!m_daemon_cert.empty()) m_httpClient->setRootCert(m_daemon_cert);
-    if (m_daemon_no_verify) m_httpClient->disableVerify();
     Event httpEvent(dispatcher);
     m_httpEvent = &httpEvent;
     m_httpEvent->set();
@@ -978,18 +964,18 @@ void NodeRpcProxy::scheduleRequest(std::function<std::error_code()>&& procedure,
 }
 
 template <typename Request, typename Response>
-std::error_code NodeRpcProxy::binaryCommand(const std::string& comm, const Request& req, Response& res) {
+std::error_code NodeRpcProxy::binaryCommand(const std::string& url, const Request& req, Response& res) {
   std::error_code ec;
-
-  std::string rpc_url = this->m_daemon_path + comm;
 
   try {
     EventLock eventLock(*m_httpEvent);
-    invokeBinaryCommand(*m_httpClient, rpc_url, req, res);
+    invokeBinaryCommand(*m_httpClient, url, req, res);
     ec = interpretResponseStatus(res.status);
-  } catch (const ConnectException&) {
+  }
+  catch (const ConnectException&) {
     ec = make_error_code(error::CONNECT_ERROR);
-  } catch (const std::exception&) {
+  }
+  catch (const std::exception&) {
     ec = make_error_code(error::NETWORK_ERROR);
   }
 
@@ -997,18 +983,18 @@ std::error_code NodeRpcProxy::binaryCommand(const std::string& comm, const Reque
 }
 
 template <typename Request, typename Response>
-std::error_code NodeRpcProxy::jsonCommand(const std::string& comm, const Request& req, Response& res) {
+std::error_code NodeRpcProxy::jsonCommand(const std::string& url, const Request& req, Response& res) {
   std::error_code ec;
-
-  std::string rpc_url = this->m_daemon_path + comm;
 
   try {
     EventLock eventLock(*m_httpEvent);
-    invokeJsonCommand(*m_httpClient, rpc_url, req, res);
+    invokeJsonCommand(*m_httpClient, url, req, res);
     ec = interpretResponseStatus(res.status);
-  } catch (const ConnectException&) {
+  }
+  catch (const ConnectException&) {
     ec = make_error_code(error::CONNECT_ERROR);
-  } catch (const std::exception&) {
+  }
+  catch (const std::exception&) {
     ec = make_error_code(error::NETWORK_ERROR);
   }
 
@@ -1030,10 +1016,8 @@ std::error_code NodeRpcProxy::jsonRpcCommand(const std::string& method, const Re
     HttpRequest httpReq;
     HttpResponse httpRes;
 
-    std::string rpc_url = this->m_daemon_path + "json_rpc";
-
     httpReq.addHeader("Content-Type", "application/json");
-    httpReq.setUrl(rpc_url);
+    httpReq.setUrl("/json_rpc");
     httpReq.setBody(jsReq.getBody());
 
     m_httpClient->request(httpReq, httpRes);

@@ -48,7 +48,7 @@ public:
 
 class NodeRpcProxy : public CryptoNote::INode {
 public:
-  NodeRpcProxy(const std::string& nodeHost, unsigned short nodePort, const std::string &daemon_path, const bool &daemon_ssl);
+  NodeRpcProxy(const std::string& nodeHost, unsigned short nodePort);
   virtual ~NodeRpcProxy();
 
   virtual bool addObserver(CryptoNote::INodeObserver* observer) override;
@@ -108,13 +108,8 @@ public:
   unsigned int rpcTimeout() const { return m_rpcTimeout; }
   void rpcTimeout(unsigned int val) { m_rpcTimeout = val; }
 
-  const std::string m_daemon_path;
   const std::string m_nodeHost;
   const unsigned short m_nodePort;
-  const bool m_daemon_ssl;
-
-  virtual void setRootCert(const std::string &path) override;
-  virtual void disableVerify() override;
 
 private:
   void resetInternalState();
@@ -150,9 +145,9 @@ private:
 
   void scheduleRequest(std::function<std::error_code()>&& procedure, const Callback& callback);
   template <typename Request, typename Response>
-  std::error_code binaryCommand(const std::string& comm, const Request& req, Response& res);
+  std::error_code binaryCommand(const std::string& url, const Request& req, Response& res);
   template <typename Request, typename Response>
-  std::error_code jsonCommand(const std::string& comm, const Request& req, Response& res);
+  std::error_code jsonCommand(const std::string& url, const Request& req, Response& res);
   template <typename Request, typename Response>
   std::error_code jsonRpcCommand(const std::string& method, const Request& req, Response& res);
 
@@ -205,8 +200,6 @@ private:
   bool m_initial;
   std::string m_fee_address;
   uint64_t m_fee_amount = 0;
-  std::string m_daemon_cert;
-  bool m_daemon_no_verify;
 };
 
 }

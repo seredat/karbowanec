@@ -33,7 +33,6 @@
 #include "CryptoNoteCore/Core.h"
 #include "CryptoNoteProtocol/CryptoNoteProtocolHandler.h"
 #include "P2p/NetNode.h"
-#include "Rpc/RpcServer.h"
 #include <System/Context.h>
 #include "Wallet/WalletGreen.h"
 
@@ -207,7 +206,7 @@ void PaymentGateService::runInProcess(Logging::LoggerRef& log) {
 
   CryptoNote::CryptoNoteProtocolHandler protocol(currency, *dispatcher, core, NULL, logger);
   CryptoNote::NodeServer p2pNode(*dispatcher, protocol, logger);
-  CryptoNote::RpcServer rpcServer(*dispatcher, logger, core, p2pNode, protocol);
+
   CryptoNote::Checkpoints checkpoints(logger);
   for (const auto& cp : CryptoNote::CHECKPOINTS) {
     checkpoints.add_checkpoint(cp.height, cp.blockId);
@@ -249,34 +248,6 @@ void PaymentGateService::runInProcess(Logging::LoggerRef& log) {
     throw std::system_error(ec);
   }
 
-  bool rpc_run_ssl = false;
-  std::string rpc_chain_file = "";
-  std::string rpc_key_file = "";
-  std::string rpc_dh_file = "";
-
-  if (config.remoteNodeConfig.m_enable_ssl) {
-    if (validateSertPath(config.coreConfig.configFolder,
-        config.remoteNodeConfig.m_chain_file,
-        config.remoteNodeConfig.m_key_file,
-        config.remoteNodeConfig.m_dh_file,
-        rpc_chain_file,
-        rpc_key_file,
-        rpc_dh_file)) {
-      rpcServer.setCerts(rpc_chain_file, rpc_key_file, rpc_dh_file);
-      rpc_run_ssl = true;
-    } else {
-      log((Logging::Level) Logging::ERROR, Logging::BRIGHT_RED) << "Start RPC SSL server was canceled because certificate file(s) could not be found" << std::endl;
-    }
-  }
-
-  log(Logging::INFO) << "Starting core rpc server on "
-	  << config.remoteNodeConfig.m_daemon_host << ":" << config.remoteNodeConfig.m_daemon_port;
-  rpcServer.start(config.remoteNodeConfig.m_daemon_host,
-                  config.remoteNodeConfig.m_daemon_port,
-                  config.remoteNodeConfig.m_daemon_port_ssl,
-                  rpc_run_ssl);
-  log(Logging::INFO) << "Core rpc server started ok";
-
   log(Logging::INFO) << "Spawning p2p server";
 
   System::Event p2pStarted(*dispatcher);
@@ -289,9 +260,6 @@ void PaymentGateService::runInProcess(Logging::LoggerRef& log) {
   p2pStarted.wait();
 
   runWalletServiceOr(currency, *node);
-
-  log(Logging::INFO) << "Stopping core rpc server...";
-  rpcServer.stop();
 
   p2pNode.sendStopSignal();
   context.get();
@@ -307,9 +275,7 @@ void PaymentGateService::runRpcProxy(Logging::LoggerRef& log) {
   std::unique_ptr<CryptoNote::INode> node(
     PaymentService::NodeFactory::createNode(
       config.remoteNodeConfig.m_daemon_host,
-      config.remoteNodeConfig.m_daemon_port,
-      "/", // TODO: need to add implementation after merge
-      false));
+      config.remoteNodeConfig.m_daemon_port));
 
   runWalletServiceOr(currency, *node);
 }
@@ -354,30 +320,8 @@ void PaymentGateService::runWalletService(const CryptoNote::Currency& currency, 
 
     PaymentService::PaymentServiceJsonRpcServer rpcServer(*dispatcher, *stopEvent, *service, logger);
 
-    bool rpc_run_ssl = false;
-    std::string rpc_chain_file = "";
-    std::string rpc_key_file = "";
-    std::string rpc_dh_file = "";
-
-    if (config.gateConfiguration.m_enable_ssl) {
-        if (validateSertPath(config.coreConfig.configFolder,
-            config.gateConfiguration.m_chain_file,
-            config.gateConfiguration.m_key_file,
-            config.gateConfiguration.m_dh_file,
-            rpc_chain_file,
-            rpc_key_file,
-            rpc_dh_file)){
-            rpcServer.setCerts(rpc_chain_file, rpc_key_file, rpc_dh_file);
-            rpc_run_ssl = true;
-        } else {
-           Logging::LoggerRef(logger, "PaymentGateService")(Logging::ERROR, Logging::BRIGHT_RED) << "Start JSON-RPC SSL server was canceled because certificate file(s) could not be found" << std::endl;
-        }
-    }
-
     rpcServer.start(config.gateConfiguration.m_bind_address,
                     config.gateConfiguration.m_bind_port,
-                    config.gateConfiguration.m_bind_port_ssl,
-                    rpc_run_ssl,
                     config.gateConfiguration.m_rpcUser,
                     config.gateConfiguration.m_rpcPassword);
 

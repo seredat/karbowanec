@@ -24,12 +24,14 @@
 #include <functional>
 #include <unordered_map>
 
-#include <Logging/LoggerRef.h>
+#include "Logging/LoggerRef.h"
 #include "ITransaction.h"
 #include "CoreRpcServerCommandsDefinitions.h"
 #include "BlockchainExplorer/BlockchainExplorerDataBuilder.h"
 #include "CryptoNoteCore/Core.h"
 #include "Common/Math.h"
+#include "Rpc/RpcServerConfig.h"
+#include "Rpc/JsonRpc.h"
 
 namespace CryptoNote {
 
@@ -39,18 +41,20 @@ class BlockchainExplorer;
 class ICryptoNoteProtocolQuery;
 
 class RpcServer : public HttpServer {
+
 public:
-  RpcServer(System::Dispatcher& dispatcher, Logging::ILogger& log, Core& core, NodeServer& p2p, ICryptoNoteProtocolQuery& protocolQuery);
+  RpcServer(
+    RpcServerConfig& config,
+    System::Dispatcher& dispatcher,
+    Logging::ILogger& log,
+    Core& core,
+    NodeServer& p2p,
+    ICryptoNoteProtocolQuery& protocolQuery
+  );
 
   typedef std::function<bool(RpcServer*, const HttpRequest& request, HttpResponse& response)> HandlerFunction;
-  bool restrictRpc(const bool is_resctricted);
-  bool enableCors(const std::string domain);
-  bool setFeeAddress(const std::string& fee_address, const AccountPublicAddress& fee_acc);
-  bool setFeeAmount(const uint64_t fee_amount);
-  bool setViewKey(const std::string& view_key);
-  bool setContactInfo(const std::string& contact);
-  bool checkIncomingTransactionForFee(const BinaryArray& tx_blob);
   std::string getCorsDomain();
+  void run();
 
 private:
 
@@ -65,7 +69,6 @@ private:
 
   virtual void processRequest(const HttpRequest& request, HttpResponse& response) override;
   bool processJsonRpcRequest(const HttpRequest& request, HttpResponse& response);
-  bool isCoreReady();
 
   // binary handlers
   bool on_get_blocks(const COMMAND_RPC_GET_BLOCKS_FAST::request& req, COMMAND_RPC_GET_BLOCKS_FAST::response& res);
@@ -80,6 +83,13 @@ private:
   bool on_get_index(const COMMAND_HTTP::request& req, COMMAND_HTTP::response& res);
   bool on_get_supply(const COMMAND_HTTP::request& req, COMMAND_HTTP::response& res);
   bool on_get_payment_id(const COMMAND_HTTP::request& req, COMMAND_HTTP::response& res);
+
+  // explorer
+  bool on_get_explorer(const COMMAND_EXPLORER::request& req, COMMAND_EXPLORER::response& res);
+  bool on_get_explorer_block_by_hash(const COMMAND_EXPLORER_GET_BLOCK_DETAILS_BY_HASH::request& req, COMMAND_EXPLORER_GET_BLOCK_DETAILS_BY_HASH::response& res);
+  bool on_get_explorer_tx_by_hash(const COMMAND_EXPLORER_GET_TRANSACTION_DETAILS_BY_HASH::request& req, COMMAND_EXPLORER_GET_TRANSACTION_DETAILS_BY_HASH::response& res);
+  bool on_get_explorer_txs_by_payment_id(const COMMAND_EXPLORER_GET_TRANSACTIONS_BY_PAYMENT_ID::request& req, COMMAND_EXPLORER_GET_TRANSACTIONS_BY_PAYMENT_ID::response& res);
+  bool on_explorer_search(const COMMAND_RPC_EXPLORER_SEARCH::request& req, COMMAND_RPC_EXPLORER_SEARCH::response& res);
 
   // json handlers
   bool on_get_info(const COMMAND_RPC_GET_INFO::request& req, COMMAND_RPC_GET_INFO::response& res);
@@ -134,7 +144,10 @@ private:
   bool on_check_payment(const COMMAND_RPC_CHECK_PAYMENT_BY_PAYMENT_ID::request& req, COMMAND_RPC_CHECK_PAYMENT_BY_PAYMENT_ID::response& rsp);
 
   void fill_block_header_response(const Block& blk, bool orphan_status, uint32_t height, const Crypto::Hash& hash, block_header_response& responce);
+  bool isCoreReady();
+  bool checkIncomingTransactionForFee(const BinaryArray& tx_blob);
 
+  RpcServerConfig m_config;
   Logging::LoggerRef logger;
   CryptoNote::Core& m_core;
   CryptoNote::NodeServer& m_p2p;
@@ -145,7 +158,7 @@ private:
   std::string m_fee_address;
   uint64_t    m_fee_amount;
   std::string m_contact_info;
-  Crypto::SecretKey m_view_key = NULL_SECRET_KEY;
+  Crypto::SecretKey m_view_key;
   CryptoNote::AccountPublicAddress m_fee_acc;
 };
 

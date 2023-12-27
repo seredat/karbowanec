@@ -25,12 +25,12 @@
 
 #include "DaemonCommandsHandler.h"
 
+#include "crypto/hash.h"
 #include "Common/FormatTools.h"
 #include "Common/SignalHandler.h"
 #include "Common/StringTools.h"
 #include "Common/PathTools.h"
-#include <Common/ColouredMsg.h>
-#include "crypto/hash.h"
+#include "Common/ColouredMsg.h"
 #include "Checkpoints/CheckpointsData.h"
 #include "CryptoNoteCore/CryptoNoteTools.h"
 #include "CryptoNoteCore/Core.h"
@@ -39,13 +39,15 @@
 #include "CryptoNoteCore/MinerConfig.h"
 #include "CryptoNoteProtocol/CryptoNoteProtocolHandler.h"
 #include "CryptoNoteProtocol/ICryptoNoteProtocolQuery.h"
-#include "P2p/NetNode.h"
-#include "P2p/NetNodeConfig.h"
+#include "Logging/LoggerManager.h" 
 #include "Rpc/RpcServer.h"
 #include "Rpc/RpcServerConfig.h"
+#include "Rpc/JsonRpc.h"
+#include "P2p/NetNode.h"
+#include "P2p/NetNodeConfig.h"
+#include "Serialization/SerializationTools.h"  
 #include "version.h"
 
-#include <Logging/LoggerManager.h>
 
 #if defined(WIN32)
 #include <crtdbg.h>
@@ -252,20 +254,9 @@ int main(int argc, char* argv[])
     MinerConfig minerConfig;
     minerConfig.init(vm);
     RpcServerConfig rpcConfig;
+    boost::filesystem::path data_dir_path(data_dir);
+    rpcConfig.setDataDir(data_dir_path.string());
     rpcConfig.init(vm);
-
-    std::string contact_str = rpcConfig.contactInfo;
-    if (!contact_str.empty() && contact_str.size() > 128) {
-      logger(ERROR, BRIGHT_RED) << "Too long contact info";
-      return 1;
-    }
-
-    // check this early
-    if ((rpcConfig.nodeFeeAddress.empty() && !rpcConfig.nodeFeeAmountStr.empty()) ||
-       (!rpcConfig.nodeFeeAddress.empty() && rpcConfig.nodeFeeAmountStr.empty())) {
-      logger(ERROR, BRIGHT_RED) << "Need to set both, fee-address and fee-amount";
-      return 1;
-    }
 
     //create objects and link them
     CryptoNote::CurrencyBuilder currencyBuilder(logManager);
@@ -330,25 +321,11 @@ int main(int argc, char* argv[])
 
     CryptoNote::CryptoNoteProtocolHandler cprotocol(currency, dispatcher, m_core, nullptr, logManager);
     CryptoNote::NodeServer p2psrv(dispatcher, cprotocol, logManager);
-    CryptoNote::RpcServer rpcServer(dispatcher, logManager, m_core, p2psrv, cprotocol);
+    CryptoNote::RpcServer rpcServer(rpcConfig, dispatcher, logManager, m_core, p2psrv, cprotocol);
 
     cprotocol.set_p2p_endpoint(&p2psrv);
     m_core.set_cryptonote_protocol(&cprotocol);
     DaemonCommandsHandler dch(m_core, p2psrv, logManager, cprotocol, &rpcServer);
-
-    boost::filesystem::path data_dir_path(data_dir);
-    boost::filesystem::path chain_file_path(rpcConfig.getChainFile());
-    boost::filesystem::path key_file_path(rpcConfig.getKeyFile());
-    boost::filesystem::path dh_file_path(rpcConfig.getDhFile());
-    if (!chain_file_path.has_parent_path()) {
-      chain_file_path = data_dir_path / chain_file_path;
-    }
-    if (!key_file_path.has_parent_path()) {
-      key_file_path = data_dir_path / key_file_path;
-    }
-    if (!dh_file_path.has_parent_path()) {
-      dh_file_path = data_dir_path / dh_file_path;
-    }
 
     // initialize objects
     logger(INFO) << "Initializing p2p server...";
@@ -384,39 +361,7 @@ int main(int argc, char* argv[])
     }
 
     logger(INFO) << "Starting core rpc server on address " << rpcConfig.getBindAddress();
-    rpcServer.start(rpcConfig.getBindIP(), rpcConfig.getBindPort());
-    rpcServer.restrictRpc(rpcConfig.restrictedRPC);
-    rpcServer.enableCors(rpcConfig.enableCors);
-    if (!rpcConfig.nodeFeeAddress.empty() && !rpcConfig.nodeFeeAmountStr.empty()) {
-      AccountPublicAddress acc = boost::value_initialized<AccountPublicAddress>();
-      if (!currency.parseAccountAddressString(rpcConfig.nodeFeeAddress, acc)) {
-        logger(ERROR, BRIGHT_RED) << "Bad fee address: " << rpcConfig.nodeFeeAddress;
-        return 1;
-      }
-      rpcServer.setFeeAddress(rpcConfig.nodeFeeAddress, acc);
-
-      uint64_t fee;
-      if (!Common::Format::parseAmount(rpcConfig.nodeFeeAmountStr, fee)) {
-        logger(ERROR, BRIGHT_RED) << "Couldn't parse fee amount";
-        return 1;
-      }
-      if (fee > CryptoNote::parameters::COIN) {
-        logger(ERROR, BRIGHT_RED) << "Maximum allowed fee is " 
-          << Common::Format::formatAmount(CryptoNote::parameters::COIN);
-        return 1;
-      }
-
-      rpcServer.setFeeAmount(fee);
-    }
-    
-    if (!rpcConfig.nodeFeeViewKey.empty()) {
-      rpcServer.setViewKey(rpcConfig.nodeFeeViewKey);
-    }
-    if (!rpcConfig.contactInfo.empty()) {
-      rpcServer.setContactInfo(rpcConfig.contactInfo);
-    }
-    logger(INFO) << "Core rpc server started ok";
-
+    rpcServer.run();
 
     std::cout << ENDL << "**********************************************************************" << ENDL
       << "The daemon will start synchronizing with the network. It may take up to several hours." << ENDL
@@ -443,13 +388,13 @@ int main(int argc, char* argv[])
     dch.stop_handling();
 
     //stop components
-    logger(INFO) << "Stopping core rpc server...";
+    logger(INFO) << "Stopping core RPC server...";
     rpcServer.stop();
 
     //deinitialize components
     logger(INFO) << "Deinitializing core...";
     m_core.deinit();
-    logger(INFO) << "Deinitializing p2p...";
+    logger(INFO) << "Deinitializing P2P...";
     p2psrv.deinit();
 
     m_core.set_cryptonote_protocol(NULL);

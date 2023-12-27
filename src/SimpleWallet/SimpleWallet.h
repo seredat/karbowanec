@@ -197,7 +197,6 @@ namespace CryptoNote
     std::string m_daemon_address;
     std::string m_daemon_host;
     std::string m_daemon_path;
-    std::string m_daemon_cert;
     std::string m_mnemonic_seed;
     std::string m_mnemonic_seed_file;
     std::string m_view_key;
@@ -207,8 +206,6 @@ namespace CryptoNote
     uint32_t m_scan_height;
     bool m_restore_wallet;                // recover flag
     bool m_non_deterministic;             // old 2-random generation
-    bool m_daemon_ssl;
-    bool m_daemon_no_verify;
     bool m_do_not_relay_tx;
     bool m_dump_keys_file;
     bool m_initial_remote_fee_mess;
