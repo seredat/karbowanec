@@ -21,7 +21,7 @@ jobs:
           ref: ${{ github.ref }}
 
       - name: Add msbuild to PATH
-        uses: microsoft/setup-msbuild@v1.0.2
+        uses: microsoft/setup-msbuild@v1.1
 
       - name: Install OpenSSL
         run: choco install openssl
@@ -51,14 +51,14 @@ jobs:
           $asset_path = "./$build_folder/src/Release/$release_name.zip"
           mkdir "$release_name"
           cp *.exe "$release_name/"
-          echo "::set-output name=sha256::${sha256}"
-          echo "::set-output name=release_name::${release_name}.zip"
-          echo "::set-output name=asset_path::${asset_path}"
-          echo "::set-output name=krb_ver::${krb_ver}"
-          echo "::set-output name=artifact_path::$build_folder/src/Release/$release_name"
+          echo "sha256=${sha256}" >> $env:GITHUB_OUTPUT
+          echo "release_name=${release_name}.zip" >> $env:GITHUB_OUTPUT
+          echo "asset_path=${asset_path}" >> $env:GITHUB_OUTPUT
+          echo "krb_ver=${krb_ver}" >> $env:GITHUB_OUTPUT
+          echo "artifact_path=$build_folder/src/Release/$release_name" >> $env:GITHUB_OUTPUT
 
       - name: Upload To GH Artifacts
-        uses: actions/upload-artifact@v1.0.0
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ steps.build.outputs.release_name }}
           path: ${{ steps.build.outputs.artifact_path }}
@@ -91,7 +91,7 @@ jobs:
         run: |
           $krb_ver="${{ github.sha }}".SubString(0,7)
           $release_name="karbo-cli-win64-mingw-$krb_ver"
-          echo "::set-output name=release_name::${release_name}"
+          echo "release_name=${release_name}" >> $env:GITHUB_OUTPUT
       - name: Build
         shell: msys2 {0}
         id: build
@@ -112,7 +112,7 @@ jobs:
           mv build/src/walletd.exe build/karbo
           mv build/src/vanitygen.exe build/karbo
       - name: Upload To GH Artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ steps.setup.outputs.release_name }}
           path: build/karbo
@@ -148,14 +148,50 @@ jobs:
           zip -r "$release_name".zip "$release_name"
           sha256=$(shasum -a 256 "$release_name".zip | awk '{print toupper($1)}')
           asset_path="./$build_folder$release_name.zip"
-          echo "::set-output name=sha256::${sha256}"
-          echo "::set-output name=release_name::${release_name}.zip"
-          echo "::set-output name=asset_path::${asset_path}"
-          echo "::set-output name=krb_ver::${krb_ver}"
-          echo "::set-output name=artifact_path::$build_folder/$release_name"
+          echo "sha256=${sha256}" >> $GITHUB_OUTPUT
+          echo "release_name=${release_name}.zip" >> $GITHUB_OUTPUT
+          echo "asset_path=${asset_path}" >> $GITHUB_OUTPUT
+          echo "krb_ver=${krb_ver}" >> $GITHUB_OUTPUT
+          echo "artifact_path=$build_folder/$release_name" >> $GITHUB_OUTPUT
 
       - name: Upload To GH Artifacts
-        uses: actions/upload-artifact@v1.0.0
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ steps.build.outputs.release_name }}
+          path: ${{ steps.build.outputs.artifact_path }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-ubuntu22:
+    name: Ubuntu 22.04
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@master
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref }}
+
+      - name: Build
+        id: build
+        run: |
+          sudo apt-get update && sudo apt-get install -y libboost-all-dev
+          build_folder="build/release"
+          krb_ver=${GITHUB_SHA::7}
+          release_name=Karbo-cli-ubuntu22.04-"$krb_ver"
+          mkdir -p "$build_folder"
+          cd "$build_folder"
+          cmake -D ARCH=default -D CMAKE_BUILD_TYPE=Release -D CMAKE_POSITION_INDEPENDENT_CODE:BOOL=true -D BOOST_IGNORE_SYSTEM_PATHS_DEFAULT=ON -D BOOST_ROOT=/usr ../..
+          make
+          mkdir -p "$release_name"
+          exeFiles=()
+          for f in src/*; do [[ -x $f && -f $f ]] && exeFiles+=( "$f" ); done
+          strip "${exeFiles[@]}"
+          cp "${exeFiles[@]}" "$release_name/"
+          echo "release_name=${release_name}" >> $GITHUB_OUTPUT
+          echo "artifact_path=$build_folder/$release_name" >> $GITHUB_OUTPUT
+
+      - name: Upload To GH Artifacts
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ steps.build.outputs.release_name }}
           path: ${{ steps.build.outputs.artifact_path }}
@@ -187,48 +223,11 @@ jobs:
           for f in src/*; do [[ -x $f && -f $f ]] && exeFiles+=( "$f" ); done
           strip "${exeFiles[@]}"
           cp "${exeFiles[@]}" "$release_name/"
-          echo "::set-output name=release_name::${release_name}"
-          echo "::set-output name=artifact_path::$build_folder/$release_name"
+          echo "release_name=${release_name}" >> $GITHUB_OUTPUT
+          echo "artifact_path=$build_folder/$release_name" >> $GITHUB_OUTPUT
 
       - name: Upload To GH Artifacts
-        uses: actions/upload-artifact@v1.0.0
-        with:
-          name: ${{ steps.build.outputs.release_name }}
-          path: ${{ steps.build.outputs.artifact_path }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  build-ubuntu18:
-    name: Ubuntu 18.04
-    runs-on: ubuntu-18.04
-    steps:
-      - uses: actions/checkout@master
-        with:
-          fetch-depth: 0
-          ref: ${{ github.ref }}
-
-      - name: Build
-        id: build
-        run: |
-          sudo apt-get purge '*boost*'
-          sudo apt install -y libboost1.62-all-dev
-          build_folder="build/release"
-          krb_ver=${GITHUB_SHA::7}
-          release_name=Karbo-cli-ubuntu18.04-"$krb_ver"
-          mkdir -p "$build_folder"
-          cd "$build_folder"
-          cmake -D ARCH=default -D CMAKE_BUILD_TYPE=Release -D CMAKE_POSITION_INDEPENDENT_CODE:BOOL=true -D BOOST_IGNORE_SYSTEM_PATHS_DEFAULT=ON -D BOOST_ROOT=/usr ../..
-          make
-          mkdir -p "$release_name"
-          exeFiles=()
-          for f in src/*; do [[ -x $f && -f $f ]] && exeFiles+=( "$f" ); done
-          strip "${exeFiles[@]}"
-          cp "${exeFiles[@]}" "$release_name/"
-          echo "::set-output name=release_name::${release_name}"
-          echo "::set-output name=artifact_path::$build_folder/$release_name"
-
-      - name: Upload To GH Artifacts
-        uses: actions/upload-artifact@v1.0.0
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ steps.build.outputs.release_name }}
           path: ${{ steps.build.outputs.artifact_path }}
