@@ -1470,8 +1470,7 @@ bool RpcServer::on_send_raw_transaction(const COMMAND_RPC_SEND_RAW_TRANSACTION::
   if (!Common::fromHex(req.tx_as_hex, tx_blob))
   {
     logger(Logging::INFO) << "[on_send_raw_tx]: Failed to parse transaction from hexbuff: " << req.tx_as_hex;
-    res.status = "Failed";
-    return true;
+    throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_WRONG_PARAM, "Failed to parse transaction from hexbuff" };
   }
 
   Crypto::Hash transactionHash = Crypto::cn_fast_hash(tx_blob.data(), tx_blob.size());
@@ -1481,15 +1480,13 @@ bool RpcServer::on_send_raw_transaction(const COMMAND_RPC_SEND_RAW_TRANSACTION::
   if (!m_core.handle_incoming_tx(tx_blob, tvc, false))
   {
     logger(Logging::INFO) << "[on_send_raw_tx]: Failed to process tx";
-    res.status = "Failed";
-    return true;
+    throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_INTERNAL_ERROR, "Failed to process tx" };
   }
 
   if (tvc.m_verification_failed)
   {
-    logger(Logging::INFO) << "[on_send_raw_tx]: transaction verification failed";
-    res.status = "Failed";
-    return true;
+    logger(Logging::INFO) << "[on_send_raw_tx]: Transaction verification failed";
+    throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_WRONG_PARAM, "Transaction verification failed" };
   }
 
   if (!tvc.m_should_be_relayed)
