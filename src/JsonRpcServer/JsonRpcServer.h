@@ -25,7 +25,7 @@
 #include <System/Event.h>
 #include "Logging/ILogger.h"
 #include "Logging/LoggerRef.h"
-#include "Rpc/HttpServer.h"
+#include "HTTP/HttpServer.h"
 
 
 namespace CryptoNote {

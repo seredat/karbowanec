@@ -1,5 +1,4 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
-// Copyright (c) 2016-2020, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -21,20 +20,13 @@
 #include <memory>
 
 #include <Common/base64.hpp>
-#include <Common/StringTools.h>
 #include <HTTP/HttpRequest.h>
 #include <HTTP/HttpResponse.h>
 #include <System/TcpConnection.h>
 #include <System/TcpStream.h>
-#include <boost/asio.hpp>
-#include <boost/asio/ssl.hpp>
-#include <boost/asio/ssl/stream.hpp>
-#include "JsonRpc.h"
+#include <Rpc/JsonRpc.h>
 
 #include "Serialization/SerializationTools.h"
-
-using boost::asio::ip::tcp;
-
 
 namespace CryptoNote {
 
@@ -46,14 +38,11 @@ public:
 class HttpClient {
 public:
 
-  HttpClient(System::Dispatcher& dispatcher, const std::string& address, uint16_t port, bool ssl_enable);
+  HttpClient(System::Dispatcher& dispatcher, const std::string& address, uint16_t port);
   ~HttpClient();
-  void request(HttpRequest& req, HttpResponse& res);
+  void request(const HttpRequest& req, HttpResponse& res);
   
   bool isConnected() const;
-
-  void setRootCert(const std::string &path);
-  void disableVerify();
 
 private:
   void connect();
@@ -62,16 +51,10 @@ private:
   const std::string m_address;
   const uint16_t m_port;
 
-  std::string m_ssl_cert;
-
   bool m_connected = false;
-  bool m_ssl_enable;
-  bool m_ssl_no_verify;
   System::Dispatcher& m_dispatcher;
   System::TcpConnection m_connection;
   std::unique_ptr<System::TcpStreambuf> m_streamBuf;
-  boost::asio::io_service m_io_service;
-  std::unique_ptr<boost::asio::ssl::stream<tcp::socket>> m_ssl_sock;
 };
 
 template <typename Request, typename Response>
@@ -79,7 +62,6 @@ void invokeJsonCommand(HttpClient& client, const std::string& url, const Request
   HttpRequest hreq;
   HttpResponse hres;
 
-  hreq.addHeader("Connection", "keep-alive");
   hreq.addHeader("Content-Type", "application/json");
   if (!user.empty() || !password.empty()) {
     hreq.addHeader("Authorization", "Basic " + base64::encode(Common::asBinaryArray(user + ":" + password)));
@@ -109,7 +91,6 @@ void invokeJsonRpcCommand(HttpClient& client, const std::string& method, const R
     HttpRequest httpReq;
     HttpResponse httpRes;
 
-    httpReq.addHeader("Connection", "keep-alive");
     httpReq.addHeader("Content-Type", "application/json");
     if (!user.empty() || !password.empty()) {
       httpReq.addHeader("Authorization", "Basic " + base64::encode(Common::asBinaryArray(user + ":" + password)));
@@ -139,8 +120,6 @@ template <typename Request, typename Response>
 void invokeBinaryCommand(HttpClient& client, const std::string& url, const Request& req, Response& res, const std::string& user = "", const std::string& password = "") {
   HttpRequest hreq;
   HttpResponse hres;
-
-  hreq.addHeader("Connection", "keep-alive");
 
   if (!user.empty() || !password.empty()) {
     hreq.addHeader("Authorization", "Basic " + base64::encode(Common::asBinaryArray(user + ":" + password)));

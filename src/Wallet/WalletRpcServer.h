@@ -25,7 +25,7 @@
 #include <boost/program_options/variables_map.hpp>
 #include "Common/CommandLine.h"
 #include "Logging/LoggerRef.h"
-#include "Rpc/HttpServer.h"
+#include "HTTP/HttpServer.h"
 #include "WalletRpcServerCommandsDefinitions.h"
 #include "WalletLegacy/WalletLegacy.h"
 
