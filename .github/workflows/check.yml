@@ -157,8 +157,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-<<<<<<< HEAD
-=======
   build-ubuntu22:
     name: Ubuntu 22.04
     runs-on: ubuntu-22.04
@@ -195,7 +193,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
->>>>>>> b836925e (Update GA, remove Ubuntu 18.04 since it's deprecated)
   build-ubuntu20:
     name: Ubuntu 20.04
     runs-on: ubuntu-20.04
