@@ -21,7 +21,6 @@
 #include <System/Ipv4Resolver.h>
 #include <System/Ipv4Address.h>
 #include <System/TcpConnector.h>
-#include <Common/StringTools.h>
 
 namespace CryptoNote {
 
