@@ -20,6 +20,7 @@
 #include <memory>
 
 #include <Common/base64.hpp>
+#include <Common/StringTools.h>
 #include <HTTP/HttpRequest.h>
 #include <HTTP/HttpResponse.h>
 #include <System/TcpConnection.h>
