@@ -32,7 +32,7 @@
 
 namespace PaymentService {
 
-PaymentServiceJsonRpcServer::PaymentServiceJsonRpcServer(System::Dispatcher* sys, System::Event* stopEvent, WalletService& service, Logging::ILogger& loggerGroup) 
+PaymentServiceJsonRpcServer::PaymentServiceJsonRpcServer(System::Dispatcher& sys, System::Event& stopEvent, WalletService& service, Logging::ILogger& loggerGroup) 
   : JsonRpcServer(sys, stopEvent, loggerGroup)
   , service(service)
   , logger(loggerGroup, "PaymentServiceJsonRpcServer")
