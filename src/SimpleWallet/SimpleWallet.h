@@ -48,12 +48,15 @@
 #include "NodeRpcProxy/NodeRpcProxy.h"
 #include "WalletLegacy/WalletHelper.h"
 #include "WalletLegacy/WalletLegacy.h"
+#include "Logging/LoggerRef.h"
+#include "Logging/LoggerManager.h"
+#include "System/Dispatcher.h"
+#include "System/Event.h"
+#include "System/RemoteContext.h"
+#include "System/Ipv4Address.h"
 
-#include <Logging/LoggerRef.h>
-#include <Logging/LoggerManager.h>
-
-#include <System/Dispatcher.h>
-#include <System/Ipv4Address.h>
+using namespace Logging;
+#undef ERROR
 
 namespace{
 	Tools::PasswordContainer pwd_container;

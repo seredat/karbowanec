@@ -38,15 +38,6 @@
 #include <miniupnpc/upnpcommands.h>
 #include <miniupnpc/upnpdev.h>
 
-#include <System/Context.h>
-#include <System/ContextGroupTimeout.h>
-#include <System/EventLock.h>
-#include <System/InterruptedException.h>
-#include <System/Ipv4Address.h>
-#include <System/Ipv4Resolver.h>
-#include <System/TcpListener.h>
-#include <System/TcpConnector.h>
- 
 #include "version.h"
 #include "Common/StdInputStream.h"
 #include "Common/StdOutputStream.h"
@@ -594,7 +585,7 @@ namespace CryptoNote
   //-----------------------------------------------------------------------------------
   
   bool NodeServer::run() {
-    logger(INFO) << "Starting NodeServer...";
+    logger(INFO) << "Starting p2p NodeServer...";
 
     m_workingContextGroup.spawn(std::bind(&NodeServer::acceptLoop, this));
     m_workingContextGroup.spawn(std::bind(&NodeServer::connectionWorker, this));
@@ -602,9 +593,11 @@ namespace CryptoNote
     m_workingContextGroup.spawn(std::bind(&NodeServer::timedSyncLoop, this));
     m_workingContextGroup.spawn(std::bind(&NodeServer::timeoutLoop, this));
 
+    logger(INFO) << "p2p NodeServer started OK";
+
     m_stopEvent.wait();
 
-    logger(INFO) << "Stopping NodeServer and its " << m_connections.size() << " connections...";
+    logger(INFO) << "Stopping p2p NodeServer and its " << m_connections.size() << " connections...";
     m_workingContextGroup.interrupt();
     m_workingContextGroup.wait();
 
