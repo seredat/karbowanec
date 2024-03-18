@@ -101,9 +101,6 @@ public:
   virtual void getTransactionsByPaymentId(const Crypto::Hash& paymentId, std::vector<CryptoNote::TransactionDetails>& transactions, 
     const Callback& callback) override { callback(std::error_code()); }
 
-  virtual void getMultisignatureOutputByGlobalIndex(uint64_t amount, uint32_t gindex, CryptoNote::MultisignatureOutput& out,
-    const Callback& callback) override { callback(std::error_code()); }
-
   void getBlockTimestamp(uint32_t height, uint64_t& timestamp, const Callback& callback) { callback(std::error_code()); }
 
   virtual void isSynchronized(bool& syncStatus, const Callback& callback) override { callback(std::error_code()); }
