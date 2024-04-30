@@ -578,6 +578,7 @@ bool RpcServer::processJsonRpcRequest(const HttpRequest& request, HttpResponse& 
       { "verifymessage", { makeMemberMethod(&RpcServer::on_verify_message), true } },
       { "submitblock", { makeMemberMethod(&RpcServer::on_submitblock), false } },
       { "resolveopenalias", { makeMemberMethod(&RpcServer::on_resolve_open_alias), true } },
+      { "search", { makeMemberMethod(&RpcServer::on_explorer_search), true } },
 
     };
 
