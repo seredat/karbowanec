@@ -5,21 +5,21 @@
 // Copyright (c) 2016-2022, The Karbo developers
 //
 // All rights reserved.
-//
+// 
 // Redistribution and use in source and binary forms, with or without modification, are
 // permitted provided that the following conditions are met:
-//
+// 
 // 1. Redistributions of source code must retain the above copyright notice, this list of
 //    conditions and the following disclaimer.
-//
+// 
 // 2. Redistributions in binary form must reproduce the above copyright notice, this list
 //    of conditions and the following disclaimer in the documentation and/or other
 //    materials provided with the distribution.
-//
+// 
 // 3. Neither the name of the copyright holder nor the names of its contributors may be
 //    used to endorse or promote products derived from this software without specific
 //    prior written permission.
-//
+// 
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
 // EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
 // MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
@@ -63,7 +63,7 @@
 #include "Common/CommandLine.h"
 #include "Common/SignalHandler.h"
 #include "Common/StringTools.h"
-#include "Common/Base58.h"
+#include <Common/Base58.h>
 #include "Common/PathTools.h"
 #include "Common/DnsTools.h"
 #include "Common/UrlTools.h"
@@ -71,24 +71,26 @@
 #include "Common/ColouredMsg.h"
 #include "CryptoNoteCore/Account.h"
 #include "CryptoNoteCore/CryptoNoteFormatUtils.h"
-#include "CryptoNoteCore/CryptoNoteTools.h"
 #include "CryptoNoteProtocol/CryptoNoteProtocolHandler.h"
 #include "NodeRpcProxy/NodeRpcProxy.h"
 #include "Rpc/CoreRpcServerCommandsDefinitions.h"
-#include "Rpc/JsonRpc.h"
-#include "Logging/LoggerManager.h"
-#include "Mnemonics/electrum-words.h"
+#include "HTTP/HttpClient.h"
+
 #include "Wallet/WalletRpcServer.h"
 #include "WalletLegacy/WalletLegacy.h"
 #include "Wallet/LegacyKeysImporter.h"
 #include "WalletLegacy/WalletHelper.h"
-#include "ITransfersContainer.h"
 
 #include "version.h"
+#include "Mnemonics/electrum-words.h"
+
+#include <Logging/LoggerManager.h>
 
 #if defined(WIN32)
 #include <Windows.h>
 #endif
+
+#include "ITransfersContainer.h"
 
 using namespace CryptoNote;
 using namespace Logging;
@@ -106,7 +108,6 @@ const command_line::arg_descriptor<std::string> arg_wallet_file = { "wallet-file
 const command_line::arg_descriptor<std::string> arg_generate_new_wallet = { "generate-new-wallet", "Generate new wallet and save it to <arg>", "" };
 const command_line::arg_descriptor<std::string> arg_daemon_address = { "daemon-address", "Use daemon instance at <host>:<port>", "" };
 const command_line::arg_descriptor<std::string> arg_daemon_host = { "daemon-host", "Use daemon instance at host <arg> instead of localhost", "" };
-const command_line::arg_descriptor<uint16_t> arg_daemon_port = { "daemon-port", "Use daemon instance at port <arg> instead of default", 0 };
 const command_line::arg_descriptor<std::string> arg_daemon_cert = { "daemon-cert", "Custom cert file for performing verification", "" };
 const command_line::arg_descriptor<bool> arg_daemon_no_verify = { "daemon-no-verify", "Disable verification procedure", false };
 const command_line::arg_descriptor<std::string> arg_password = { "password", "Wallet password", "", true };
@@ -118,13 +119,13 @@ const command_line::arg_descriptor<std::string> arg_view_secret_key = { "view-ke
 const command_line::arg_descriptor<std::string> arg_spend_secret_key = { "spend-key", "Specify spend secret key for wallet recovery", "" };
 const command_line::arg_descriptor<bool> arg_restore_wallet = { "restore", "Recover wallet using electrum-style mnemonic or raw keys", false };
 const command_line::arg_descriptor<bool> arg_non_deterministic = { "non-deterministic", "Creates non-deterministic (independent) view and spend keys", false };
+const command_line::arg_descriptor<uint16_t> arg_daemon_port = { "daemon-port", "Use daemon instance at port <arg> instead of default", 0 };
 const command_line::arg_descriptor<std::string> arg_log_file = {"log-file", "Set the log file location", ""};
 const command_line::arg_descriptor<uint32_t> arg_log_level = { "log-level", "Set the log verbosity level", INFO, true };
 const command_line::arg_descriptor<bool> arg_testnet = { "testnet", "Used to deploy test nets. The daemon must be launched with --testnet flag", false };
 const command_line::arg_descriptor<bool> arg_reset = { "reset", "Discard cache data and start synchronizing from scratch", false };
 const command_line::arg_descriptor<uint32_t> arg_scan_height = { "scan-height", "The height to begin scanning a wallet from", 0 };
 const command_line::arg_descriptor< std::vector<std::string> > arg_command = { "command", "" };
-
 
 void seedFormater(std::string& seed){
   const unsigned int word_width = 12;
@@ -182,15 +183,17 @@ void seedLoader(const char *seed_file, std::string& seed) {
   }
 }
 
-inline std::string interpret_rpc_response(const std::string& status) {
+inline std::string interpret_rpc_response(bool ok, const std::string& status) {
   std::string err;
-  if (status == CORE_RPC_STATUS_BUSY) {
-    err = "daemon is busy. Please try later";
+  if (ok) {
+    if (status == CORE_RPC_STATUS_BUSY) {
+      err = "daemon is busy. Please try later";
+    } else if (status != CORE_RPC_STATUS_OK) {
+      err = status;
+    }
+  } else {
+    err = "possible lost connection to daemon";
   }
-  else if (status != CORE_RPC_STATUS_OK) {
-    err = status;
-  }
-
   return err;
 }
 
@@ -444,7 +447,7 @@ std::string tryToOpenWalletOrLoadKeysOrThrow(LoggerRef& logger, std::unique_ptr<
       } else { // no keys, wallet error loading
         throw std::runtime_error("can't load wallet file '" + walletFileName + "', check password");
       }
-    } else { //new wallet ok
+    } else { //new wallet ok 
       return walletFileName;
     }
   } else if (keysExists) { //wallet not exists but keys presented
@@ -620,15 +623,12 @@ simple_wallet::simple_wallet(System::Dispatcher& dispatcher, const CryptoNote::C
   m_dispatcher(dispatcher),
   m_daemon_port(0),
   m_daemon_path("/"),
-  m_daemon_ssl(false),
-  m_daemon_cert(""),
-  m_daemon_no_verify(false),
   m_dump_keys_file(false),
   m_scan_height(0),
-  m_currency(currency),
+  m_currency(currency), 
   m_logManager(log),
   logger(log, "simplewallet"),
-  m_refresh_progress_reporter(*this),
+  m_refresh_progress_reporter(*this), 
   m_initResultPromise(nullptr),
   m_walletSynchronized(false),
   m_trackingWallet(false),
@@ -671,11 +671,6 @@ simple_wallet::simple_wallet(System::Dispatcher& dispatcher, const CryptoNote::C
   m_consoleHandler.setHandler("verify_message", std::bind(&simple_wallet::verify_message, this, std::placeholders::_1), "Verify a signature of the message");
   m_consoleHandler.setHandler("help", std::bind(&simple_wallet::help, this, std::placeholders::_1), "Show this help");
   m_consoleHandler.setHandler("exit", std::bind(&simple_wallet::exit, this, std::placeholders::_1), "Close wallet");
-
-  std::stringstream userAgent;
-  userAgent << "NodeRpcProxy/" << PROJECT_VERSION_LONG;
-  m_requestHeaders = { {"User-Agent", userAgent.str()}, { "Connection", "keep-alive" } };
-
 }
 //----------------------------------------------------------------------------------------------------
 
@@ -775,7 +770,7 @@ bool simple_wallet::get_tx_proof(const std::vector<std::string> &args)
       return true;
     }
     tx_key2 = *(struct Crypto::SecretKey *) &tx_key_hash;
-
+  
     if (r) {
       if (args.size() == 3 && tx_key != tx_key2) {
         fail_msg_writer() << "Tx secret key was found for the given txid, but you've also provided another tx secret key which doesn't match the found one.";
@@ -789,7 +784,7 @@ bool simple_wallet::get_tx_proof(const std::vector<std::string> &args)
       return true;
     }
   }
-
+ 
   if (m_wallet->getTxProof(txid, address, tx_key, sig_str)) {
     success_msg_writer() << "Signature: " << sig_str << std::endl;
   }
@@ -851,12 +846,6 @@ bool simple_wallet::get_reserve_proof(const std::vector<std::string> &args)
 bool simple_wallet::init(const boost::program_options::variables_map& vm)
 {
   handle_command_line(vm);
-
-  if (!m_daemon_cert.empty()) {
-    if (!Common::validateCertPath(m_daemon_cert)) {
-      fail_msg_writer() << "Custom cert file could not be found" << std::endl;
-    }
-  }
 
   if (!m_daemon_address.empty() && (!m_daemon_host.empty() || 0 != m_daemon_port))
   {
@@ -1000,7 +989,9 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
 
   if (!m_daemon_address.empty())
   {
-    if (!Common::parseUrlAddress(m_daemon_address, m_daemon_host, m_daemon_port, m_daemon_path, m_daemon_ssl))
+    std::string daemon_path = "/";
+    bool daemon_ssl = false;
+    if (!Common::parseUrlAddress(m_daemon_address, m_daemon_host, m_daemon_port, daemon_path, daemon_ssl))
     {
       fail_msg_writer() << "failed to parse daemon address: " << m_daemon_address;
       return false;
@@ -1020,10 +1011,7 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     return false;
   }
 
-  this->m_node.reset(new NodeRpcProxy(m_daemon_host, m_daemon_port, m_daemon_path, m_daemon_ssl));
-
-  if (!m_daemon_cert.empty()) this->m_node->setRootCert(m_daemon_cert);
-  if (m_daemon_no_verify) this->m_node->disableVerify();
+  this->m_node.reset(new NodeRpcProxy(m_daemon_host, m_daemon_port));
 
   std::promise<std::error_code> errorPromise;
   std::future<std::error_code> f_error = errorPromise.get_future();
@@ -1059,7 +1047,7 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
       seedLoader(m_mnemonic_seed_file.c_str(), m_mnemonic_seed);
     }
 
-    if (!m_mnemonic_seed.empty() && m_view_key.empty() && m_spend_key.empty()) {
+    if (!m_mnemonic_seed.empty() && m_view_key.empty() && m_spend_key.empty()) {     
       Crypto::SecretKey private_spend_key;
       std::string languageName;
       if (!Crypto::ElectrumWords::words_to_bytes(m_mnemonic_seed, private_spend_key, languageName)) {
@@ -1261,9 +1249,7 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
       && addressPrefix == parameters::CRYPTONOTE_PUBLIC_ADDRESS_BASE58_PREFIX
       && data.size() == sizeof(keys))
     {
-      if (!fromBinaryArray(keys, Common::asBinaryArray(data))) {
-        logger(ERROR, BRIGHT_RED) << "Failed to parse account keys";
-      }
+      std::memcpy(&keys, data.data(), sizeof(keys));
     }
 
     if (!new_wallet(walletFileName, pwd_container.password(), keys))
@@ -1407,8 +1393,6 @@ void simple_wallet::handle_command_line(const boost::program_options::variables_
   m_daemon_address               = command_line::get_arg(vm, arg_daemon_address);
   m_daemon_host                  = command_line::get_arg(vm, arg_daemon_host);
   m_daemon_port                  = command_line::get_arg(vm, arg_daemon_port);
-  m_daemon_cert                  = command_line::get_arg(vm, arg_daemon_cert);
-  m_daemon_no_verify             = command_line::get_arg(vm, arg_daemon_no_verify);
   m_restore_wallet               = command_line::get_arg(vm, arg_restore_wallet);
   m_non_deterministic            = command_line::get_arg(vm, arg_non_deterministic);
   m_mnemonic_seed                = command_line::get_arg(vm, arg_mnemonic_seed);
@@ -1795,35 +1779,24 @@ bool simple_wallet::start_mining(const std::vector<std::string>& args) {
   COMMAND_RPC_START_MINING::response res;
 
   std::string rpc_url = this->m_daemon_path + "start_mining";
-  std::string err;
 
   try {
-    httplib::Client cli(m_daemon_address);
-    if (m_daemon_ssl && m_daemon_no_verify) {
-      cli.enable_server_certificate_verification(!m_daemon_no_verify);
-    }
-    const auto rsp = cli.Post(rpc_url.c_str(), m_requestHeaders, storeToJson(req), "application/json");
-    if (rsp) {
-      if (rsp->status == 200) {
-        if (!loadFromJson(res, rsp->body)) {
-          err = "Failed to parse JSON response";
-        }
-      }
-      err = interpret_rpc_response(res.status);
-    }
-    else {
-      err = "No response...";
-    }
+    HttpClient httpClient(m_dispatcher, m_daemon_host, m_daemon_port);
 
-    if (err.empty()) {
+    invokeJsonCommand(httpClient, rpc_url, req, res);
+
+    std::string err = interpret_rpc_response(true, res.status);
+    if (err.empty())
       success_msg_writer() << "Mining started in daemon";
-    }
-    else {
+    else
       fail_msg_writer() << "Mining has not started due to an error: " << err;
-    }
+
+  } catch (const ConnectException&) {
+    printConnectionError();
   } catch (const std::exception& e) {
     fail_msg_writer() << "Failed to invoke RPC method: " << e.what();
   }
+
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -1833,35 +1806,23 @@ bool simple_wallet::stop_mining(const std::vector<std::string>& args)
   COMMAND_RPC_STOP_MINING::response res;
 
   std::string rpc_url = this->m_daemon_path + "stop_mining";
-  std::string err;
 
   try {
-    httplib::Client cli(m_daemon_address);
-    if (m_daemon_ssl && m_daemon_no_verify) {
-      cli.enable_server_certificate_verification(!m_daemon_no_verify);
-    }
-    const auto rsp = cli.Post(rpc_url.c_str(), m_requestHeaders, storeToJson(req), "application/json");
-    if (rsp) {
-      if (rsp->status == 200) {
-        if (!loadFromJson(res, rsp->body)) {
-          err = "Failed to parse JSON response";
-        }
-      }
-      err = interpret_rpc_response(res.status);
-    }
-    else {
-      err = "No response...";
-    }
+    HttpClient httpClient(m_dispatcher, m_daemon_host, m_daemon_port);
 
-    if (err.empty()) {
+    invokeJsonCommand(httpClient, rpc_url, req, res);
+
+    std::string err = interpret_rpc_response(true, res.status);
+    if (err.empty())
       success_msg_writer() << "Mining stopped in daemon";
-    }
-    else {
+    else
       fail_msg_writer() << "Mining has not stopped: " << err;
-    }
+  } catch (const ConnectException&) {
+    printConnectionError();
   } catch (const std::exception& e) {
     fail_msg_writer() << "Failed to invoke RPC method: " << e.what();
   }
+
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -1898,7 +1859,7 @@ void simple_wallet::connectionStatusUpdated(bool connected) {
 void simple_wallet::externalTransactionCreated(CryptoNote::TransactionId transactionId)  {
   WalletLegacyTransaction txInfo;
   m_wallet->getTransaction(transactionId, txInfo);
-
+  
   std::stringstream logPrefix;
   if (txInfo.blockHeight == WALLET_LEGACY_UNCONFIRMED_TRANSACTION_HEIGHT) {
     logPrefix << "Unconfirmed";
@@ -2247,7 +2208,7 @@ bool simple_wallet::transfer(const std::vector<std::string> &args) {
       }
       txFile << raw_tx;
 
-      success_msg_writer(true) << "Raw transaction prepared successfully and saved to file : " << filename
+      success_msg_writer(true) << "Raw transaction prepared successfully and saved to file : " << filename 
         << ", id: " << Common::podToHex(txInfo.hash) << ", key: " << Common::podToHex(tx_key);
       m_do_not_relay_tx = false;
     }
@@ -2293,7 +2254,7 @@ bool simple_wallet::estimate_fusion(const std::vector<std::string>& args) {
         ", minimum threshold " << m_currency.formatAmount(m_currency.defaultDustThreshold() + 1);
     }
   }
-  try {
+  try {  
     size_t fusionReadyCount = m_wallet->estimateFusion(fusionThreshold);
     success_msg_writer() << "Fusion ready outputs count: " << fusionReadyCount;
   }
@@ -2472,7 +2433,7 @@ bool simple_wallet::verify_message(const std::vector<std::string> &args) {
     fail_msg_writer() << "failed to parse address " << address_string;
     return true;
   }
-
+  
   bool r = m_wallet->verify_message(message, address, signature);
   if (!r) {
     fail_msg_writer() << "Invalid signature from " << address_string;
@@ -2542,7 +2503,6 @@ int main(int argc, char* argv[]) {
   Logging::LoggerManager logManager;
   Logging::LoggerRef logger(logManager, "simplewallet");
   System::Dispatcher dispatcher;
-  System::Event m_stopComplete(dispatcher);
 
   po::variables_map vm;
 
@@ -2585,7 +2545,7 @@ int main(int argc, char* argv[]) {
 
   if (!r)
     return 1;
-
+  
   auto modulePath = Common::NativePathToGeneric(argv[0]);
   auto cfgLogFile = Common::NativePathToGeneric(command_line::get_arg(vm, arg_log_file));
   if (cfgLogFile.empty()) {
@@ -2650,16 +2610,7 @@ int main(int argc, char* argv[]) {
     if (!daemon_port)
       daemon_port = RPC_DEFAULT_PORT;
 
-    if (!daemon_cert.empty()) {
-      if (!Common::validateCertPath(daemon_cert)) {
-        logger(ERROR, BRIGHT_RED) << "Custom cert file could not be found" << std::endl;
-      }
-    }
-
-    std::unique_ptr<INode> node(new NodeRpcProxy(daemon_host, daemon_port, daemon_path, daemon_ssl));
-
-    if (!daemon_cert.empty()) node->setRootCert(daemon_cert);
-    if (daemon_no_verify) node->disableVerify();
+    std::unique_ptr<INode> node(new NodeRpcProxy(daemon_host, daemon_port));
 
     std::promise<std::error_code> errorPromise;
     std::future<std::error_code> error = errorPromise.get_future();
@@ -2686,35 +2637,23 @@ int main(int argc, char* argv[]) {
       return 1;
     }
 
-    Tools::wallet_rpc_server wrpc(logManager, *wallet, *node, currency, walletFileName);
+    Tools::wallet_rpc_server wrpc(dispatcher, logManager, *wallet, *node, currency, walletFileName);
 
     if (!wrpc.init(vm)) {
       logger(ERROR, BRIGHT_RED) << "Failed to initialize wallet rpc server";
       return 1;
     }
 
-    Tools::SignalHandler::install([&m_stopComplete, &dispatcher, &wrpc, &wallet] {
-      wrpc.stop();
-
-      dispatcher.remoteSpawn([&] {
-        m_stopComplete.set();
-      });
-
+    Tools::SignalHandler::install([&wrpc, &wallet] {
+      wrpc.send_stop_signal();
     });
 
-    bool enable_ssl;
     std::string bind_address;
-    std::string bind_address_ssl;
-    std::string ssl_info;
-    wrpc.getServerConf(bind_address, bind_address_ssl, enable_ssl);
-    if (enable_ssl) ssl_info += std::string(", SSL on address ") + bind_address_ssl;
-    logger(INFO) << "Starting wallet rpc server on address " << bind_address << ssl_info;
+    wrpc.getServerConf(bind_address);
+    logger(INFO) << "Starting wallet rpc server on address " << bind_address;
     wrpc.run();
-
-    m_stopComplete.wait();
-
     logger(INFO) << "Stopped wallet rpc server";
-
+    
     try {
       logger(INFO) << "Storing wallet...";
       CryptoNote::WalletHelper::storeWallet(*wallet, walletFileName);
@@ -2726,10 +2665,10 @@ int main(int argc, char* argv[]) {
   } else {
     //runs wallet with console interface
     CryptoNote::simple_wallet wal(dispatcher, currency, logManager);
-
+    
     if (!wal.init(vm)) {
-      //logger(ERROR, BRIGHT_RED) << "Failed to initialize wallet";
-      return 1;
+      //logger(ERROR, BRIGHT_RED) << "Failed to initialize wallet"; 
+      return 1; 
     }
 
     std::vector<std::string> command = command_line::get_arg(vm, arg_command);
@@ -2739,7 +2678,7 @@ int main(int argc, char* argv[]) {
     Tools::SignalHandler::install([&wal] {
       wal.stop();
     });
-
+    
     wal.run();
 
     if (!wal.deinit()) {

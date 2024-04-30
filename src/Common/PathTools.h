@@ -32,6 +32,5 @@ std::string GetExtension(const std::string& path);
 std::string RemoveExtension(const std::string& path);
 std::string ReplaceExtenstion(const std::string& path, const std::string& extension);
 bool HasParentPath(const std::string& path);
-bool validateCertPath(std::string& path);
 
 }

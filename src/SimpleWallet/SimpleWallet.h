@@ -35,12 +35,13 @@
 #include <future>
 #include <memory>
 #include <mutex>
+
 #include <boost/program_options/variables_map.hpp>
 
 #include "android.h"
 #include "IWalletLegacy.h"
 #include "Common/PasswordContainer.h"
-#include "HTTP/httplib.h"
+
 #include "Common/ConsoleHandler.h"
 #include "CryptoNoteCore/CryptoNoteBasicImpl.h"
 #include "CryptoNoteCore/Currency.h"
@@ -199,7 +200,6 @@ namespace CryptoNote
     std::string m_daemon_address;
     std::string m_daemon_host;
     std::string m_daemon_path;
-    std::string m_daemon_cert;
     std::string m_mnemonic_seed;
     std::string m_mnemonic_seed_file;
     std::string m_view_key;
@@ -209,8 +209,6 @@ namespace CryptoNote
     uint32_t m_scan_height;
     bool m_restore_wallet;                // recover flag
     bool m_non_deterministic;             // old 2-random generation
-    bool m_daemon_ssl;
-    bool m_daemon_no_verify;
     bool m_do_not_relay_tx;
     bool m_dump_keys_file;
     bool m_initial_remote_fee_mess;
@@ -226,8 +224,6 @@ namespace CryptoNote
     std::unique_ptr<CryptoNote::NodeRpcProxy> m_node;
     std::unique_ptr<CryptoNote::IWalletLegacy> m_wallet;
     refresh_progress_reporter_t m_refresh_progress_reporter;
-
-    httplib::Headers m_requestHeaders;
 
     bool m_walletSynchronized;
     bool m_trackingWallet;

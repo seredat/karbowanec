@@ -113,9 +113,6 @@ public:
   virtual std::string feeAddress() const override { return std::string(); }
   virtual uint64_t feeAmount() const override { return 0; }
 
-  virtual void setRootCert(const std::string &path) override { }
-  virtual void disableVerify() override { }
-
 };
 
 
@@ -148,11 +145,8 @@ NodeFactory::NodeFactory() {
 NodeFactory::~NodeFactory() {
 }
 
-CryptoNote::INode* NodeFactory::createNode(const std::string& daemonAddress,
-                                           uint16_t daemonPort,
-                                           const std::string &daemonPath,
-                                           const bool &daemonSSL) {
-  std::unique_ptr<CryptoNote::INode> node(new CryptoNote::NodeRpcProxy(daemonAddress, daemonPort, daemonPath, daemonSSL));
+CryptoNote::INode* NodeFactory::createNode(const std::string& daemonAddress, uint16_t daemonPort) {
+  std::unique_ptr<CryptoNote::INode> node(new CryptoNote::NodeRpcProxy(daemonAddress, daemonPort));
 
   NodeInitObserver initObserver;
   node->init(std::bind(&NodeInitObserver::initCompleted, &initObserver, std::placeholders::_1));

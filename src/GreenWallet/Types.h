@@ -93,9 +93,6 @@ struct Config
     /* The url path */
     std::string path = "/";
 
-    /* Enable SSL mode */
-    bool ssl = false;
-
     /* The wallet file path */
     std::string walletFile = "";
 

@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
-// Copyright (c) 2016-2022, The Karbo developers
+// Copyright (c) 2016-2020, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -25,7 +25,6 @@
 #include <thread>
 #include <unordered_set>
 
-#include "HTTP/httplib.h"
 #include "../CryptoNoteConfig.h"
 #include "Common/ObserverManager.h"
 #include "INode.h"
@@ -39,6 +38,8 @@ namespace System {
 
 namespace CryptoNote {
 
+class HttpClient;
+
 class INodeRpcProxyObserver {
 public:
   virtual ~INodeRpcProxyObserver() {}
@@ -47,7 +48,7 @@ public:
 
 class NodeRpcProxy : public CryptoNote::INode {
 public:
-  NodeRpcProxy(const std::string& nodeHost, unsigned short nodePort, const std::string &daemon_path, const bool &daemon_ssl);
+  NodeRpcProxy(const std::string& nodeHost, unsigned short nodePort);
   virtual ~NodeRpcProxy();
 
   virtual bool addObserver(CryptoNote::INodeObserver* observer) override;
@@ -107,14 +108,8 @@ public:
   unsigned int rpcTimeout() const { return m_rpcTimeout; }
   void rpcTimeout(unsigned int val) { m_rpcTimeout = val; }
 
-  const std::string m_daemon_path;
   const std::string m_nodeHost;
   const unsigned short m_nodePort;
-  const bool m_daemon_ssl;
-  std::string m_node_url;
-
-  virtual void setRootCert(const std::string &path) override;
-  virtual void disableVerify() override;
 
 private:
   void resetInternalState();
@@ -150,9 +145,9 @@ private:
 
   void scheduleRequest(std::function<std::error_code()>&& procedure, const Callback& callback);
   template <typename Request, typename Response>
-  std::error_code binaryCommand(const std::string& comm, const Request& req, Response& res);
+  std::error_code binaryCommand(const std::string& url, const Request& req, Response& res);
   template <typename Request, typename Response>
-  std::error_code jsonCommand(const std::string& comm, const Request& req, Response& res);
+  std::error_code jsonCommand(const std::string& url, const Request& req, Response& res);
   template <typename Request, typename Response>
   std::error_code jsonRpcCommand(const std::string& method, const Request& req, Response& res);
 
@@ -173,10 +168,7 @@ private:
   Tools::ObserverManager<CryptoNote::INodeRpcProxyObserver> m_rpcProxyObserverManager;
 
   unsigned int m_rpcTimeout;
-
-  httplib::Client* m_httpClient = nullptr;
-
-  httplib::Headers m_requestHeaders;
+  HttpClient* m_httpClient = nullptr;
   System::Event* m_httpEvent = nullptr;
 
   uint64_t m_pullInterval;
@@ -208,8 +200,6 @@ private:
   bool m_initial;
   std::string m_fee_address;
   uint64_t m_fee_amount = 0;
-  std::string m_daemon_cert;
-  bool m_daemon_no_verify;
 };
 
 }

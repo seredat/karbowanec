@@ -22,7 +22,7 @@ public:
   typedef std::vector<JsonValue> Array;
   typedef bool Bool;
   typedef int64_t Integer;
-  typedef std::nullptr_t Nile;
+  typedef std::nullptr_t Nil;
   typedef std::map<Key, JsonValue> Object;
   typedef double Real;
   typedef std::string String;
@@ -45,7 +45,7 @@ public:
   JsonValue(Array&& value);
   explicit JsonValue(Bool value);
   JsonValue(Integer value);
-  JsonValue(Nile value);
+  JsonValue(Nil value);
   JsonValue(const Object& value);
   JsonValue(Object&& value);
   JsonValue(Real value);
@@ -64,7 +64,7 @@ public:
   JsonValue& operator=(Array&& value);
   //JsonValue& operator=(Bool value);
   JsonValue& operator=(Integer value);
-  JsonValue& operator=(Nile value);
+  JsonValue& operator=(Nil value);
   JsonValue& operator=(const Object& value);
   JsonValue& operator=(Object&& value);
   JsonValue& operator=(Real value);

@@ -42,9 +42,6 @@ KRBD_P2P_IP="0.0.0.0"
 KRBD_P2P_PORT="32347"
 KRBD_RPC_IP="127.0.0.1"
 KRBD_RPC_PORT="32348"
-KRBD_RPC_SSL_PORT="32448"
-KRBD_RPC_CHAIN_PATH="/var/karbo/rpc_server.crt"
-KRBD_RPC_KEY_PATH="/var/karbo/rpc_server.key"
 KRBD_LOG_LEVEL="2"
 KRBD_FEE_ADDRESS="Ke5tURH8PotZfvk3B444EtEu29PwtjTND4SBmw1NL7gd9gZ6y78F9cz4ZKepay2o2uH4HXu4poTUeJ4FyQMiaTukLKgrpLS"
 KRBD_FEE_AMOUNT="0.1"
@@ -167,10 +164,6 @@ service_init(){
         --p2p-bind-port $KRBD_P2P_PORT \
         --rpc-bind-ip $KRBD_RPC_IP \
         --rpc-bind-port $KRBD_RPC_PORT \
-        --rpc-bind-ssl-enable \
-        --rpc-bind-ssl-port $KRBD_RPC_SSL_PORT \
-        --rpc-chain-file $KRBD_RPC_CHAIN_PATH \
-        --rpc-key-file $KRBD_RPC_KEY_PATH \
         --fee-address $KRBD_FEE_ADDRESS \
         --fee-amount $KRBD_FEE_AMOUNT \
         --view-key $KRBD_VIEW_KEY > /dev/null & echo $! > $RUN_DIR/KRBD.pid

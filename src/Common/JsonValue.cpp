@@ -109,7 +109,7 @@ JsonValue::JsonValue(Bool value) : type(BOOL), valueBool(value) {
 JsonValue::JsonValue(Integer value) : type(INTEGER), valueInteger(value) {
 }
 
-JsonValue::JsonValue(Nile) : type(NIL) {
+JsonValue::JsonValue(Nil) : type(NIL) {
 }
 
 JsonValue::JsonValue(const Object& value) {
@@ -308,7 +308,7 @@ JsonValue& JsonValue::operator=(Integer value) {
   return *this;
 }
 
-JsonValue& JsonValue::operator=(Nile) {
+JsonValue& JsonValue::operator=(Nil) {
   if (type != NIL) {
     destructValue();
     type = NIL;

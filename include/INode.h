@@ -77,7 +77,7 @@ struct BlockHeaderInfo {
   uint32_t nonce;
   bool isAlternative;
   uint32_t depth; // last block index = current block index + depth
-  difficulty_type difficulty;
+  Difficulty difficulty;
   uint64_t reward;
 };
 
@@ -158,9 +158,6 @@ public:
 
   virtual std::string feeAddress() const = 0;
   virtual uint64_t feeAmount() const = 0;
-
-  virtual void setRootCert(const std::string &path) = 0;
-  virtual void disableVerify() = 0;
 
   virtual void relayTransaction(const Transaction& transaction, const Callback& callback) = 0;
   virtual void getRandomOutsByAmounts(std::vector<uint64_t>&& amounts, uint64_t outsCount, std::vector<CryptoNote::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount>& result, const Callback& callback) = 0;
