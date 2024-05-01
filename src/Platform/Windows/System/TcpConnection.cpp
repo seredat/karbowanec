@@ -1,4 +1,5 @@
-// Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2012-2017, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2016-2019, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -141,6 +142,10 @@ size_t TcpConnection::read(uint8_t* data, size_t size) {
     throw InterruptedException();
   }
 
+  if (context.interrupted) {
+    throw InterruptedException();
+  }
+
   assert(transferred <= size);
   assert(flags == 0);
   return transferred;
@@ -207,6 +212,10 @@ size_t TcpConnection::write(const uint8_t* data, size_t size) {
     }
 
     assert(context.interrupted);
+    throw InterruptedException();
+  }
+
+  if (context.interrupted) {
     throw InterruptedException();
   }
 

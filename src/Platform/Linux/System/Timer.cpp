@@ -1,4 +1,5 @@
-// Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2012-2017, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2016-2019, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -102,11 +103,14 @@ void Timer::sleep(std::chrono::nanoseconds duration) {
         if (!timerContext->interrupted) {
           uint64_t value = 0;
           if(::read(timer, &value, sizeof value) == -1 ){
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wlogical-op"
             if(errno == EAGAIN || errno == EWOULDBLOCK) {
+#pragma GCC diagnostic pop
               timerContext->interrupted = true;
               dispatcher->pushContext(timerContext->context);
             } else {
-              throw std::runtime_error("Timer::interrupt, read failed, "  + lastErrorMessage());
+              throw std::runtime_error("Timer::sleep, interrupt procedure, read failed, "  + lastErrorMessage());
             }
           } else {
             assert(value>0);
@@ -114,11 +118,11 @@ void Timer::sleep(std::chrono::nanoseconds duration) {
           }
 
           epoll_event timerEvent;
-          timerEvent.events = 0;
+          timerEvent.events = EPOLLONESHOT;
           timerEvent.data.ptr = nullptr;
 
           if (epoll_ctl(dispatcher->getEpoll(), EPOLL_CTL_MOD, timer, &timerEvent) == -1) {
-            throw std::runtime_error("Timer::interrupt, epoll_ctl failed, " + lastErrorMessage());
+            throw std::runtime_error("Timer::sleep, interrupt procedure, epoll_ctl failed, " + lastErrorMessage());
           }
         }
     };

@@ -1,4 +1,5 @@
-// Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2012-2017, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2016-2019, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -144,6 +145,7 @@ TcpConnection TcpConnector::connect(const Ipv4Address& address, uint16_t port) {
               } else {
                 if((connectorContext.events & (EPOLLERR | EPOLLHUP)) != 0) {
                   int result = close(connection);
+                  if (result) {}
                   assert(result != -1);
 
                   throw std::runtime_error("TcpConnector::connect, connection failed");
@@ -171,6 +173,7 @@ TcpConnection TcpConnector::connect(const Ipv4Address& address, uint16_t port) {
     }
 
     int result = close(connection);
+    if (result) {}
     assert(result != -1);
   }
 

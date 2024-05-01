@@ -1,4 +1,5 @@
-// Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2012-2017, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2016-2019, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -19,9 +20,11 @@
 
 #include <atomic>
 #include <cstddef>
+#include <exception>
 #include <functional>
 #include <queue>
 #include <stack>
+#include <stdexcept>
 
 namespace System {
 
@@ -74,7 +77,11 @@ public:
   int getTimer();
   void pushTimer(int timer);
 
-static const int SIZEOF_PTHREAD_MUTEX_T = sizeof(pthread_mutex_t);
+#ifdef __LP64__
+  static const int SIZEOF_PTHREAD_MUTEX_T = 56 + sizeof(long);
+#else
+  static const int SIZEOF_PTHREAD_MUTEX_T = 40 + sizeof(long);
+#endif
 
 private:
   void spawn(std::function<void()>&& procedure);
