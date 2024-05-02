@@ -1,4 +1,5 @@
-// Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2012-2017, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2016-2019, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -38,7 +39,7 @@ class BlockchainSynchronizer :
 public:
 
   BlockchainSynchronizer(INode& node, Logging::ILogger& logger, const Crypto::Hash& genesisBlockHash);
-  ~BlockchainSynchronizer();
+  virtual ~BlockchainSynchronizer() override;
 
   // IBlockchainSynchronizer
   virtual void addConsumer(IBlockchainConsumer* consumer) override;
@@ -146,6 +147,8 @@ private:
   mutable std::mutex m_consumersMutex;
   mutable std::mutex m_stateMutex;
   std::condition_variable m_hasWork;
+
+  bool wasStarted = false;
 };
 
 }
