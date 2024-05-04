@@ -1,4 +1,5 @@
-// Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2012-2017, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2016-2019, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -17,6 +18,7 @@
 
 #include "Dispatcher.h"
 #include <cassert>
+
 #include <fcntl.h>
 #include <pthread.h>
 #include <sys/epoll.h>
@@ -56,8 +58,7 @@ private:
 
 static_assert(Dispatcher::SIZEOF_PTHREAD_MUTEX_T == sizeof(pthread_mutex_t), "invalid pthread mutex size");
 
-//const size_t STACK_SIZE = 64 * 1024;
-const size_t STACK_SIZE = 512 * 1024;
+const size_t STACK_SIZE = 64 * 1024;
 
 };
 
@@ -104,11 +105,13 @@ Dispatcher::Dispatcher() {
         }
 
         auto result = close(remoteSpawnEvent);
+        if (result) {}
         assert(result == 0);
       }
     }
 
     auto result = close(epoll);
+    if (result) {}
     assert(result == 0);
   }
 
@@ -135,11 +138,13 @@ Dispatcher::~Dispatcher() {
 
   while (!timers.empty()) {
     int result = ::close(timers.top());
+    if (result) {}
     assert(result == 0);
     timers.pop();
   }
 
   auto result = close(epoll);
+  if (result) {}
   assert(result == 0);
   result = close(remoteSpawnEvent);
   assert(result == 0);
@@ -172,8 +177,10 @@ void Dispatcher::dispatch() {
     if (firstResumingContext != nullptr) {
       context = firstResumingContext;
       firstResumingContext = context->next;
-      //assert(context->inExecutionQueue);
+
+      assert(context->inExecutionQueue);
       context->inExecutionQueue = false;
+      
       break;
     }
 
@@ -256,10 +263,13 @@ bool Dispatcher::interrupted() {
 
 void Dispatcher::pushContext(NativeContext* context) {
   assert(context != nullptr);
+
   if (context->inExecutionQueue)
     return;
+
   context->next = nullptr;
   context->inExecutionQueue = true;
+
   if(firstResumingContext != nullptr) {
     assert(lastResumingContext != nullptr);
     lastResumingContext->next = context;
@@ -330,23 +340,21 @@ void Dispatcher::yield() {
         }
 
         if ((events[i].events & EPOLLOUT) != 0) {
-          if(contextPair->writeContext != nullptr) {
-            if(contextPair->writeContext->context != nullptr) {
+          if (contextPair->writeContext != nullptr) {
+            if (contextPair->writeContext->context != nullptr) {
               contextPair->writeContext->context->interruptProcedure = nullptr;
             }
+            pushContext(contextPair->writeContext->context);
+            contextPair->writeContext->events = events[i].events;
           }
-          pushContext(contextPair->writeContext->context);
-          contextPair->writeContext->events = events[i].events;
         } else if ((events[i].events & EPOLLIN) != 0) {
-          if(contextPair->readContext != nullptr) {
-            if(contextPair->readContext->context != nullptr) {
+          if (contextPair->readContext != nullptr) {
+            if (contextPair->readContext->context != nullptr) {
               contextPair->readContext->context->interruptProcedure = nullptr;
             }
+            pushContext(contextPair->readContext->context);
+            contextPair->readContext->events = events[i].events;
           }
-          pushContext(contextPair->readContext->context);
-          contextPair->readContext->events = events[i].events;
-        } else if ((events[i].events & (EPOLLERR | EPOLLHUP)) != 0) {
-          throw std::runtime_error("Dispatcher::dispatch, events & (EPOLLERR | EPOLLHUP) != 0");
         } else {
           continue;
         }
@@ -408,7 +416,7 @@ int Dispatcher::getTimer() {
   if (timers.empty()) {
     timer = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
     epoll_event timerEvent;
-    timerEvent.events = 0;
+    timerEvent.events = EPOLLONESHOT;
     timerEvent.data.ptr = nullptr;
 
     if (epoll_ctl(getEpoll(), EPOLL_CTL_ADD, timer, &timerEvent) == -1) {
@@ -443,7 +451,7 @@ void Dispatcher::contextProcedure(void* ucontext) {
     ++runningContextCount;
     try {
       context.procedure();
-    } catch(std::exception&) {
+    } catch(...) {
     }
 
     if (context.group != nullptr) {
