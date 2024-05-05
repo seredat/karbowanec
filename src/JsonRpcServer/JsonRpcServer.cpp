@@ -60,8 +60,6 @@ void JsonRpcServer::start(const std::string& bindAddress, uint16_t bindPort, uin
   }
 
   m_workers.push_back(std::thread(std::bind(&JsonRpcServer::listen, this, bindAddress, bindPort)));
-
-  stopEvent->wait();
 }
 
 void JsonRpcServer::stop() {
@@ -70,14 +68,6 @@ void JsonRpcServer::stop() {
   }
 
   http->stop();
-
-  if (m_dispatcher != nullptr) {
-    m_dispatcher->remoteSpawn([&]() {
-      if (stopEvent != nullptr) {
-        stopEvent->set();
-      }
-    });
-  }
 
   for (auto& th : m_workers) {
     if (th.joinable()) {
