@@ -1,7 +1,8 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2018, The TurtleCoin Developers
 // Copyright (c) 2018-2019 The Cash2 developers
-// Copyright (c) 2016-2022, Karbo developers
+// Copyright (c) 2021-2023, The Talleo developers
+// Copyright (c) 2016-2024, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -837,6 +838,28 @@ std::error_code WalletService::deleteAddress(const std::string& address) {
   }
 
   logger(Logging::DEBUGGING) << "Address " << address << " successfully deleted";
+  return std::error_code();
+}
+
+std::error_code WalletService::hasAddress(const std::string& address, bool& isOurs) {
+  try {
+    System::EventLock lk(readyEvent);
+
+    logger(Logging::DEBUGGING) << "Has address request came";
+
+    isOurs = wallet.isMyAddress(address);
+    if (!isOurs) {
+      logger(Logging::DEBUGGING, Logging::BRIGHT_YELLOW) << "Address " << address << " doesn't exist in container";
+      //return make_error_code(CryptoNote::error::WalletServiceErrorCode::OBJECT_NOT_FOUND);
+    } else {
+      logger(Logging::DEBUGGING) << "Address " << address << " exists in container";
+    }
+  }
+  catch (std::system_error& x) {
+    logger(Logging::DEBUGGING, Logging::BRIGHT_YELLOW) << "Error while checking if address exists in container: " << x.what();
+    return x.code();
+  }
+
   return std::error_code();
 }
 
