@@ -58,7 +58,7 @@ jobs:
           echo "artifact_path=$build_folder/src/Release/$release_name" >> $env:GITHUB_OUTPUT
 
       - name: Upload To GH Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.build.outputs.release_name }}
           path: ${{ steps.build.outputs.artifact_path }}
@@ -112,7 +112,7 @@ jobs:
           mv build/src/walletd.exe build/karbo
           mv build/src/vanitygen.exe build/karbo
       - name: Upload To GH Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.setup.outputs.release_name }}
           path: build/karbo
@@ -121,7 +121,7 @@ jobs:
 
   build-macos:
     name: macOS
-    runs-on: macos-11
+    runs-on: macos-12
     steps:
       - uses: actions/checkout@master
         with:
@@ -155,7 +155,7 @@ jobs:
           echo "artifact_path=$build_folder/$release_name" >> $GITHUB_OUTPUT
 
       - name: Upload To GH Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.build.outputs.release_name }}
           path: ${{ steps.build.outputs.artifact_path }}
@@ -191,7 +191,7 @@ jobs:
           echo "artifact_path=$build_folder/$release_name" >> $GITHUB_OUTPUT
 
       - name: Upload To GH Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.build.outputs.release_name }}
           path: ${{ steps.build.outputs.artifact_path }}
@@ -227,7 +227,7 @@ jobs:
           echo "artifact_path=$build_folder/$release_name" >> $GITHUB_OUTPUT
 
       - name: Upload To GH Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.build.outputs.release_name }}
           path: ${{ steps.build.outputs.artifact_path }}
