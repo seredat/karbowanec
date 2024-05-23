@@ -48,7 +48,7 @@ jobs:
           echo "krb_ver=${krb_ver}" >> $env:GITHUB_OUTPUT
 
       - name: Create Release
-        uses: softprops/action-gh-release@v0.1.8
+        uses: softprops/action-gh-release@v2
         with:
           files: ${{ steps.build.outputs.asset_path }}
           name: Karbo CLI Suite ${{ steps.build.outputs.krb_ver }}
@@ -59,7 +59,7 @@ jobs:
 
   build-macos:
     name: macOS
-    runs-on: macos-11
+    runs-on: macos-12
     steps:
       - uses: actions/checkout@master
         with:
@@ -90,7 +90,7 @@ jobs:
           echo "krb_ver=${krb_ver}" >> $GITHUB_OUTPUT
 
       - name: Create Release
-        uses: softprops/action-gh-release@v0.1.8
+        uses: softprops/action-gh-release@v2
         with:
           files: ${{ steps.build.outputs.asset_path }}
           name: Karbo CLI Suite ${{ steps.build.outputs.krb_ver }}
@@ -134,7 +134,7 @@ jobs:
           echo "krb_ver=${krb_ver}" >> $GITHUB_OUTPUT
 
       - name: Create Release
-        uses: softprops/action-gh-release@v0.1.8
+        uses: softprops/action-gh-release@v2
         with:
           files: ${{ steps.build.outputs.asset_path }}
           name: Karbo CLI Suite ${{ steps.build.outputs.krb_ver }}
@@ -178,7 +178,7 @@ jobs:
           echo "krb_ver=${krb_ver}" >> $GITHUB_OUTPUT
 
       - name: Create Release
-        uses: softprops/action-gh-release@v0.1.8
+        uses: softprops/action-gh-release@v2
         with:
           files: ${{ steps.build.outputs.asset_path }}
           name: Karbo CLI Suite ${{ steps.build.outputs.krb_ver }}
