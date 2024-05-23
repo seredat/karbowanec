@@ -1450,7 +1450,7 @@ bool simple_wallet::new_wallet(const std::string &wallet_file, const std::string
     {
       CryptoNote::WalletHelper::storeWallet(*m_wallet, m_wallet_file);
       //create wallet backup file
-      boost::filesystem::copy_file(m_wallet_file, boost::filesystem::change_extension(m_wallet_file, ".walletbak"));
+      boost::filesystem::copy_file(m_wallet_file, m_wallet_file.substr(0, m_wallet_file.find_last_of('.')) + ".walletbak");
     }
     catch (std::exception& e)
     {
