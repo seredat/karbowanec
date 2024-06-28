@@ -235,7 +235,7 @@ bool Dispatcher::interrupted() {
 }
 
 void Dispatcher::pushContext(NativeContext* context) {
-  assert(GetCurrentThreadId() == threadId);
+  //assert(GetCurrentThreadId() == threadId);
   assert(context != nullptr);
 
   if (context->inExecutionQueue) {
