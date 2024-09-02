@@ -52,6 +52,7 @@ jobs:
         with:
           files: ${{ steps.build.outputs.asset_path }}
           name: Karbo CLI Suite ${{ steps.build.outputs.krb_ver }}
+          append_body: true
           body: |
             [Download for Windows](../../releases/download/${{ steps.build.outputs.krb_ver }}/${{ steps.build.outputs.release_name }}) `SHA256: ${{ steps.build.outputs.sha256 }}`
         env:
@@ -94,6 +95,7 @@ jobs:
         with:
           files: ${{ steps.build.outputs.asset_path }}
           name: Karbo CLI Suite ${{ steps.build.outputs.krb_ver }}
+          append_body: true
           body: |
             [Download for macOS](../../releases/download/${{ steps.build.outputs.krb_ver }}/${{ steps.build.outputs.release_name }}) `SHA256: ${{ steps.build.outputs.sha256 }}`
         env:
@@ -138,6 +140,7 @@ jobs:
         with:
           files: ${{ steps.build.outputs.asset_path }}
           name: Karbo CLI Suite ${{ steps.build.outputs.krb_ver }}
+          append_body: true
           body: |
             [Download for Ubuntu 22.04](../../releases/download/${{ steps.build.outputs.krb_ver }}/${{ steps.build.outputs.release_name }}) `SHA256: ${{ steps.build.outputs.sha256 }}`
         env:
@@ -182,6 +185,7 @@ jobs:
         with:
           files: ${{ steps.build.outputs.asset_path }}
           name: Karbo CLI Suite ${{ steps.build.outputs.krb_ver }}
+          append_body: true
           body: |
             [Download for Ubuntu 20.04](../../releases/download/${{ steps.build.outputs.krb_ver }}/${{ steps.build.outputs.release_name }}) `SHA256: ${{ steps.build.outputs.sha256 }}`
         env:
