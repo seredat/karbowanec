@@ -33,8 +33,7 @@ private:
 
   CryptoNote::INode* getNode(const std::string& daemonAddress,
                              uint16_t daemonPort,
-                             const std::string &daemonPath,
-                             const bool &daemonSSL);
+                             const std::string &daemonPath);
 
   static NodeFactory factory;
 };
