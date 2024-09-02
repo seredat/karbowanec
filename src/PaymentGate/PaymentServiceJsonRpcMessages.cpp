@@ -1,7 +1,8 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2018, The TurtleCoin Developers
-// Copyright (c) 2018-2019 The Cash2 developers
-// Copyright (c) 2018-2019 The Karbo developers
+// Copyright (c) 2018-2019, The Cash2 developers
+// Copyright (c) 2021-2023, The Talleo developers
+// Copyright (c) 2016-2024, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -154,6 +155,16 @@ void DeleteAddress::Request::serialize(CryptoNote::ISerializer& serializer) {
 }
 
 void DeleteAddress::Response::serialize(CryptoNote::ISerializer& serializer) {
+}
+
+void HasAddress::Request::serialize(CryptoNote::ISerializer& serializer) {
+  if (!serializer(address, "address")) {
+    throw RequestSerializationError();
+  }
+}
+
+void HasAddress::Response::serialize(CryptoNote::ISerializer& serializer) {
+  serializer(isOurs, "isOurs");
 }
 
 void GetSpendKeys::Request::serialize(CryptoNote::ISerializer& serializer) {

@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2017, The CryptoNote developers, The Bytecoin developers
-// Copyright (c) 2018-2019, Karbo developers
+// Copyright (c) 2016-2024, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -151,6 +151,8 @@ public:
 
   virtual size_t getAddressCount() const = 0;
   virtual std::string getAddress(size_t index) const = 0;
+  virtual bool isMyAddress(const std::string& address) const = 0;
+
   virtual AccountPublicAddress getAccountPublicAddress(size_t index) const = 0;
   virtual KeyPair getAddressSpendKey(size_t index) const = 0;
   virtual KeyPair getAddressSpendKey(const std::string& address) const = 0;

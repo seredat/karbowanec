@@ -1,4 +1,5 @@
-// Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2012-2017, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2016-2019, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -158,6 +159,14 @@ TcpConnection TcpConnector::connect(const Ipv4Address& address, uint16_t port) {
                   }
                 }
               } else {
+                if (context2.interrupted) {
+                  if (closesocket(connection) != 0) {
+                    throw std::runtime_error("TcpConnector::connect, closesocket failed, " + errorMessage(WSAGetLastError()));
+                  } else {
+                    throw InterruptedException();
+                  }
+                }
+
                 assert(transferred == 0);
                 assert(flags == 0);
                 DWORD value = 1;

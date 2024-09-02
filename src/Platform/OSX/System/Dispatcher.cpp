@@ -1,4 +1,5 @@
-// Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2012-2017, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2016-2019, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -17,6 +18,7 @@
 
 #include "Dispatcher.h"
 #include <cassert>
+#include <stdexcept>
 #include <string>
 #include <sys/errno.h>
 #include <sys/event.h>
@@ -55,8 +57,8 @@ private:
   pthread_mutex_t& mutex;
 };
 
-//const size_t STACK_SIZE = 64 * 1024;
-const size_t STACK_SIZE = 512 * 1024;
+const size_t STACK_SIZE = 64 * 1024;
+
 }
 
 static_assert(Dispatcher::SIZEOF_PTHREAD_MUTEX_T == sizeof(pthread_mutex_t), "invalid pthread mutex size");
@@ -80,16 +82,16 @@ Dispatcher::Dispatcher() : lastCreatedTimer(0) {
           message = "pthread_mutex_init failed, " + lastErrorMessage();
         } else {
           remoteSpawned = false;
-
+          
           mainContext.interrupted = false;
           mainContext.group = &contextGroup;
           mainContext.groupPrev = nullptr;
           mainContext.groupNext = nullptr;
+          mainContext.inExecutionQueue = false;
           contextGroup.firstContext = nullptr;
           contextGroup.lastContext = nullptr;
           contextGroup.firstWaiter = nullptr;
           contextGroup.lastWaiter = nullptr;
-          mainContext.inExecutionQueue = false;
           currentContext = &mainContext;
           firstResumingContext = nullptr;
           firstReusableContext = nullptr;
@@ -100,6 +102,7 @@ Dispatcher::Dispatcher() : lastCreatedTimer(0) {
     }
 
     auto result = close(kqueue);
+    if (result) {}
     assert(result == 0);
   }
 
@@ -123,8 +126,9 @@ Dispatcher::~Dispatcher() {
     delete[] stackPtr;
     delete ucontext;
   }
-
+  
   auto result = close(kqueue);
+  if (result) {}
   assert(result != -1);
   result = pthread_mutex_destroy(reinterpret_cast<pthread_mutex_t*>(this->mutex));
   assert(result != -1);
@@ -146,11 +150,13 @@ void Dispatcher::dispatch() {
     if (firstResumingContext != nullptr) {
       context = firstResumingContext;
       firstResumingContext = context->next;
-      //assert(context->inExecutionQueue);
+
+      assert(context->inExecutionQueue);
       context->inExecutionQueue = false;
+      
       break;
     }
-
+    
     if(remoteSpawned.load() == true) {
       MutextGuard guard(*reinterpret_cast<pthread_mutex_t*>(this->mutex));
       while (!remoteSpawningProcedures.empty()) {
@@ -240,8 +246,10 @@ bool Dispatcher::interrupted() {
 
 void Dispatcher::pushContext(NativeContext* context) {
   assert(context!=nullptr);
+
   if (context->inExecutionQueue)
     return;
+
   context->next = nullptr;
   context->inExecutionQueue = true;
   if (firstResumingContext != nullptr) {
@@ -307,7 +315,7 @@ void Dispatcher::yield() {
 
         if (events[i].filter == EVFILT_USER && events[i].ident == 0) {
           EV_SET(&updates[updatesCounter++], 0, EVFILT_USER, EV_ADD | EV_DISABLE, NOTE_FFNOP, 0, NULL);
-
+          
           MutextGuard guard(*reinterpret_cast<pthread_mutex_t*>(this->mutex));
           while (!remoteSpawningProcedures.empty()) {
             spawn(std::move(remoteSpawningProcedures.front()));
@@ -343,24 +351,24 @@ int Dispatcher::getKqueue() const {
 
 NativeContext& Dispatcher::getReusableContext() {
   if(firstReusableContext == nullptr) {
-    uctx* newlyCreatedContext = new uctx;
-    uint8_t* stackPointer = new uint8_t[STACK_SIZE];
-    static_cast<uctx*>(newlyCreatedContext)->uc_stack.ss_sp = stackPointer;
-    static_cast<uctx*>(newlyCreatedContext)->uc_stack.ss_size = STACK_SIZE;
-
-    ContextMakingData makingData{ newlyCreatedContext, this};
-    makecontext(static_cast<uctx*>(newlyCreatedContext), reinterpret_cast<void(*)()>(contextProcedureStatic), reinterpret_cast<intptr_t>(&makingData));
-
-    uctx* oldContext = static_cast<uctx*>(currentContext->uctx);
-    if (swapcontext(oldContext, newlyCreatedContext) == -1) {
-      throw std::runtime_error("Dispatcher::getReusableContext, swapcontext failed, " + lastErrorMessage());
-    }
-
-    assert(firstReusableContext != nullptr);
-    assert(firstReusableContext->uctx == newlyCreatedContext);
-    firstReusableContext->stackPtr = stackPointer;
+   uctx* newlyCreatedContext = new uctx;
+   uint8_t* stackPointer = new uint8_t[STACK_SIZE];
+   static_cast<uctx*>(newlyCreatedContext)->uc_stack.ss_sp = stackPointer;
+   static_cast<uctx*>(newlyCreatedContext)->uc_stack.ss_size = STACK_SIZE;
+   
+   ContextMakingData makingData{ newlyCreatedContext, this};
+   makecontext(static_cast<uctx*>(newlyCreatedContext), reinterpret_cast<void(*)()>(contextProcedureStatic), reinterpret_cast<intptr_t>(&makingData));
+   
+   uctx* oldContext = static_cast<uctx*>(currentContext->uctx);
+   if (swapcontext(oldContext, newlyCreatedContext) == -1) {
+     throw std::runtime_error("Dispatcher::getReusableContext, swapcontext failed, " + lastErrorMessage());
+   }
+   
+   assert(firstReusableContext != nullptr);
+   assert(firstReusableContext->uctx == newlyCreatedContext);
+   firstReusableContext->stackPtr = stackPointer;
   }
-
+  
   NativeContext* context = firstReusableContext;
   firstReusableContext = firstReusableContext->next;
   return *context;
@@ -405,7 +413,7 @@ void Dispatcher::contextProcedure(void* ucontext) {
     ++runningContextCount;
     try {
       context.procedure();
-    } catch(std::exception&) {
+    } catch(...) {
     }
 
     if (context.group != nullptr) {

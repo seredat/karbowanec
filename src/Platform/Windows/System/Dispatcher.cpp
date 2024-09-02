@@ -1,4 +1,5 @@
-// Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2012-2017, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2016-2019, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -132,6 +133,15 @@ void Dispatcher::dispatch() {
   assert(GetCurrentThreadId() == threadId);
   NativeContext* context;
   for (;;) {
+    if (firstResumingContext != nullptr) {
+      context = firstResumingContext;
+      firstResumingContext = context->next;
+
+      assert(context->inExecutionQueue);
+      context->inExecutionQueue = false;
+      
+      break;
+    }
 
     LARGE_INTEGER frequency;
     LARGE_INTEGER ticks;
@@ -148,8 +158,10 @@ void Dispatcher::dispatch() {
     if (firstResumingContext != nullptr) {
       context = firstResumingContext;
       firstResumingContext = context->next;
-      //assert(context->inExecutionQueue);
+
+      assert(context->inExecutionQueue);
       context->inExecutionQueue = false;
+
       break;
     }
 
@@ -225,9 +237,11 @@ bool Dispatcher::interrupted() {
 void Dispatcher::pushContext(NativeContext* context) {
   assert(GetCurrentThreadId() == threadId);
   assert(context != nullptr);
+
   if (context->inExecutionQueue) {
     return;
   }
+
   context->next = nullptr;
   context->inExecutionQueue = true;
   if (firstResumingContext != nullptr) {
@@ -364,9 +378,11 @@ void Dispatcher::pushReusableContext(NativeContext& context) {
 
 void Dispatcher::interruptTimer(uint64_t time, NativeContext* context) {
   assert(GetCurrentThreadId() == threadId);
+
   if (context->inExecutionQueue) {
     return;
   }
+
   auto range = timers.equal_range(time);
   for (auto it = range.first; ; ++it) {
     assert(it != range.second);
@@ -391,7 +407,7 @@ void Dispatcher::contextProcedure() {
     ++runningContextCount;
     try {
       context.procedure();
-    } catch (std::exception&) {
+    } catch (...) {
     }
 
     if (context.group != nullptr) {
