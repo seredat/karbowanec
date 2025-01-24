@@ -18,6 +18,8 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with Karbo.  If not, see <http://www.gnu.org/licenses/>.
 
+#include "version.h"
+
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
 
@@ -37,21 +39,19 @@
 #include "CryptoNoteCore/MinerConfig.h"
 #include "CryptoNoteProtocol/CryptoNoteProtocolHandler.h"
 #include "CryptoNoteProtocol/ICryptoNoteProtocolQuery.h"
-#include "HTTP/httplib.h"
-#include "Logging/LoggerManager.h"
+#include "Logging/LoggerManager.h" 
 #include "Rpc/RpcServer.h"
 #include "Rpc/RpcServerConfig.h"
 #include "Rpc/JsonRpc.h"
 #include "P2p/NetNode.h"
 #include "P2p/NetNodeConfig.h"
-#include "Serialization/SerializationTools.h"
+#include "Serialization/SerializationTools.h"  
 #include "version.h"
+
 
 #if defined(WIN32)
 #include <crtdbg.h>
 #endif
-
-#define CHECK_FOR_UPDATE_ENDPOINT "/repos/seredat/karbowanec/tags"
 
 using Common::JsonValue;
 using namespace CryptoNote;
@@ -138,7 +138,7 @@ int main(int argc, char* argv[])
     po::options_description desc_cmd_only("Command line options");
     po::options_description desc_cmd_sett("Command line options and settings options");
 
-    desc_cmd_sett.add_options()
+    desc_cmd_sett.add_options() 
       ("enable-blockchain-indexes,i", po::bool_switch()->default_value(false), "Enable blockchain indexes");
 
     command_line::add_arg(desc_cmd_only, command_line::arg_help);
@@ -203,14 +203,13 @@ int main(int argc, char* argv[])
 
     if (!r)
       return 1;
-
+  
     auto modulePath = Common::NativePathToGeneric(argv[0]);
     auto cfgLogFile = Common::NativePathToGeneric(command_line::get_arg(vm, arg_log_file));
 
     if (cfgLogFile.empty()) {
       cfgLogFile = Common::ReplaceExtenstion(modulePath, ".log");
-    }
-    else {
+    } else {
       if (!Common::HasParentPath(cfgLogFile)) {
         cfgLogFile = Common::CombinePath(Common::GetPathDirectory(modulePath), cfgLogFile);
       }
@@ -232,13 +231,15 @@ int main(int argc, char* argv[])
       ": ##::'##::::'## ##::: ##.... ##: ##.... ##:'##.... ##:\n"
       ": ##:'##::::'##:. ##:: ##:::: ##: ##:::: ##: ##:::: ##:\n"
       ": #####::::'##:::. ##: ########:: ########:: ##:::: ##:\n",
-      Common::Console::Color::BrightCyan);
+    Common::Console::Color::BrightCyan);
     std::cout << ColouredMsg(
       ": ##. ##::: #########: ##.. ##::: ##.... ##: ##:::: ##:\n"
       ": ##:. ##:: ##.... ##: ##::. ##:: ##:::: ##: ##:::: ##:\n"
       ": ##::. ##: ##:::: ##: ##:::. ##: ########::. #######::\n"
       ":..::::..::..:::::..::..:::::..::........::::.......:::\n\n",
-      Common::Console::Color::BrightYellow);
+    Common::Console::Color::BrightYellow);
+
+    logger(INFO) << "Module folder: " << argv[0];
 
     bool testnet_mode = command_line::get_arg(vm, arg_testnet_on);
     if (testnet_mode) {
@@ -262,8 +263,7 @@ int main(int argc, char* argv[])
     currencyBuilder.testnet(testnet_mode);
     try {
       currencyBuilder.currency();
-    }
-    catch (std::exception&) {
+    } catch (std::exception&) {
       std::cout << "GENESIS_COINBASE_TX_HEX constant has an incorrect value. Please launch: " << CryptoNote::CRYPTONOTE_NAME << "d --" << arg_print_genesis_tx.name;
       return 1;
     }
@@ -313,8 +313,7 @@ int main(int argc, char* argv[])
       if (!Tools::directoryExists(coreConfig.configFolder)) {
         throw std::runtime_error("Directory does not exist: " + coreConfig.configFolder);
       }
-    }
-    else {
+    } else {
       if (!Tools::create_directories_if_necessary(coreConfig.configFolder)) {
         throw std::runtime_error("Can't create directory: " + coreConfig.configFolder);
       }
@@ -361,14 +360,8 @@ int main(int argc, char* argv[])
       dch.start_handling();
     }
 
-    std::string ssl_info = "";
-    if (rpcConfig.isEnabledSSL()) ssl_info += ", SSL on address " + rpcConfig.getBindAddressSSL();
-    logger(INFO) << "Starting core RPC server on address " << rpcConfig.getBindAddress() << ssl_info;
-
-    rpcServer.start();
-
-    logger(INFO) << "Core RPC server started OK";
-
+    logger(INFO) << "Starting core rpc server on address " << rpcConfig.getBindAddress();
+    rpcServer.run();
 
     std::cout << ENDL << "**********************************************************************" << ENDL
       << "The daemon will start synchronizing with the network. It may take up to several hours." << ENDL
@@ -401,7 +394,7 @@ int main(int argc, char* argv[])
     //deinitialize components
     logger(INFO) << "Deinitializing core...";
     m_core.deinit();
-    logger(INFO) << "Deinitializing p2p...";
+    logger(INFO) << "Deinitializing P2P...";
     p2psrv.deinit();
 
     m_core.set_cryptonote_protocol(NULL);

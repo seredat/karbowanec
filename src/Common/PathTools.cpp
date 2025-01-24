@@ -17,7 +17,6 @@
 
 #include "PathTools.h"
 #include <algorithm>
-#include <boost/filesystem.hpp>
 
 namespace {
 
@@ -108,21 +107,5 @@ bool HasParentPath(const std::string& path) {
   return path.find(GENERIC_PATH_SEPARATOR) != std::string::npos;
 }
 
-bool validateCertPath(std::string& path) {
-  bool res = false;
-  boost::system::error_code ec;
-  boost::filesystem::path data_dir_path(boost::filesystem::current_path());
-  boost::filesystem::path cert_file_path(path);
-  if (!cert_file_path.has_parent_path()) cert_file_path = data_dir_path / cert_file_path;
-  if (boost::filesystem::exists(cert_file_path, ec)) {
-    path = boost::filesystem::canonical(cert_file_path).string();
-    res = true;
-  }
-  else {
-    path.clear();
-    res = false;
-  }
-  return res;
-}
 
 }

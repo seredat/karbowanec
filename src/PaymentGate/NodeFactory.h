@@ -25,10 +25,7 @@ namespace PaymentService {
 
 class NodeFactory {
 public:
-  static CryptoNote::INode* createNode(const std::string& daemonAddress,
-                                       uint16_t daemonPort,
-                                       const std::string &daemonPath,
-                                       const bool &daemonSSL);
+  static CryptoNote::INode* createNode(const std::string& daemonAddress, uint16_t daemonPort);
   static CryptoNote::INode* createNodeStub();
 private:
   NodeFactory();
@@ -36,8 +33,7 @@ private:
 
   CryptoNote::INode* getNode(const std::string& daemonAddress,
                              uint16_t daemonPort,
-                             const std::string &daemonPath,
-                             const bool &daemonSSL);
+                             const std::string &daemonPath);
 
   static NodeFactory factory;
 };

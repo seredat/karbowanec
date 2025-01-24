@@ -1,7 +1,7 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2014-2016, XDN developers
 // Copyright (c) 2014-2016, The Monero Project
-// Copyright (c) 2016-2023, Karbo developers
+// Copyright (c) 2016-2022, Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -21,22 +21,25 @@
 #include <list>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/filesystem.hpp>
-
+#include "WalletRpcServer.h"
 #include "crypto/hash.h"
-#include "Common/base64.hpp"
 #include "Common/CommandLine.h"
 #include "Common/StringTools.h"
 #include "CryptoNoteCore/CryptoNoteFormatUtils.h"
 #include "CryptoNoteCore/CryptoNoteBasicImpl.h"
 #include "CryptoNoteCore/Account.h"
-#include "ITransfersContainer.h"
 #include "Rpc/JsonRpc.h"
 #include "WalletLegacy/WalletHelper.h"
 #include "WalletLegacy/WalletLegacy.h"
 #include "Common/StringTools.h"
 #include "Common/Base58.h"
 #include "Common/Util.h"
-#include "WalletRpcServer.h"
+
+#include "ITransfersContainer.h"
+
+#if defined(WIN32)
+#undef ERROR
+#endif
 
 using namespace Logging;
 using namespace CryptoNote;
@@ -44,101 +47,58 @@ using namespace CryptoNote;
 namespace Tools {
 
 const command_line::arg_descriptor<uint16_t>    wallet_rpc_server::arg_rpc_bind_port =
-  { "rpc-bind-port", "Starts wallet as RPC server for wallet operations, sets bind port for server.", WALLET_RPC_DEFAULT_PORT, true };
-const command_line::arg_descriptor<uint16_t>    wallet_rpc_server::arg_rpc_bind_ssl_port =
-  { "rpc-bind-ssl-port", "Starts wallet as RPC server for wallet operations, sets bind port ssl for server.", WALLET_RPC_DEFAULT_SSL_PORT };
+  { "rpc-bind-port", "Starts wallet as RPC server for wallet operations, sets bind port for server.", 0, true };
 const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_rpc_bind_ip = 
   { "rpc-bind-ip"  , "Specify IP to bind RPC server to.", "127.0.0.1" };
-const command_line::arg_descriptor<bool>    wallet_rpc_server::arg_rpc_bind_ssl_enable =
-  { "rpc-bind-ssl-enable", "Enable SSL for RPC service", false, true };
 const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_rpc_user = 
   { "rpc-user"     , "Username to use with the RPC server. If empty, no server authorization will be done.", "" };
 const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_rpc_password = 
   { "rpc-password" , "Password to use with the RPC server. If empty, no server authorization will be done.", "" };
-const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_chain_file =
-  { "rpc-chain-file" , "SSL chain file", RPC_DEFAULT_CHAIN_FILE };
-const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_key_file =
-  { "rpc-key-file" , "SSL key file", RPC_DEFAULT_KEY_FILE };
 
 void wallet_rpc_server::init_options(boost::program_options::options_description& desc)
 {
   command_line::add_arg(desc, arg_rpc_bind_ip);
   command_line::add_arg(desc, arg_rpc_bind_port);
-  command_line::add_arg(desc, arg_rpc_bind_ssl_port);
-  command_line::add_arg(desc, arg_rpc_bind_ssl_enable);
   command_line::add_arg(desc, arg_rpc_user);
   command_line::add_arg(desc, arg_rpc_password);
-  command_line::add_arg(desc, arg_chain_file);
-  command_line::add_arg(desc, arg_key_file);
 }
 
 //------------------------------------------------------------------------------------------------------------------------------
 
 wallet_rpc_server::wallet_rpc_server(
-  Logging::ILogger& log,
-  CryptoNote::IWalletLegacy& w,
-  CryptoNote::INode& n,
-  CryptoNote::Currency& currency,
-  const std::string& walletFilename) :
-  logger(log, "WalletRpc"),
-  m_wallet(w),
-  m_node(n),
-  m_currency(currency),
-  m_walletFilename(walletFilename),
-  m_run_ssl(false)
-{
-}
-
-//------------------------------------------------------------------------------------------------------------------------------
-
-wallet_rpc_server::~wallet_rpc_server() {
-}
+  System::Dispatcher& dispatcher, 
+  Logging::ILogger& log, 
+  CryptoNote::IWalletLegacy&w,
+  CryptoNote::INode& n, 
+  CryptoNote::Currency& currency, 
+  const std::string& walletFile) : 
+    HttpServer(dispatcher, log), 
+    logger(log, "WalletRpc"), 
+    m_dispatcher(dispatcher), 
+    m_stopComplete(dispatcher), 
+    m_wallet(w),
+    m_node(n), 
+    m_currency(currency),
+    m_walletFilename(walletFile)
+{}
 
 //------------------------------------------------------------------------------------------------------------------------------
 
 bool wallet_rpc_server::run()
 {
-  if (m_run_ssl) {
-    m_workers.push_back(std::thread(std::bind(&wallet_rpc_server::listen_ssl, this, m_bind_ip, m_port_ssl)));
-  }
-
-  m_workers.push_back(std::thread(std::bind(&wallet_rpc_server::listen, this, m_bind_ip, m_port)));
-
+  start(m_bind_ip, m_port, m_rpcUser, m_rpcPassword);
+  m_stopComplete.wait();
   return true;
 }
 
-//------------------------------------------------------------------------------------------------------------------------------
-
-void wallet_rpc_server::stop() {
-  if (m_run_ssl) {
-    https->stop();
-  }
-
-  http->stop();
-
-  for (auto& th : m_workers) {
-    if (th.joinable()) {
-      th.join();
-    }
-  }
-
-  m_workers.clear();
-}
-
-//------------------------------------------------------------------------------------------------------------------------------
-
-void wallet_rpc_server::listen(const std::string address, const uint16_t port) {
-  if (!http->listen(address.c_str(), port)) {
-    logger(Logging::ERROR) << "Could not bind service to " << address << ":" << port
-      << "\nIs another service using this address and port?\n";
-  }
-}
-
-void wallet_rpc_server::listen_ssl(const std::string address, const uint16_t port) {
-  if (!https->listen(address.c_str(), port)) {
-    logger(Logging::ERROR) << "Could not bind service to " << address << ":" << port
-      << "\nIs another service using this address and port?\n";
-  }
+void wallet_rpc_server::send_stop_signal()
+{
+  m_dispatcher.remoteSpawn([this]
+  {
+    std::cout << "wallet_rpc_server::send_stop_signal()" << std::endl;
+    stop();
+    m_stopComplete.set();
+  });
 }
 
 //------------------------------------------------------------------------------------------------------------------------------
@@ -147,21 +107,15 @@ bool wallet_rpc_server::handle_command_line(const boost::program_options::variab
 {
   m_bind_ip        = command_line::get_arg(vm, arg_rpc_bind_ip);
   m_port           = command_line::get_arg(vm, arg_rpc_bind_port);
-  m_port_ssl       = command_line::get_arg(vm, arg_rpc_bind_ssl_port);
-  m_enable_ssl     = command_line::get_arg(vm, arg_rpc_bind_ssl_enable);
   m_rpcUser        = command_line::get_arg(vm, arg_rpc_user);
   m_rpcPassword    = command_line::get_arg(vm, arg_rpc_password);
-  m_chain_file     = command_line::get_arg(vm, arg_chain_file);
-  m_key_file       = command_line::get_arg(vm, arg_key_file);
+
   return true;
 }
 //------------------------------------------------------------------------------------------------------------------------------
 
 bool wallet_rpc_server::init(const boost::program_options::variables_map& vm)
 {
-  boost::filesystem::path data_dir_path(boost::filesystem::current_path());
-  boost::filesystem::path chain_file_path(m_chain_file);
-  boost::filesystem::path key_file_path(m_key_file);
   if (!handle_command_line(vm))
   {
     logger(Logging::ERROR) << "Failed to process command line in wallet_rpc_server";
@@ -169,70 +123,26 @@ bool wallet_rpc_server::init(const boost::program_options::variables_map& vm)
   }
   else {
     boost::system::error_code ec;
-    if (!chain_file_path.has_parent_path()) chain_file_path = data_dir_path / chain_file_path;
-    if (!key_file_path.has_parent_path()) key_file_path = data_dir_path / key_file_path;
-    if (m_enable_ssl) {
-      if (boost::filesystem::exists(chain_file_path, ec) &&
-          boost::filesystem::exists(key_file_path, ec)) {
-        m_run_ssl = true;
-      }
-      else
-      {
-        logger((Logging::Level) ERROR, BRIGHT_RED) << "Starting RPC SSL server was canceled because certificate file(s) could not be found" << std::endl;
-      }
-    }
+    boost::filesystem::path data_dir_path(boost::filesystem::current_path());
+
+    return true;
   }
-
-  http = new httplib::Server();
-
-  http->Post(".*", [this](const httplib::Request& req, httplib::Response& res) {
-    processRequest(req, res);
-  });
-
-  if (m_run_ssl) {
-    https = new httplib::SSLServer(boost::filesystem::canonical(chain_file_path).string().c_str(), boost::filesystem::canonical(key_file_path).string().c_str());
-
-    https->Post(".*", [this](const httplib::Request& req, httplib::Response& res) {
-      processRequest(req, res);
-    });
-  }
-
-  if (!m_rpcUser.empty() || !m_rpcPassword.empty()) {
-    m_credentials = base64::encode(Common::asBinaryArray(m_rpcUser + ":" + m_rpcPassword));
-  }
-
-  return true;
 }
 
-//------------------------------------------------------------------------------------------------------------------------------
-
-void wallet_rpc_server::getServerConf(std::string &bind_address, std::string &bind_address_ssl, bool &enable_ssl) {
+void wallet_rpc_server::getServerConf(std::string &bind_address) {
   bind_address = m_bind_ip + ":" + std::to_string(m_port);
-  bind_address_ssl = m_bind_ip + ":" + std::to_string(m_port_ssl);
-  enable_ssl = m_enable_ssl;
 }
 
-//------------------------------------------------------------------------------------------------------------------------------
-
-void wallet_rpc_server::processRequest(const httplib::Request& request, httplib::Response& response)
+void wallet_rpc_server::processRequest(const CryptoNote::HttpRequest& request, CryptoNote::HttpResponse& response)
 {
   using namespace CryptoNote::JsonRpc;
-
-  if (!authenticate(request)) {
-    logger(WARNING) << "Authorization required";
-    response.status = 401;
-    response.set_header("WWW-Authenticate", "Basic realm=\"RPC\"");
-    response.set_content("Authorization required", "text/plain; charset=UTF-8");
-
-    return;
-  }
 
   JsonRpcRequest jsonRequest;
   JsonRpcResponse jsonResponse;
 
   try
   {
-    jsonRequest.parseRequest(request.body);
+    jsonRequest.parseRequest(request.getBody());
     jsonResponse.setId(jsonRequest.getId());
 
     static const std::unordered_map<std::string, JsonMemberMethod> s_methods =
@@ -276,28 +186,9 @@ void wallet_rpc_server::processRequest(const httplib::Request& request, httplib:
     jsonResponse.setError(JsonRpcError(WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR, e.what()));
   }
 
-  response.set_content(jsonResponse.getBody(), "application/json");
-}
+  response.addHeader("Content-Type", "application/json");
 
-//------------------------------------------------------------------------------------------------------------------------------
-
-bool wallet_rpc_server::authenticate(const httplib::Request& request) const {
-  if (!m_credentials.empty()) {
-    auto headerIt = request.headers.find("authorization");
-    if (headerIt == request.headers.end()) {
-      return false;
-    }
-
-    if (headerIt->second.substr(0, 6) != "Basic ") {
-      return false;
-    }
-
-    if (headerIt->second.substr(6) != m_credentials) {
-      return false;
-    }
-  }
-
-  return true;
+  response.setBody(jsonResponse.getBody());
 }
 
 //------------------------------------------------------------------------------------------------------------------------------
@@ -691,7 +582,7 @@ bool wallet_rpc_server::on_stop_wallet(const wallet_rpc::COMMAND_RPC_STOP::reque
     logger(Logging::ERROR) << "Couldn't save wallet: " << e.what();
     throw JsonRpc::JsonRpcError(WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR, std::string("Couldn't save wallet: ") + e.what());
   }
-  wallet_rpc_server::stop();
+  wallet_rpc_server::send_stop_signal();
   return true;
 }
 

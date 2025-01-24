@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright(c) 2014 - 2017 XDN - project developers
-// Copyright(c) 2018 - 2023 The Karbo developers
+// Copyright(c) 2018 The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -32,138 +32,49 @@
 #include <System/Ipv4Address.h>
 #include "HTTP/HttpParser.h"
 #include "HTTP/HttpResponse.h"
-
 #include "Rpc/JsonRpc.h"
-#include "Common/base64.hpp"
 #include "Common/JsonValue.h"
-#include "Common/StringTools.h"
 #include "Serialization/JsonInputValueSerializer.h"
 #include "Serialization/JsonOutputStreamSerializer.h"
 
 namespace CryptoNote {
 
-JsonRpcServer::JsonRpcServer(System::Dispatcher* sys, System::Event* stopEvent, Logging::ILogger& loggerGroup) :
-  m_dispatcher(sys),
+JsonRpcServer::JsonRpcServer(System::Dispatcher& sys, System::Event& stopEvent, Logging::ILogger& loggerGroup) :
+  HttpServer(sys, loggerGroup), 
+  system(sys),
   stopEvent(stopEvent),
-  logger(loggerGroup, "JsonRpcServer"),
-  m_enable_ssl(false)
+  logger(loggerGroup, "JsonRpcServer")
 {
 }
 
-JsonRpcServer::~JsonRpcServer() {
-  stop();
+void JsonRpcServer::start(const std::string& bindAddress, uint16_t bindPort, const std::string& m_rpcUser, const std::string& m_rpcPassword) {
+  HttpServer::start(bindAddress, bindPort, m_rpcUser, m_rpcPassword);
+  stopEvent.wait();
+  HttpServer::stop();
 }
 
-void JsonRpcServer::start(const std::string& bindAddress, uint16_t bindPort, uint16_t bindPortSSL) {
-  if (m_enable_ssl) {
-    m_workers.push_back(std::thread(std::bind(&JsonRpcServer::listen_ssl, this, bindAddress, bindPortSSL)));
-  }
-
-  m_workers.push_back(std::thread(std::bind(&JsonRpcServer::listen, this, bindAddress, bindPort)));
-}
-
-void JsonRpcServer::stop() {
-  if (m_enable_ssl) {
-    https->stop();
-  }
-
-  http->stop();
-
-  for (auto& th : m_workers) {
-    if (th.joinable()) {
-      th.join();
-    }
-  }
-
-  m_workers.clear();
-}
-
-void JsonRpcServer::init(const std::string& chain_file, const std::string& key_file, bool server_ssl_enable){
-  m_chain_file = chain_file;
-  m_key_file = key_file;
-  m_enable_ssl = server_ssl_enable;
-
-  http = new httplib::Server();
-
-  http->Post(".*", [this](const httplib::Request& req, httplib::Response& res) {
-    processRequest(req, res);
-  });
-
-  if (server_ssl_enable) {
-    https = new httplib::SSLServer(m_chain_file.c_str(), m_key_file.c_str());
-
-    https->Post(".*", [this](const httplib::Request& req, httplib::Response& res) {
-      processRequest(req, res);
-    });
-  }
-}
-
-void JsonRpcServer::setAuth(const std::string& user, const std::string& password) {
-  if (!user.empty() || !password.empty()) {
-    m_credentials = base64::encode(Common::asBinaryArray(user + ":" + password));
-  }
-}
-
-bool JsonRpcServer::authenticate(const httplib::Request& request) const {
-  if (!m_credentials.empty()) {
-    auto headerIt = request.headers.find("authorization");
-    if (headerIt == request.headers.end()) {
-      return false;
-    }
-
-    if (headerIt->second.substr(0, 6) != "Basic ") {
-      return false;
-    }
-
-    if (headerIt->second.substr(6) != m_credentials) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-void JsonRpcServer::listen(const std::string address, const uint16_t port) {
-  if (!http->listen(address.c_str(), port)) {
-    logger(Logging::WARNING) << "Could not bind service to " << address << ":" << port
-      << "\nIs another service using this address and port?\n";
-  }
-}
-
-void JsonRpcServer::listen_ssl(const std::string address, const uint16_t port) {
-  if (!https->listen(address.c_str(), port)) {
-    logger(Logging::WARNING) << "Could not bind service to " << address << ":" << port
-      << "\nIs another service using this address and port?\n";
-  }
-}
-
-void JsonRpcServer::processRequest(const httplib::Request& req, httplib::Response& resp) {
+void JsonRpcServer::processRequest(const CryptoNote::HttpRequest& req, CryptoNote::HttpResponse& resp) {
   try {
+    logger(Logging::TRACE) << "HTTP request came: \n" << req;
 
-    if (!authenticate(req)) {
-      logger(Logging::WARNING) << "Authorization required";
-      resp.status = 401;
-      resp.set_header("WWW-Authenticate", "Basic realm=\"RPC\"");
-      resp.set_content("Authorization required", "text/plain; charset=UTF-8");
-
-      return;
-    }
-
-    if (req.path == "/json_rpc") {
-      std::istringstream jsonInputStream(req.body);
+    if (req.getUrl() == "/json_rpc") {
+      std::istringstream jsonInputStream(req.getBody());
       Common::JsonValue jsonRpcRequest;
       Common::JsonValue jsonRpcResponse(Common::JsonValue::OBJECT);
 
       try {
         jsonInputStream >> jsonRpcRequest;
       } catch (std::runtime_error&) {
-        logger(Logging::DEBUGGING) << "Couldn't parse request: \"" << req.body << "\"";
+        logger(Logging::DEBUGGING) << "Couldn't parse request: \"" << req.getBody() << "\"";
         makeJsonParsingErrorResponse(jsonRpcResponse);
         
-        resp.set_header("Access-Control-Allow-Origin", "*");
-        resp.status = 200;
-        resp.set_content(jsonRpcResponse.toString(), "application/json");
+        resp.addHeader("Content-Type", "application/json");
+        resp.addHeader("Access-Control-Allow-Origin", "*");
+        resp.addHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+        resp.addHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
 
+        resp.setStatus(CryptoNote::HttpResponse::STATUS_200);
+        resp.setBody(jsonRpcResponse.toString());
         return;
       }
 
@@ -172,17 +83,17 @@ void JsonRpcServer::processRequest(const httplib::Request& req, httplib::Respons
       std::ostringstream jsonOutputStream;
       jsonOutputStream << jsonRpcResponse;
 
-      resp.status = 200;
-      resp.set_content(jsonOutputStream.str(), "application/json");
+      resp.setStatus(CryptoNote::HttpResponse::STATUS_200);
+      resp.setBody(jsonOutputStream.str());
 
     } else {
-      logger(Logging::WARNING) << "Requested url \"" << req.path << "\" is not found";
-      resp.status = 404;
+      logger(Logging::WARNING) << "Requested url \"" << req.getUrl() << "\" is not found";
+      resp.setStatus(CryptoNote::HttpResponse::STATUS_404);
       return;
     }
   } catch (std::exception& e) {
     logger(Logging::WARNING) << "Error while processing http request: " << e.what();
-    resp.status = 500;
+    resp.setStatus(CryptoNote::HttpResponse::STATUS_500);
   }
 }
 

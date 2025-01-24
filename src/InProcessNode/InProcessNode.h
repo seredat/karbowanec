@@ -99,9 +99,6 @@ public:
   virtual void isSynchronized(bool& syncStatus, const Callback& callback) override;
   virtual void getConnections(std::vector<p2pConnection>& connections, const Callback& callback) override;
 
-  virtual void setRootCert(const std::string &path) override;
-  virtual void disableVerify() override;
-
 private:
   virtual void peerCountUpdated(size_t count) override;
   virtual void lastKnownBlockHeightUpdated(uint32_t height) override;

@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
-// Copyright (c) 2016-2022, The Karbo developers
+// Copyright (c) 2016-2023, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -17,12 +17,13 @@
 // along with Karbo.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <boost/filesystem.hpp>
+#include <stdexcept>
 
 #include "RpcServerConfig.h"
+#include "Common/FormatTools.h"
 #include "Common/CommandLine.h"
 #include "CryptoNoteConfig.h"
 #include "CryptoNoteCore/CryptoNoteBasicImpl.h"
-#include "Common/FormatTools.h"
 #include "android.h"
 
 namespace CryptoNote {
@@ -31,16 +32,9 @@ namespace CryptoNote {
 
     const std::string DEFAULT_RPC_IP = "127.0.0.1";
     const uint16_t DEFAULT_RPC_PORT = RPC_DEFAULT_PORT;
-    const uint16_t DEFAULT_RPC_SSL_PORT = RPC_DEFAULT_SSL_PORT;
-    const std::string DEFAULT_RPC_CHAIN_FILE = std::string(RPC_DEFAULT_CHAIN_FILE);
-    const std::string DEFAULT_RPC_KEY_FILE = std::string(RPC_DEFAULT_KEY_FILE);
 
     const command_line::arg_descriptor<std::string> arg_rpc_bind_ip     = { "rpc-bind-ip", "", DEFAULT_RPC_IP };
     const command_line::arg_descriptor<uint16_t>    arg_rpc_bind_port   = { "rpc-bind-port", "", DEFAULT_RPC_PORT };
-    const command_line::arg_descriptor<bool> arg_rpc_bind_ssl_enable    = { "rpc-bind-ssl-enable", "Enable SSL for RPC service", false };
-    const command_line::arg_descriptor<uint16_t> arg_rpc_bind_ssl_port  = { "rpc-bind-ssl-port", "SSL port for RPC service", DEFAULT_RPC_SSL_PORT };
-    const command_line::arg_descriptor<std::string> arg_chain_file      = { "rpc-chain-file", "SSL chain file", DEFAULT_RPC_CHAIN_FILE };
-    const command_line::arg_descriptor<std::string> arg_key_file        = { "rpc-key-file", "SSL key file", DEFAULT_RPC_KEY_FILE };
     const command_line::arg_descriptor<bool>        arg_restricted_rpc  = { "restricted-rpc", "Restrict RPC to view only commands to prevent abuse", false };
     const command_line::arg_descriptor<std::string> arg_enable_cors     = { "enable-cors", "Adds header 'Access-Control-Allow-Origin' to the daemon's RPC responses. Uses the value as domain. Use * for all", "" };
     const command_line::arg_descriptor<std::string> arg_set_contact     = { "contact", "Sets node admin contact", "" };
@@ -55,25 +49,18 @@ namespace CryptoNote {
     bindIp(DEFAULT_RPC_IP),
     bindPort(DEFAULT_RPC_PORT),
     enableCors(""),
-    enableSSL(false),
     restrictedRPC(false),
     contactInfo(""),
     nodeFeeAddress(""),
     nodeFeeAmountStr(""),
-    nodeFeeViewKey(""),
-    bindPortSSL(RPC_DEFAULT_SSL_PORT)
+    nodeFeeViewKey("")
   {
   }
 
-  bool RpcServerConfig::isEnabledSSL() const { return enableSSL; }
   bool RpcServerConfig::isRestricted() const { return restrictedRPC; }
   uint16_t RpcServerConfig::getBindPort() const { return bindPort; }
-  uint16_t RpcServerConfig::getBindPortSSL() const { return bindPortSSL; }
   std::string RpcServerConfig::getBindIP() const { return bindIp; }
   std::string RpcServerConfig::getBindAddress() const { return bindIp + ":" + std::to_string(bindPort); }
-  std::string RpcServerConfig::getBindAddressSSL() const { return bindIp + ":" + std::to_string(bindPortSSL); }
-  std::string RpcServerConfig::getChainFile() const { return chainFile; }
-  std::string RpcServerConfig::getKeyFile() const { return keyFile; }
   std::string RpcServerConfig::getCors() const { return enableCors; }
   std::string RpcServerConfig::getNodeFeeAddress() const { return nodeFeeAddress; }
   uint64_t RpcServerConfig::getNodeFeeAmount() const { return nodeFeeAmount; }
@@ -83,10 +70,6 @@ namespace CryptoNote {
   void RpcServerConfig::initOptions(boost::program_options::options_description& desc) {
     command_line::add_arg(desc, arg_rpc_bind_ip);
     command_line::add_arg(desc, arg_rpc_bind_port);
-    command_line::add_arg(desc, arg_rpc_bind_ssl_enable);
-    command_line::add_arg(desc, arg_rpc_bind_ssl_port);
-    command_line::add_arg(desc, arg_chain_file);
-    command_line::add_arg(desc, arg_key_file);
     command_line::add_arg(desc, arg_restricted_rpc);
     command_line::add_arg(desc, arg_set_contact);
     command_line::add_arg(desc, arg_enable_cors);
@@ -142,39 +125,6 @@ namespace CryptoNote {
 
     if (command_line::has_arg(vm, arg_set_view_key)) {
       nodeFeeViewKey = command_line::get_arg(vm, arg_set_view_key);
-    }
-
-    if (command_line::has_arg(vm, arg_rpc_bind_ssl_enable)) {
-      enableSSL = command_line::get_arg(vm, arg_rpc_bind_ssl_enable);
-    }
-    if (command_line::has_arg(vm, arg_rpc_bind_ssl_port)) {
-      bindPortSSL = command_line::get_arg(vm, arg_rpc_bind_ssl_port);
-    }
-    if (command_line::has_arg(vm, arg_chain_file)) {
-      chainFile = command_line::get_arg(vm, arg_chain_file);
-    }
-    if (command_line::has_arg(vm, arg_key_file)) {
-    keyFile = command_line::get_arg(vm, arg_key_file);
-    }
-
-    boost::filesystem::path chain_file_path(chainFile);
-    boost::filesystem::path key_file_path(keyFile);
-
-    // default certs location, we need full path to pass to http(s) server
-    if (!chain_file_path.has_parent_path()) {
-      chain_file_path = m_data_dir / chain_file_path;
-      chainFile = chain_file_path.string();
-    }
-    if (!key_file_path.has_parent_path()) {
-      key_file_path = m_data_dir / key_file_path;
-      keyFile = key_file_path.string();
-    }
-
-    boost::system::error_code ec;
-    if (isEnabledSSL() && (!boost::filesystem::exists(chain_file_path, ec) ||
-      !boost::filesystem::exists(key_file_path, ec))) {
-      throw std::runtime_error("SSL certificate file(s) could not be found");
-      enableSSL = false;
     }
   }
 
