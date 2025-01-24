@@ -22,6 +22,7 @@
 #include <boost/range/combine.hpp>
 
 #include "Common/StringTools.h"
+#include "Common/FormatTools.h"
 #include "CryptoNoteCore/CryptoNoteFormatUtils.h"
 #include "CryptoNoteCore/CryptoNoteBasicImpl.h"
 #include "CryptoNoteCore/CryptoNoteTools.h"
@@ -150,10 +151,12 @@ bool BlockchainExplorerDataBuilder::fillBlockDetails(const Block &block, BlockDe
   size_t minerTxBlobSize = getObjectBinarySize(block.baseTransaction);
   blockDetails.blockSize = blokBlobSize + blockDetails.transactionsCumulativeSize - minerTxBlobSize;
 
-  if (!m_core.getAlreadyGeneratedCoins(hash, blockDetails.alreadyGeneratedCoins)) {
+  uint64_t alreadyGeneratedCoins = 0;
+  if (!m_core.getAlreadyGeneratedCoins(hash, alreadyGeneratedCoins)) {
     return false;
   }
-
+  blockDetails.alreadyGeneratedCoins = Common::Format::formatAmount(alreadyGeneratedCoins);
+ 
   if (!m_core.getGeneratedTransactionsNumber(blockDetails.height, blockDetails.alreadyGeneratedTransactions)) {
     return false;
   }

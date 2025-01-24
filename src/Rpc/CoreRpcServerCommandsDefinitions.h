@@ -403,7 +403,7 @@ struct COMMAND_RPC_GET_INFO {
     uint64_t start_time;
     uint8_t block_major_version;
     std::string already_generated_coins;
-    std::string contact;   
+    std::string contact;
 
     void serialize(ISerializer &s) {
       KV_MEMBER(status)
