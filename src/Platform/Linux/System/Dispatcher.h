@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
@@ -25,6 +26,9 @@
 #include <queue>
 #include <stack>
 #include <stdexcept>
+#include <mutex>
+#include <condition_variable>
+#include <memory>
 #ifndef __GLIBC__
 #include <bits/reg.h>
 #endif
@@ -44,24 +48,36 @@ struct NativeContext {
   NativeContext* groupNext;
   std::function<void()> procedure;
   std::function<void()> interruptProcedure;
+
+  NativeContext() = default;
+  ~NativeContext() = default;
 };
 
 struct NativeContextGroup {
-  NativeContext* firstContext;
-  NativeContext* lastContext;
-  NativeContext* firstWaiter;
-  NativeContext* lastWaiter;
+  NativeContext* firstContext{nullptr};
+  NativeContext* lastContext{nullptr};
+  NativeContext* firstWaiter{nullptr};
+  NativeContext* lastWaiter{nullptr};
+
+  NativeContextGroup() = default;
+  ~NativeContextGroup() = default;
 };
 
 struct OperationContext {
   NativeContext *context;
   bool interrupted;
   uint32_t events;
+
+  OperationContext() = default;
+  ~OperationContext() = default;
 };
 
 struct ContextPair {
-  OperationContext *readContext;
-  OperationContext *writeContext;
+  OperationContext *readContext{nullptr};
+  OperationContext *writeContext{nullptr};
+
+  ContextPair() = default;
+  ~ContextPair() = default;
 };
 
 class Dispatcher {
@@ -110,11 +126,15 @@ private:
 
   NativeContext mainContext;
   NativeContextGroup contextGroup;
-  NativeContext* currentContext;
-  NativeContext* firstResumingContext;
-  NativeContext* lastResumingContext;
-  NativeContext* firstReusableContext;
-  size_t runningContextCount;
+  NativeContext* currentContext{nullptr};
+  NativeContext* firstResumingContext{nullptr};
+  NativeContext* lastResumingContext{nullptr};
+  NativeContext* firstReusableContext{nullptr};
+  size_t runningContextCount{0};
+
+  std::mutex dispatcherMutex;
+  std::condition_variable_any remoteSpawnedCv;
+  std::atomic<bool> remoteSpawned;
 
   void contextProcedure(void* ucontext);
   static void contextProcedureStatic(void* context);
