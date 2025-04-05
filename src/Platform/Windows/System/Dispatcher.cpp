@@ -37,13 +37,10 @@ namespace System {
 
   Dispatcher::Dispatcher()
     : currentContext(nullptr),
-      firstResumingContext(nullptr),
-      lastResumingContext(nullptr),
-      firstReusableContext(nullptr),
-      runningContextCount(0) {
-    static_assert(sizeof(CRITICAL_SECTION) == sizeof(Dispatcher::criticalSection), "CRITICAL_SECTION size doesn't fit sizeof(Dispatcher::criticalSection)");
-    BOOL result = InitializeCriticalSectionAndSpinCount(reinterpret_cast<LPCRITICAL_SECTION>(criticalSection), 4000);
-    assert(result != FALSE);
+    firstResumingContext(nullptr),
+    lastResumingContext(nullptr),
+    firstReusableContext(nullptr),
+    runningContextCount(0) {
     std::string message;
     if (ConvertThreadToFiberEx(NULL, 0) == NULL) {
       message = "ConvertThreadToFiberEx failed, " + lastErrorMessage();
@@ -61,7 +58,7 @@ namespace System {
         }
         else {
           remoteNotificationSent = false;
-          reinterpret_cast<LPOVERLAPPED>(remoteSpawnOverlapped)->hEvent = NULL;
+          remoteSpawnOverlapped.hEvent = NULL;
           threadId = GetCurrentThreadId();
 
           mainContext.fiber = GetCurrentFiber();
@@ -81,15 +78,12 @@ namespace System {
           return;
         }
 
-        result = CloseHandle(completionPort);
-        assert(result == TRUE);
+        CloseHandle(completionPort);
       }
 
-      result = ConvertFiberToThread();
-      assert(result == TRUE);
+      ConvertFiberToThread();
     }
 
-    DeleteCriticalSection(reinterpret_cast<LPCRITICAL_SECTION>(criticalSection));
     throw std::runtime_error("Dispatcher::Dispatcher, " + message);
   }
 
@@ -110,13 +104,9 @@ namespace System {
       DeleteFiber(fiber);
     }
 
-    int wsaResult = WSACleanup();
-    assert(wsaResult == 0);
-    BOOL result = CloseHandle(completionPort);
-    assert(result == TRUE);
-    result = ConvertFiberToThread();
-    assert(result == TRUE);
-    DeleteCriticalSection(reinterpret_cast<LPCRITICAL_SECTION>(criticalSection));
+    WSACleanup();
+    CloseHandle(completionPort);
+    ConvertFiberToThread();
   }
 
   void Dispatcher::clear() {
@@ -166,8 +156,8 @@ namespace System {
       OVERLAPPED_ENTRY entry;
       ULONG actual = 0;
       if (GetQueuedCompletionStatusEx(completionPort, &entry, 1, &actual, timeout, TRUE) == TRUE) {
-        if (entry.lpOverlapped == reinterpret_cast<LPOVERLAPPED>(remoteSpawnOverlapped)) {
-          EnterCriticalSection(reinterpret_cast<LPCRITICAL_SECTION>(criticalSection));
+        if (entry.lpOverlapped == &remoteSpawnOverlapped) {
+          std::lock_guard<std::mutex> lock(dispatcherMutex);
           assert(remoteNotificationSent);
           assert(!remoteSpawningProcedures.empty());
           do {
@@ -176,7 +166,6 @@ namespace System {
           } while (!remoteSpawningProcedures.empty());
 
           remoteNotificationSent = false;
-          LeaveCriticalSection(reinterpret_cast<LPCRITICAL_SECTION>(criticalSection));
           continue;
         }
 
@@ -251,17 +240,14 @@ namespace System {
   }
 
   void Dispatcher::remoteSpawn(std::function<void()>&& procedure) {
-    EnterCriticalSection(reinterpret_cast<LPCRITICAL_SECTION>(criticalSection));
+    std::lock_guard<std::mutex> lock(dispatcherMutex);
     remoteSpawningProcedures.push(std::move(procedure));
     if (!remoteNotificationSent) {
       remoteNotificationSent = true;
-      if (PostQueuedCompletionStatus(completionPort, 0, 0, reinterpret_cast<LPOVERLAPPED>(remoteSpawnOverlapped)) == NULL) {
-        LeaveCriticalSection(reinterpret_cast<LPCRITICAL_SECTION>(criticalSection));
+      if (PostQueuedCompletionStatus(completionPort, 0, 0, &remoteSpawnOverlapped) == NULL) {
         throw std::runtime_error("Dispatcher::remoteSpawn, PostQueuedCompletionStatus failed, " + lastErrorMessage());
       };
     }
-
-    LeaveCriticalSection(reinterpret_cast<LPCRITICAL_SECTION>(criticalSection));
   }
 
   void Dispatcher::spawn(std::function<void()>&& procedure) {
@@ -305,8 +291,8 @@ namespace System {
       if (GetQueuedCompletionStatusEx(completionPort, entries, 16, &actual, 0, TRUE) == TRUE) {
         assert(actual > 0);
         for (ULONG i = 0; i < actual; ++i) {
-          if (entries[i].lpOverlapped == reinterpret_cast<LPOVERLAPPED>(remoteSpawnOverlapped)) {
-            EnterCriticalSection(reinterpret_cast<LPCRITICAL_SECTION>(criticalSection));
+          if (entries[i].lpOverlapped == &remoteSpawnOverlapped) {
+            std::lock_guard<std::mutex> lock(dispatcherMutex);
             assert(remoteNotificationSent);
             assert(!remoteSpawningProcedures.empty());
             do {
@@ -315,7 +301,6 @@ namespace System {
             } while (!remoteSpawningProcedures.empty());
 
             remoteNotificationSent = false;
-            LeaveCriticalSection(reinterpret_cast<LPCRITICAL_SECTION>(criticalSection));
             continue;
           }
 
@@ -342,6 +327,7 @@ namespace System {
   }
 
   void Dispatcher::addTimer(uint64_t time, NativeContext* context) {
+    std::lock_guard<std::mutex> lock(timersMutex);
     timers.insert(std::make_pair(time, context));
   }
 

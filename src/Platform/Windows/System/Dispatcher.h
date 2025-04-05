@@ -89,10 +89,10 @@ namespace System {
 
     HANDLE completionPort;
     std::map<HANDLE, NativeContext*> timerHandles;
-    uint8_t criticalSection[2 * sizeof(long) + 4 * sizeof(void*)];
+    std::mutex dispatcherMutex;
     bool remoteNotificationSent;
     std::queue<std::function<void()>> remoteSpawningProcedures;
-    uint8_t remoteSpawnOverlapped[4 * sizeof(void*)];
+    OVERLAPPED remoteSpawnOverlapped;
     uint32_t threadId;
 
     std::multimap<uint64_t, NativeContext*> timers;
