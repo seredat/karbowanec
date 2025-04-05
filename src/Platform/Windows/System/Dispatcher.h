@@ -18,77 +18,97 @@
 
 #pragma once
 
-#include <cstdint>
 #include <functional>
-#include <map>
 #include <queue>
+#include <mutex>
+#include <condition_variable>
+#include <atomic>
+#include <memory>
+#include <vector>
+#include <map>
+#include <chrono>
+
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+
+#include <windows.h>
+#undef ERROR
 
 namespace System {
 
-struct NativeContextGroup;
+  struct NativeContextGroup;
 
-struct NativeContext {
-  void* fiber{nullptr};
-  bool interrupted;
-  bool inExecutionQueue;
-  NativeContext* next{nullptr};
-  NativeContextGroup* group;
-  NativeContext* groupPrev;
-  NativeContext* groupNext;
-  std::function<void()> procedure;
-  std::function<void()> interruptProcedure;
-};
+  struct NativeContext {
+    void* fiber{ nullptr };
+    bool interrupted;
+    bool inExecutionQueue;
+    NativeContext* next{ nullptr };
+    NativeContextGroup* group;
+    NativeContext* groupPrev;
+    NativeContext* groupNext;
+    std::function<void()> procedure;
+    std::function<void()> interruptProcedure;
+  };
 
-struct NativeContextGroup {
-  NativeContext* firstContext;
-  NativeContext* lastContext;
-  NativeContext* firstWaiter;
-  NativeContext* lastWaiter;
-};
+  struct NativeContextGroup {
+    NativeContext* firstContext{ nullptr };
+    NativeContext* lastContext{ nullptr };
+    NativeContext* firstWaiter{ nullptr };
+    NativeContext* lastWaiter{ nullptr };
+  };
 
-class Dispatcher {
-public:
-  Dispatcher();
-  Dispatcher(const Dispatcher&) = delete;
-  ~Dispatcher();
-  Dispatcher& operator=(const Dispatcher&) = delete;
-  void clear();
-  void dispatch();
-  NativeContext* getCurrentContext() const;
-  void interrupt();
-  void interrupt(NativeContext* context);
-  bool interrupted();
-  void pushContext(NativeContext* context);
-  void remoteSpawn(std::function<void()>&& procedure);
-  void yield();
+  struct DispatcherContext : public OVERLAPPED {
+    NativeContext* context;
+  };
 
-  // Platform-specific
-  void addTimer(uint64_t time, NativeContext* context);
-  void* getCompletionPort() const;
-  NativeContext& getReusableContext();
-  void pushReusableContext(NativeContext&);
-  void interruptTimer(uint64_t time, NativeContext* context);
+  class Dispatcher {
+  public:
+    Dispatcher();
+    ~Dispatcher();
 
-private:
-  void spawn(std::function<void()>&& procedure);
-  void* completionPort;
-  uint8_t criticalSection[2 * sizeof(long) + 4 * sizeof(void*)];
-  bool remoteNotificationSent;
-  std::queue<std::function<void()>> remoteSpawningProcedures;
-  uint8_t remoteSpawnOverlapped[4 * sizeof(void*)];
-  uint32_t threadId;
-  std::multimap<uint64_t, NativeContext*> timers;
+    void clear();
+    void dispatch();
+    NativeContext* getCurrentContext() const;
+    void interrupt();
+    void interrupt(NativeContext* context);
+    bool interrupted();
+    void pushContext(NativeContext* context);
+    void remoteSpawn(std::function<void()>&& procedure);
+    void yield();
+    NativeContext& getReusableContext();
+    void pushReusableContext(NativeContext& context);
 
-  NativeContext mainContext;
-  NativeContextGroup contextGroup;
-  NativeContext* currentContext;
-  NativeContext* firstResumingContext;
-  NativeContext* lastResumingContext;
-  NativeContext* firstReusableContext;
-  size_t runningContextCount;
+    // Platform-specific
+    void addTimer(uint64_t time, NativeContext* context);
+    void interruptTimer(uint64_t time, NativeContext* context);
+    HANDLE getCompletionPort() const;
 
-  void contextProcedure();
-  static void __stdcall contextProcedureStatic(void* context);
-};
+  private:
+    void spawn(std::function<void()>&& procedure);
 
-}
+    HANDLE completionPort;
+    std::map<HANDLE, NativeContext*> timerHandles;
+    uint8_t criticalSection[2 * sizeof(long) + 4 * sizeof(void*)];
+    bool remoteNotificationSent;
+    std::queue<std::function<void()>> remoteSpawningProcedures;
+    uint8_t remoteSpawnOverlapped[4 * sizeof(void*)];
+    uint32_t threadId;
+
+    std::multimap<uint64_t, NativeContext*> timers;
+    std::mutex timersMutex;
+
+    // Context management variables
+    NativeContext mainContext;
+    NativeContextGroup contextGroup;
+    NativeContext* currentContext{ nullptr };
+    NativeContext* firstResumingContext{ nullptr };
+    NativeContext* lastResumingContext{ nullptr };
+    NativeContext* firstReusableContext{ nullptr };
+    size_t runningContextCount{ 0 };
+
+    void contextProcedure();
+    static void contextProcedureStatic(void* context);
+  };
+
+} // namespace System
