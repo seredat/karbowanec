@@ -470,7 +470,7 @@ void RpcServer::processRequest(const httplib::Request& request, httplib::Respons
             uint32_t height = static_cast<uint32_t>(std::stoul(hash_str));
             if (m_core.getCurrentBlockchainHeight() <= height) {
               throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_TOO_BIG_HEIGHT,
-                std::string("To big height: ") + std::to_string(height) +
+                std::string("Too big height: ") + std::to_string(height) +
                 ", current blockchain height = " + std::to_string(m_core.getCurrentBlockchainHeight() - 1) };
             }
             Crypto::Hash block_hash = m_core.getBlockIdByHeight(height);
@@ -1488,6 +1488,7 @@ bool RpcServer::on_get_explorer(const COMMAND_EXPLORER::request& req, COMMAND_EX
     " &bull; " + "Difficulty: <b>" + std::to_string(m_core.getNextBlockDifficulty()) + "</b>" +
     " &bull; " + "Alt. blocks: <b>" + std::to_string(m_core.getAlternativeBlocksCount()) + "</b>" +
     " &bull; " + "Transactions: <b>" + std::to_string(m_core.getBlockchainTotalTransactions() - top_block_index + 1) + "</b>" +
+    " &bull; " + "Emission: <b>" + m_core.currency().formatAmount(m_core.getTotalGeneratedAmount()) + "</b>" +
     " &bull; " + "Next reward: <b>" + m_core.currency().formatAmount(m_core.currency().calculateReward(m_core.getTotalGeneratedAmount())) + "</b>" +
     "</p>\n";
 
