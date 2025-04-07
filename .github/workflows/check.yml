@@ -13,7 +13,8 @@ jobs:
     name: Windows
     runs-on: windows-2019
     env:
-      BOOST_ROOT: C:\thirdparties\boost-1.72.0
+      BOOST_ROOT: C:\thirdparties\boost-1.83.0
+
     steps:
       - uses: actions/checkout@master
         with:
@@ -26,12 +27,16 @@ jobs:
       - name: Install OpenSSL
         run: choco install openssl
 
-      - name: Install Boost
-        shell: powershell
+      - name: Install curl
         run: |
-          $Url = "https://sourceforge.net/projects/boost/files/boost-binaries/1.72.0/boost_1_72_0-msvc-14.2-64.exe"
-          (New-Object System.Net.WebClient).DownloadFile($Url, "$env:TEMP\boost-installer.exe")
-          Start-Process -Wait -FilePath "$env:TEMP\boost-installer.exe" "/SILENT","/SP-","/SUPPRESSMSGBOXES","/DIR=$env:BOOST_ROOT"
+          choco install curl -y
+
+      - name: Download and Install Boost 1.83
+        run: |
+          $Url = "https://sourceforge.net/projects/boost/files/boost-binaries/1.83.0/boost_1_83_0-msvc-14.2-64.exe"
+          $OutputPath = "C:\\Users\\runneradmin\\AppData\\Local\\Temp\\boost-installer.exe"
+          curl -L $Url -o $OutputPath
+          Start-Process -Wait -FilePath $OutputPath "/SILENT","/SP-","/SUPPRESSMSGBOXES","/DIR=C:\\thirdparties\\boost-1.83.0"
 
       - name: Build
         shell: powershell
@@ -92,6 +97,7 @@ jobs:
           $krb_ver="${{ github.sha }}".SubString(0,7)
           $release_name="karbo-cli-win64-mingw-$krb_ver"
           echo "release_name=${release_name}" >> $env:GITHUB_OUTPUT
+
       - name: Build
         shell: msys2 {0}
         id: build
@@ -101,6 +107,7 @@ jobs:
           cd build
           cmake .. -DCMAKE_BUILD_TYPE=Release -DSTATIC=ON
           cmake --build . --config Release
+
       - name: Prepare release
         shell: msys2 {0}
         run: |
@@ -111,6 +118,7 @@ jobs:
           mv build/src/optimizer.exe build/karbo
           mv build/src/walletd.exe build/karbo
           mv build/src/vanitygen.exe build/karbo
+
       - name: Upload To GH Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -128,17 +136,28 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.ref }}
 
+      - name: Install boost
+        uses: MarkusJx/install-boost@v2
+        id: install-boost
+        with:
+          boost_version: 1.83.0
+          platform_version: 13
+          toolset: clang
+
       - name: Build
         id: build
         run: |
+          BOOST_ROOT=${{ steps.install-boost.outputs.BOOST_ROOT }}
+          Boost_INCLUDE_DIR=$BOOST_ROOT/include
+          Boost_LIBRARY_DIR=$BOOST_ROOT/lib
           build_folder="build/"
           krb_ver=${GITHUB_SHA::7}
           release_name="Karbo-cli-macOS-$krb_ver"
-          brew install --force openssl boost gcc
-          brew link openssl boost --force
+          brew install --force openssl gcc
+          brew link openssl --force
           mkdir "$build_folder"
           cd "$build_folder"
-          cmake -DCMAKE_C_FLAGS="-mmacosx-version-min=10.12" -DCMAKE_CXX_FLAGS="-mmacosx-version-min=10.12" -DOPENSSL_USE_STATIC_LIBS=ON ..
+          cmake -DCMAKE_C_FLAGS="-mmacosx-version-min=10.12" -DCMAKE_CXX_FLAGS="-mmacosx-version-min=10.12" -DOPENSSL_USE_STATIC_LIBS=ON -DBOOST_ROOT=$BOOST_ROOT -DBoost_INCLUDE_DIR=$Boost_INCLUDE_DIR -DBoost_LIBRARY_DIR=$Boost_LIBRARY_DIR -DBoost_NO_SYSTEM_PATHS=ON -DBoost_USE_STATIC_LIBS=ON -DBoost_LIBRARYDIR=$BOOST_LIBRARY_DIR -DBoost_COMPILER=-clang -DBoost_ARCHITECTURE=-x64 ..
           make
           mkdir "$release_name"
           exeFiles=()
@@ -153,6 +172,8 @@ jobs:
           echo "asset_path=${asset_path}" >> $GITHUB_OUTPUT
           echo "krb_ver=${krb_ver}" >> $GITHUB_OUTPUT
           echo "artifact_path=$build_folder/$release_name" >> $GITHUB_OUTPUT
+        env:
+          BOOST_ROOT: ${{ steps.install-boost.outputs.BOOST_ROOT }}
 
       - name: Upload To GH Artifacts
         uses: actions/upload-artifact@v4
@@ -163,8 +184,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-ubuntu22:
-    name: Ubuntu 22.04
-    runs-on: ubuntu-22.04
+    name: Ubuntu 24.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@master
         with:
@@ -177,7 +198,7 @@ jobs:
           sudo apt-get update && sudo apt-get install -y libboost-all-dev
           build_folder="build/release"
           krb_ver=${GITHUB_SHA::7}
-          release_name=Karbo-cli-ubuntu22.04-"$krb_ver"
+          release_name=Karbo-cli-ubuntu24.04-"$krb_ver"
           mkdir -p "$build_folder"
           cd "$build_folder"
           cmake -D ARCH=default -D CMAKE_BUILD_TYPE=Release -D CMAKE_POSITION_INDEPENDENT_CODE:BOOL=true -D BOOST_IGNORE_SYSTEM_PATHS_DEFAULT=ON -D BOOST_ROOT=/usr ../..
