@@ -159,7 +159,7 @@ struct BlockDetails {
   uint64_t baseReward = 0;
   uint64_t blockSize = 0;
   uint64_t transactionsCumulativeSize = 0;
-  uint64_t alreadyGeneratedCoins = 0;
+  std::string alreadyGeneratedCoins;
   uint64_t alreadyGeneratedTransactions = 0;
   uint64_t sizeMedian = 0;
   uint64_t effectiveSizeMedian = 0;
