@@ -1171,9 +1171,18 @@ uint64_t Blockchain::getCurrentCumulativeBlocksizeLimit() {
 }
 
 bool Blockchain::getHashingBlob(const uint32_t height, BinaryArray& blob) {
+  if (height > m_blobs.size()) {
+    logger(DEBUGGING) << "internal error in getHashingBlob: requested height " << height << " is bigger than blobs height" << m_blobs.size();
+    return false;
+  }
+
   blob = m_blobs[height];
 
   return true;
+}
+
+std::vector<BinaryArray> Blockchain::getHashingBlobs() {
+  return m_blobs;
 }
 
 bool Blockchain::checkProofOfWork(Crypto::cn_context& context, const Block& block, difficulty_type currentDiffic, Crypto::Hash& proofOfWork) {
