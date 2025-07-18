@@ -67,7 +67,7 @@ jobs:
 
   build-macos:
     name: macOS
-    if: false  # skip the job for now
+    #if: false  # skip the job for now
     runs-on: macos-13
     steps:
       - uses: actions/checkout@master
