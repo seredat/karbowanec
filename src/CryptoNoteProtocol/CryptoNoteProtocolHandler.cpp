@@ -39,6 +39,8 @@
 
 #include "crypto/random.h"
 
+#undef ERROR
+
 using namespace Logging;
 using namespace Common;
 
