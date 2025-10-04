@@ -1,9 +1,28 @@
+// Copyright (c) 2012-2017, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2016-2019, The Karbo developers
+//
+// This file is part of Karbo.
+//
+// Karbo is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Karbo is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with Karbo.  If not, see <http://www.gnu.org/licenses/>.
+
 #pragma once
 
 #include <cstdint>
 #include <functional>
 #include <map>
 #include <queue>
+#include <thread>
 #include <boost/asio.hpp>
 
 namespace System {
@@ -52,8 +71,7 @@ namespace System {
     void pushReusableContext(NativeContext&);
     void interruptTimer(uint64_t time, NativeContext* context);
 
-    // Boost.Asio integration
-    boost::asio::io_context& getIoContext() { return ioContext; }
+    boost::asio::io_context& getIoContext() { return m_ioContext; }
 
   private:
     void spawn(std::function<void()>&& procedure);
@@ -76,8 +94,12 @@ namespace System {
     void contextProcedure();
     static void __stdcall contextProcedureStatic(void* context);
 
-    // Boost.Asio
-    boost::asio::io_context ioContext;
+    boost::asio::io_context m_ioContext;
+    boost::asio::executor_work_guard<boost::asio::io_context::executor_type> m_workGuard;
+
+    size_t threadCount = std::thread::hardware_concurrency();
+    std::vector<std::thread> threadPool;
+
   };
 
-} // namespace System
+}
