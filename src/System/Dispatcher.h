@@ -5,40 +5,36 @@
 #include <map>
 #include <queue>
 #include <boost/asio.hpp>
-#include <boost/fiber/all.hpp>
-#include <mutex>
-#include <condition_variable>
 
 namespace System {
 
-  struct NativeContext;
-  struct NativeContextGroup {
-    NativeContext* firstContext{ nullptr };
-    NativeContext* lastContext{ nullptr };
-    NativeContext* firstWaiter{ nullptr };
-    NativeContext* lastWaiter{ nullptr };
-  };
+  struct NativeContextGroup;
 
   struct NativeContext {
-    boost::fibers::fiber fiber;
-    bool interrupted{ false };
-    bool inExecutionQueue{ false };
+    void* fiber{ nullptr };
+    bool interrupted;
+    bool inExecutionQueue;
     NativeContext* next{ nullptr };
-    NativeContextGroup* group{ nullptr };
-    NativeContext* groupPrev{ nullptr };
-    NativeContext* groupNext{ nullptr };
+    NativeContextGroup* group;
+    NativeContext* groupPrev;
+    NativeContext* groupNext;
     std::function<void()> procedure;
     std::function<void()> interruptProcedure;
+  };
+
+  struct NativeContextGroup {
+    NativeContext* firstContext;
+    NativeContext* lastContext;
+    NativeContext* firstWaiter;
+    NativeContext* lastWaiter;
   };
 
   class Dispatcher {
   public:
     Dispatcher();
-    ~Dispatcher();
-
     Dispatcher(const Dispatcher&) = delete;
+    ~Dispatcher();
     Dispatcher& operator=(const Dispatcher&) = delete;
-
     void clear();
     void dispatch();
     NativeContext* getCurrentContext() const;
@@ -49,34 +45,39 @@ namespace System {
     void remoteSpawn(std::function<void()>&& procedure);
     void yield();
 
-    // Timer support
-    void addTimer(uint64_t timeMs, NativeContext* context);
-    void interruptTimer(uint64_t timeMs, NativeContext* context);
-
+    // Platform-specific
+    void addTimer(uint64_t time, NativeContext* context);
+    void* getCompletionPort() const;
     NativeContext& getReusableContext();
     void pushReusableContext(NativeContext&);
+    void interruptTimer(uint64_t time, NativeContext* context);
 
+    // Boost.Asio integration
     boost::asio::io_context& getIoContext() { return ioContext; }
 
   private:
     void spawn(std::function<void()>&& procedure);
-    void contextProcedure(NativeContext* context);
-
-    boost::asio::io_context ioContext;
-    std::mutex mtx;
-    std::condition_variable cv;
-
+    void* completionPort;
+    uint8_t criticalSection[2 * sizeof(long) + 4 * sizeof(void*)];
+    bool remoteNotificationSent;
     std::queue<std::function<void()>> remoteSpawningProcedures;
+    uint8_t remoteSpawnOverlapped[4 * sizeof(void*)];
+    uint32_t threadId;
+    std::multimap<uint64_t, NativeContext*> timers;
+
     NativeContext mainContext;
     NativeContextGroup contextGroup;
-    NativeContext* currentContext{ nullptr };
-    NativeContext* firstResumingContext{ nullptr };
-    NativeContext* lastResumingContext{ nullptr };
-    NativeContext* firstReusableContext{ nullptr };
-    size_t runningContextCount{ 0 };
+    NativeContext* currentContext;
+    NativeContext* firstResumingContext;
+    NativeContext* lastResumingContext;
+    NativeContext* firstReusableContext;
+    size_t runningContextCount;
 
-    // timers: key = expire ms, value = context
-    std::multimap<uint64_t, NativeContext*> timers;
+    void contextProcedure();
+    static void __stdcall contextProcedureStatic(void* context);
+
+    // Boost.Asio
+    boost::asio::io_context ioContext;
   };
 
 } // namespace System

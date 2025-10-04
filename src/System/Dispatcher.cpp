@@ -1,81 +1,231 @@
 #include "Dispatcher.h"
+
 #include <cassert>
-#include <chrono>
+#include <stdexcept>
+#include <string>
+#include <algorithm>
+
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <winsock2.h>
+#include "ErrorMessage.h"
 
 namespace System {
 
+  namespace {
+
+    struct DispatcherContext : public OVERLAPPED {
+      NativeContext* context;
+    };
+
+    const size_t STACK_SIZE = 16384;
+    const size_t RESERVE_STACK_SIZE = 2097152;
+
+  }
+
   Dispatcher::Dispatcher() {
-    // Ensure mainContext is the current context
-    mainContext.interrupted = false;
-    mainContext.inExecutionQueue = false;
-    mainContext.group = &contextGroup;
-    mainContext.groupPrev = nullptr;
-    mainContext.groupNext = nullptr;
-    mainContext.procedure = nullptr;
-    mainContext.interruptProcedure = nullptr;
+    static_assert(sizeof(CRITICAL_SECTION) == sizeof(Dispatcher::criticalSection),
+      "CRITICAL_SECTION size doesn't fit sizeof(Dispatcher::criticalSection)");
 
-    contextGroup.firstContext = nullptr;
-    contextGroup.lastContext = nullptr;
-    contextGroup.firstWaiter = nullptr;
-    contextGroup.lastWaiter = nullptr;
+    BOOL result = InitializeCriticalSectionAndSpinCount(
+      reinterpret_cast<LPCRITICAL_SECTION>(criticalSection), 4000);
+    assert(result != FALSE);
 
-    currentContext = &mainContext;
+    std::string message;
+
+    if (ConvertThreadToFiberEx(NULL, 0) == NULL) {
+      message = "ConvertThreadToFiberEx failed, " + lastErrorMessage();
+    }
+    else {
+      completionPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
+      if (completionPort == NULL) {
+        message = "CreateIoCompletionPort failed, " + lastErrorMessage();
+      }
+      else {
+        WSADATA wsaData;
+        int wsaResult = WSAStartup(0x0202, &wsaData);
+        if (wsaResult != 0) {
+          message = "WSAStartup failed, " + errorMessage(wsaResult);
+        }
+        else {
+          remoteNotificationSent = false;
+          reinterpret_cast<LPOVERLAPPED>(remoteSpawnOverlapped)->hEvent = NULL;
+          threadId = GetCurrentThreadId();
+
+          // Initialize main context
+          mainContext.fiber = GetCurrentFiber();
+          mainContext.interrupted = false;
+          mainContext.group = &contextGroup;
+          mainContext.groupPrev = nullptr;
+          mainContext.groupNext = nullptr;
+          mainContext.inExecutionQueue = false;
+
+          // Initialize group
+          contextGroup.firstContext = nullptr;
+          contextGroup.lastContext = nullptr;
+          contextGroup.firstWaiter = nullptr;
+          contextGroup.lastWaiter = nullptr;
+
+          currentContext = &mainContext;
+          firstResumingContext = nullptr;
+          firstReusableContext = nullptr;
+          runningContextCount = 0;
+
+          // ioContext is default initialized
+          return;
+        }
+
+        result = CloseHandle(completionPort);
+        assert(result == TRUE);
+      }
+
+      result = ConvertFiberToThread();
+      assert(result == TRUE);
+    }
+
+    DeleteCriticalSection(reinterpret_cast<LPCRITICAL_SECTION>(criticalSection));
+    throw std::runtime_error("Dispatcher::Dispatcher, " + message);
   }
 
   Dispatcher::~Dispatcher() {
-    // interrupt all contexts, yield until cleared
-    std::unique_lock<std::mutex> lock(mtx);
-    for (NativeContext* ctx = contextGroup.firstContext; ctx != nullptr; ctx = ctx->groupNext) {
-      ctx->interrupted = true;
-      if (ctx->interruptProcedure) ctx->interruptProcedure();
-    }
-    lock.unlock();
+    assert(GetCurrentThreadId() == threadId);
 
-    // let remaining things finish
-    dispatch();
-
-    // cleanup fibers/contexts
-    if (firstReusableContext) {
-      // detach/Delete remaining fibers - use joinable checks
-      // boost::fibers::fiber::joinable not always meaningful for detached fibers, but we try to join if joinable.
-      NativeContext* it = firstReusableContext;
-      while (it) {
-        if (it->fiber.joinable()) {
-          try { it->fiber.join(); }
-          catch (...) {}
-        }
-        it = it->next;
-      }
+    for (NativeContext* context = contextGroup.firstContext;
+      context != nullptr; context = context->groupNext) {
+      interrupt(context);
     }
+
+    yield();
+
+    assert(timers.empty());
+    assert(contextGroup.firstContext == nullptr);
+    assert(contextGroup.firstWaiter == nullptr);
+    assert(firstResumingContext == nullptr);
+    assert(runningContextCount == 0);
+
+    while (firstReusableContext != nullptr) {
+      void* fiber = firstReusableContext->fiber;
+      firstReusableContext = firstReusableContext->next;
+      DeleteFiber(fiber);
+    }
+
+    int wsaResult = WSACleanup();
+    assert(wsaResult == 0);
+
+    BOOL result = CloseHandle(completionPort);
+    assert(result == TRUE);
+
+    result = ConvertFiberToThread();
+    assert(result == TRUE);
+
+    DeleteCriticalSection(reinterpret_cast<LPCRITICAL_SECTION>(criticalSection));
   }
 
   void Dispatcher::clear() {
-    std::unique_lock<std::mutex> lock(mtx);
-    while (!remoteSpawningProcedures.empty()) remoteSpawningProcedures.pop();
-    timers.clear();
-    // Do not delete fibers here; reuse pool kept manageable by user code
+    assert(GetCurrentThreadId() == threadId);
+    while (firstReusableContext != nullptr) {
+      void* fiber = firstReusableContext->fiber;
+      firstReusableContext = firstReusableContext->next;
+      DeleteFiber(fiber);
+    }
+  }
+
+  void Dispatcher::dispatch() {
+    assert(GetCurrentThreadId() == threadId);
+    NativeContext* context;
+
+    for (;;) {
+      if (firstResumingContext != nullptr) {
+        context = firstResumingContext;
+        firstResumingContext = context->next;
+        assert(context->inExecutionQueue);
+        context->inExecutionQueue = false;
+        break;
+      }
+
+      LARGE_INTEGER frequency, ticks;
+      QueryPerformanceCounter(&ticks);
+      QueryPerformanceFrequency(&frequency);
+      uint64_t currentTime = ticks.QuadPart / (frequency.QuadPart / 1000);
+
+      auto timerContextPair = timers.begin();
+      auto end = timers.end();
+      while (timerContextPair != end && timerContextPair->first <= currentTime) {
+        pushContext(timerContextPair->second);
+        timerContextPair = timers.erase(timerContextPair);
+      }
+
+      if (firstResumingContext != nullptr) {
+        context = firstResumingContext;
+        firstResumingContext = context->next;
+        assert(context->inExecutionQueue);
+        context->inExecutionQueue = false;
+        break;
+      }
+
+      DWORD timeout = timers.empty() ? INFINITE
+        : static_cast<DWORD>(std::min(
+          timers.begin()->first - currentTime,
+          static_cast<uint64_t>(INFINITE - 1)));
+
+      OVERLAPPED_ENTRY entry;
+      ULONG actual = 0;
+      if (GetQueuedCompletionStatusEx(completionPort, &entry, 1, &actual, timeout,
+        TRUE) == TRUE) {
+        if (entry.lpOverlapped == reinterpret_cast<LPOVERLAPPED>(remoteSpawnOverlapped)) {
+          EnterCriticalSection(reinterpret_cast<LPCRITICAL_SECTION>(criticalSection));
+          assert(remoteNotificationSent);
+          assert(!remoteSpawningProcedures.empty());
+          do {
+            spawn(std::move(remoteSpawningProcedures.front()));
+            remoteSpawningProcedures.pop();
+          } while (!remoteSpawningProcedures.empty());
+
+          remoteNotificationSent = false;
+          LeaveCriticalSection(reinterpret_cast<LPCRITICAL_SECTION>(criticalSection));
+          continue;
+        }
+
+        context = reinterpret_cast<DispatcherContext*>(entry.lpOverlapped)->context;
+        break;
+      }
+
+      DWORD lastError = GetLastError();
+      if (lastError == WAIT_TIMEOUT) {
+        continue;
+      }
+
+      if (lastError != WAIT_IO_COMPLETION) {
+        throw std::runtime_error(
+          "Dispatcher::dispatch, GetQueuedCompletionStatusEx failed, " +
+          errorMessage(lastError));
+      }
+    }
+
+    if (context != currentContext) {
+      currentContext = context;
+      SwitchToFiber(context->fiber);
+    }
   }
 
   NativeContext* Dispatcher::getCurrentContext() const {
+    assert(GetCurrentThreadId() == threadId);
     return currentContext;
   }
 
-  bool Dispatcher::interrupted() {
-    return currentContext && currentContext->interrupted;
-  }
-
-  void Dispatcher::interrupt() {
-    interrupt(currentContext);
-  }
+  void Dispatcher::interrupt() { interrupt(currentContext); }
 
   void Dispatcher::interrupt(NativeContext* context) {
-    if (!context) return;
+    assert(GetCurrentThreadId() == threadId);
+    assert(context != nullptr);
     if (!context->interrupted) {
-      if (context->interruptProcedure) {
-        // run interrupt procedure immediately (like original)
-        auto fn = context->interruptProcedure;
+      if (context->interruptProcedure != nullptr) {
+        context->interruptProcedure();
         context->interruptProcedure = nullptr;
-        fn();
       }
       else {
         context->interrupted = true;
@@ -83,239 +233,245 @@ namespace System {
     }
   }
 
+  bool Dispatcher::interrupted() {
+    if (currentContext->interrupted) {
+      currentContext->interrupted = false;
+      return true;
+    }
+    return false;
+  }
+
   void Dispatcher::pushContext(NativeContext* context) {
     assert(context != nullptr);
-    std::unique_lock<std::mutex> lock(mtx);
     if (context->inExecutionQueue) return;
+
     context->next = nullptr;
     context->inExecutionQueue = true;
-    if (firstResumingContext) {
+    if (firstResumingContext != nullptr) {
+      assert(lastResumingContext->next == nullptr);
       lastResumingContext->next = context;
     }
     else {
       firstResumingContext = context;
     }
     lastResumingContext = context;
-    // wake up dispatch loop if sleeping
-    cv.notify_one();
   }
 
   void Dispatcher::remoteSpawn(std::function<void()>&& procedure) {
-    std::unique_lock<std::mutex> lock(mtx);
+    EnterCriticalSection(reinterpret_cast<LPCRITICAL_SECTION>(criticalSection));
     remoteSpawningProcedures.push(std::move(procedure));
-    cv.notify_one();
+    if (!remoteNotificationSent) {
+      remoteNotificationSent = true;
+      if (PostQueuedCompletionStatus(completionPort, 0, 0,
+        reinterpret_cast<LPOVERLAPPED>(remoteSpawnOverlapped)) == NULL) {
+        LeaveCriticalSection(reinterpret_cast<LPCRITICAL_SECTION>(criticalSection));
+        throw std::runtime_error(
+          "Dispatcher::remoteSpawn, PostQueuedCompletionStatus failed, " +
+          lastErrorMessage());
+      }
+    }
+    LeaveCriticalSection(reinterpret_cast<LPCRITICAL_SECTION>(criticalSection));
+  }
+
+  void Dispatcher::spawn(std::function<void()>&& procedure) {
+    assert(GetCurrentThreadId() == threadId);
+
+    NativeContext* context = &getReusableContext();
+    if (contextGroup.firstContext != nullptr) {
+      context->groupPrev = contextGroup.lastContext;
+      assert(contextGroup.lastContext->groupNext == nullptr);
+      contextGroup.lastContext->groupNext = context;
+    }
+    else {
+      context->groupPrev = nullptr;
+      contextGroup.firstContext = context;
+      contextGroup.firstWaiter = nullptr;
+    }
+
+    context->interrupted = false;
+    context->group = &contextGroup;
+    context->groupNext = nullptr;
+    context->procedure = std::move(procedure);
+    contextGroup.lastContext = context;
+
+    pushContext(context);
   }
 
   void Dispatcher::yield() {
-    boost::this_fiber::yield();
-  }
+    assert(GetCurrentThreadId() == threadId);
 
-  NativeContext& Dispatcher::getReusableContext() {
-    std::unique_lock<std::mutex> lock(mtx);
-    if (firstReusableContext == nullptr) {
-      // create a new reusable NativeContext (fiber will be launched on demand)
-      firstReusableContext = new NativeContext();
-      firstReusableContext->interrupted = false;
-      firstReusableContext->inExecutionQueue = false;
-      firstReusableContext->next = nullptr;
-      firstReusableContext->group = nullptr;
-      firstReusableContext->groupPrev = nullptr;
-      firstReusableContext->groupNext = nullptr;
-      firstReusableContext->procedure = nullptr;
-      firstReusableContext->interruptProcedure = nullptr;
-    }
-    NativeContext* ctx = firstReusableContext;
-    firstReusableContext = ctx->next;
-    ctx->next = nullptr;
-    return *ctx;
-  }
-
-  void Dispatcher::pushReusableContext(NativeContext& ctx) {
-    std::unique_lock<std::mutex> lock(mtx);
-    ctx.next = firstReusableContext;
-    firstReusableContext = &ctx;
-    if (runningContextCount > 0) --runningContextCount;
-  }
-
-  // spawn: create a new context and push into execution queue
-  void Dispatcher::spawn(std::function<void()>&& procedure) {
-    NativeContext& ctx = getReusableContext();
-    ctx.procedure = std::move(procedure);
-    ctx.interrupted = false;
-    ctx.inExecutionQueue = false;
-    ctx.group = &contextGroup;
-    ctx.groupPrev = nullptr;
-    ctx.groupNext = nullptr;
-
-    // create a fiber that runs the contextProcedure for this NativeContext
-    ctx.fiber = boost::fibers::fiber([this, &ctx]() {
-      contextProcedure(&ctx);
-      });
-    ctx.fiber.detach();
-
-    pushContext(&ctx);
-  }
-
-  void Dispatcher::contextProcedure(NativeContext* ctx) {
-    // This function executes inside a fiber
     for (;;) {
-      ++runningContextCount;
-      try {
-        if (ctx->procedure) ctx->procedure();
-      }
-      catch (...) {
-        // swallow exceptions to mimic original
+      LARGE_INTEGER frequency, ticks;
+      QueryPerformanceCounter(&ticks);
+      QueryPerformanceFrequency(&frequency);
+      uint64_t currentTime = ticks.QuadPart / (frequency.QuadPart / 1000);
+
+      auto timerContextPair = timers.begin();
+      auto end = timers.end();
+      while (timerContextPair != end && timerContextPair->first <= currentTime) {
+        timerContextPair->second->interruptProcedure = nullptr;
+        pushContext(timerContextPair->second);
+        timerContextPair = timers.erase(timerContextPair);
       }
 
-      // When a context's procedure is done, remove it from its group and reschedule waiters if any
-      if (ctx->group != nullptr) {
-        if (ctx->groupPrev != nullptr) {
-          // unlink from middle
-          ctx->groupPrev->groupNext = ctx->groupNext;
-          if (ctx->groupNext != nullptr) {
-            ctx->groupNext->groupPrev = ctx->groupPrev;
+      OVERLAPPED_ENTRY entries[16];
+      ULONG actual = 0;
+      if (GetQueuedCompletionStatusEx(completionPort, entries, 16, &actual, 0, TRUE) == TRUE) {
+        assert(actual > 0);
+        for (ULONG i = 0; i < actual; ++i) {
+          if (entries[i].lpOverlapped ==
+            reinterpret_cast<LPOVERLAPPED>(remoteSpawnOverlapped)) {
+            EnterCriticalSection(reinterpret_cast<LPCRITICAL_SECTION>(criticalSection));
+            assert(remoteNotificationSent);
+            assert(!remoteSpawningProcedures.empty());
+            do {
+              spawn(std::move(remoteSpawningProcedures.front()));
+              remoteSpawningProcedures.pop();
+            } while (!remoteSpawningProcedures.empty());
+            remoteNotificationSent = false;
+            LeaveCriticalSection(reinterpret_cast<LPCRITICAL_SECTION>(criticalSection));
+            continue;
           }
-          else {
-            ctx->group->lastContext = ctx->groupPrev;
-          }
+
+          NativeContext* context = reinterpret_cast<DispatcherContext*>(entries[i].lpOverlapped)->context;
+          context->interruptProcedure = nullptr;
+          pushContext(context);
         }
-        else {
-          // first in group
-          ctx->group->firstContext = ctx->groupNext;
-          if (ctx->groupNext != nullptr) {
-            ctx->groupNext->groupPrev = nullptr;
-          }
-          else {
-            // group empty; wake up waiters
-            if (ctx->group->firstWaiter != nullptr) {
-              if (firstResumingContext != nullptr) {
-                lastResumingContext->next = ctx->group->firstWaiter;
-              }
-              else {
-                firstResumingContext = ctx->group->firstWaiter;
-              }
-              lastResumingContext = ctx->group->lastWaiter;
-              ctx->group->firstWaiter = nullptr;
-              ctx->group->lastWaiter = nullptr;
-            }
-          }
-        }
-        // push back to reusable pool
-        pushReusableContext(*ctx);
       }
       else {
-        // no group (shouldn't normally happen for spawned contexts), but still reuse
-        pushReusableContext(*ctx);
+        DWORD lastError = GetLastError();
+        if (lastError == WAIT_TIMEOUT) {
+          break;
+        }
+        else if (lastError != WAIT_IO_COMPLETION) {
+          throw std::runtime_error(
+            "Dispatcher::yield, GetQueuedCompletionStatusEx failed, " +
+            errorMessage(lastError));
+        }
       }
+    }
 
-      // yield and let dispatch pick next
-      boost::this_fiber::yield();
+    if (firstResumingContext != nullptr) {
+      pushContext(currentContext);
+      dispatch();
     }
   }
 
-  void Dispatcher::dispatch() {
-    std::unique_lock<std::mutex> lock(mtx);
+  // --- Timer and reusable context handling ---
+  void Dispatcher::addTimer(uint64_t time, NativeContext* context) {
+    assert(GetCurrentThreadId() == threadId);
+    timers.insert(std::make_pair(time, context));
+  }
 
-    for (;;) {
-      // 1) Handle remote spawns
-      while (!remoteSpawningProcedures.empty()) {
-        auto proc = std::move(remoteSpawningProcedures.front());
-        remoteSpawningProcedures.pop();
-        // spawn will create context & fiber and push context
-        lock.unlock();
-        spawn(std::move(proc));
-        lock.lock();
+  void* Dispatcher::getCompletionPort() const { return completionPort; }
+
+  NativeContext& Dispatcher::getReusableContext() {
+    if (firstReusableContext == nullptr) {
+      void* fiber = CreateFiberEx(STACK_SIZE, RESERVE_STACK_SIZE, 0, contextProcedureStatic, this);
+      if (fiber == NULL) {
+        throw std::runtime_error("Dispatcher::getReusableContext, CreateFiberEx failed, " + lastErrorMessage());
       }
 
-      // 2) run ready contexts (one by one)
-      if (firstResumingContext) {
-        NativeContext* ctx = firstResumingContext;
-        firstResumingContext = ctx->next;
-        if (!firstResumingContext) lastResumingContext = nullptr;
-
-        currentContext = ctx;
-        ctx->next = nullptr;
-        ctx->inExecutionQueue = false;
-
-        // If fiber is not started, create it; else, resume it by joining it
-        if (!ctx->fiber.joinable()) {
-          // fiber was detached on spawn; to run it we must create a new fiber to call the procedure.
-          // Create a temporary fiber that runs contextProcedure and join it.
-          // Note: to avoid complex reentrancy, we spawn a temporary fiber and join it outside lock.
-          lock.unlock();
-          boost::fibers::fiber f([this, ctx] { contextProcedure(ctx); });
-          f.join(); // runs until it yields or completes
-          lock.lock();
-        }
-        else {
-          // The fiber exists - resume by unlocking and letting scheduler run it.
-          lock.unlock();
-          try {
-            // join the fiber if joinable; otherwise yield
-            if (ctx->fiber.joinable()) ctx->fiber.join();
-            else boost::this_fiber::yield();
-          }
-          catch (...) {
-            // swallow
-          }
-          lock.lock();
-        }
-        // after a context run, break to let caller continue (mimic original which ran one context)
-        return;
-      }
-
-      // 3) process expired timers
-      if (!timers.empty()) {
-        uint64_t nowMs = static_cast<uint64_t>(
-          std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now().time_since_epoch()
-          ).count()
-          );
-
-        auto it = timers.begin();
-        while (it != timers.end() && it->first <= nowMs) {
-          NativeContext* ctx = it->second;
-          it = timers.erase(it);
-          pushContext(ctx);
-        }
-        if (firstResumingContext) continue; // loop to run contexts
-      }
-
-      // 4) Poll io_context to run async completion handlers (non-blocking)
-      lock.unlock();
-      try {
-        ioContext.poll();
-      }
-      catch (...) {
-        // swallow any asio exceptions
-      }
-      // yield so other fibers may run
-      boost::this_fiber::yield();
-      lock.lock();
-
-      // 5) nothing to run -> wait briefly
-      if (!firstResumingContext && remoteSpawningProcedures.empty() && timers.empty()) {
-        cv.wait_for(lock, std::chrono::milliseconds(1));
-        // after wake, loop and recheck
-      }
+      SwitchToFiber(fiber);
+      assert(firstReusableContext != nullptr);
+      firstReusableContext->fiber = fiber;
     }
+
+    NativeContext* context = firstReusableContext;
+    firstReusableContext = context->next;
+    return *context;
   }
 
-  void Dispatcher::addTimer(uint64_t timeMs, NativeContext* context) {
-    std::unique_lock<std::mutex> lock(mtx);
-    timers.emplace(timeMs, context);
-    cv.notify_one();
+  void Dispatcher::pushReusableContext(NativeContext& context) {
+    context.next = firstReusableContext;
+    firstReusableContext = &context;
+    --runningContextCount;
   }
 
-  void Dispatcher::interruptTimer(uint64_t timeMs, NativeContext* context) {
-    std::unique_lock<std::mutex> lock(mtx);
-    auto range = timers.equal_range(timeMs);
-    for (auto it = range.first; it != range.second; ++it) {
+  void Dispatcher::interruptTimer(uint64_t time, NativeContext* context) {
+    assert(GetCurrentThreadId() == threadId);
+
+    if (context->inExecutionQueue) {
+      return;
+    }
+
+    auto range = timers.equal_range(time);
+    for (auto it = range.first;; ++it) {
+      assert(it != range.second);
       if (it->second == context) {
+        pushContext(context);
         timers.erase(it);
         break;
       }
     }
+  }
+
+  // --- Context procedure ---
+  void Dispatcher::contextProcedure() {
+    assert(GetCurrentThreadId() == threadId);
+    assert(firstReusableContext == nullptr);
+
+    NativeContext context;
+    context.interrupted = false;
+    context.next = nullptr;
+    context.inExecutionQueue = false;
+    firstReusableContext = &context;
+
+    SwitchToFiber(currentContext->fiber);
+
+    for (;;) {
+      ++runningContextCount;
+      try {
+        context.procedure();
+      }
+      catch (...) {
+      }
+
+      if (context.group != nullptr) {
+        if (context.groupPrev != nullptr) {
+          assert(context.groupPrev->groupNext == &context);
+          context.groupPrev->groupNext = context.groupNext;
+          if (context.groupNext != nullptr) {
+            assert(context.groupNext->groupPrev == &context);
+            context.groupNext->groupPrev = context.groupPrev;
+          }
+          else {
+            assert(context.group->lastContext == &context);
+            context.group->lastContext = context.groupPrev;
+          }
+        }
+        else {
+          assert(context.group->firstContext == &context);
+          context.group->firstContext = context.groupNext;
+          if (context.groupNext != nullptr) {
+            assert(context.groupNext->groupPrev == &context);
+            context.groupNext->groupPrev = nullptr;
+          }
+          else {
+            assert(context.group->lastContext == &context);
+            if (context.group->firstWaiter != nullptr) {
+              if (firstResumingContext != nullptr) {
+                assert(lastResumingContext->next == nullptr);
+                lastResumingContext->next = context.group->firstWaiter;
+              }
+              else {
+                firstResumingContext = context.group->firstWaiter;
+              }
+              lastResumingContext = context.group->lastWaiter;
+              context.group->firstWaiter = nullptr;
+            }
+          }
+        }
+
+        pushReusableContext(context);
+      }
+
+      dispatch();
+    }
+  }
+
+  void __stdcall Dispatcher::contextProcedureStatic(void* context) {
+    static_cast<Dispatcher*>(context)->contextProcedure();
   }
 
 } // namespace System
