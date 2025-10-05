@@ -1,9 +1,16 @@
 ﻿#include "Dispatcher.h"
+
 #include <cassert>
 #include <chrono>
 #include <stdexcept>
+#include <utility>
+
+#include <boost/asio.hpp>
+#include <boost/coroutine/symmetric_coroutine.hpp>
 
 namespace System {
+
+  using coro_t = boost::coroutines::symmetric_coroutine<void>;
 
   Dispatcher::Dispatcher()
     : ioContext(),
@@ -12,7 +19,7 @@ namespace System {
     lastResumingContext(nullptr),
     firstReusableContext(nullptr),
     runningContextCount(0) {
-    // Init main context
+    // Initialize main context (replicates the structure from platform impls)
     mainContext.coro = nullptr;
     mainContext.yield = nullptr;
     mainContext.interrupted = false;
@@ -20,6 +27,9 @@ namespace System {
     mainContext.group = &contextGroup;
     mainContext.groupPrev = nullptr;
     mainContext.groupNext = nullptr;
+    mainContext.next = nullptr;
+    mainContext.procedure = nullptr;
+    mainContext.interruptProcedure = nullptr;
 
     contextGroup.firstContext = nullptr;
     contextGroup.lastContext = nullptr;
@@ -28,35 +38,27 @@ namespace System {
   }
 
   Dispatcher::~Dispatcher() {
-    // Interrupt all live contexts
+    // Interrupt all contexts that are still registered in the group
     for (NativeContext* ctx = contextGroup.firstContext; ctx != nullptr; ctx = ctx->groupNext) {
       interrupt(ctx);
     }
 
-    // Let them drain
+    // Give them a chance to run their interrupt handlers and exit
     yield();
 
-    assert(contextGroup.firstContext == nullptr);
-    assert(firstResumingContext == nullptr);
-    assert(runningContextCount == 0);
-
-    // Delete all reusable coroutines
-    while (firstReusableContext != nullptr) {
-      auto* pcoro = firstReusableContext->coro;
-      firstReusableContext->coro = nullptr;
-      firstReusableContext->yield = nullptr;
-      firstReusableContext = firstReusableContext->next;
-      delete pcoro;
-    }
-
-    // Drain any leftover posted asio tasks
+    // Drain any remaining asio work safely (no work_guard)
     for (;;) {
       std::size_t ran = ioContext.poll();
       if (ran == 0) break;
     }
-  }
 
-  void Dispatcher::clear() {
+    // Invariants as per original implementations
+    assert(contextGroup.firstContext == nullptr);
+    assert(contextGroup.firstWaiter == nullptr);
+    assert(firstResumingContext == nullptr);
+    assert(runningContextCount == 0);
+
+    // Free all reusable coroutine objects
     while (firstReusableContext != nullptr) {
       auto* pcoro = firstReusableContext->coro;
       firstReusableContext->coro = nullptr;
@@ -64,68 +66,100 @@ namespace System {
       firstReusableContext = firstReusableContext->next;
       delete pcoro;
     }
+  }
+
+  void Dispatcher::clear() {
+    // Free all reusable coroutine objects
+    while (firstReusableContext != nullptr) {
+      auto* pcoro = firstReusableContext->coro;
+      firstReusableContext->coro = nullptr;
+      firstReusableContext->yield = nullptr;
+      firstReusableContext = firstReusableContext->next;
+      delete pcoro;
+    }
+
+    // No persistent OS timers to close (we use a multimap of deadlines)
     timers.clear();
   }
 
   static inline uint64_t now_ms() {
+    using namespace std::chrono;
     return static_cast<uint64_t>(
-      std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now().time_since_epoch()).count());
+      duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count());
   }
 
   void Dispatcher::dispatch() {
+    // Try to pop a ready context
     NativeContext* context = nullptr;
 
-    // 1) Release expired timers → push waiting contexts
-    const uint64_t now = now_ms();
-    auto it = timers.begin();
-    while (it != timers.end() && it->first <= now) {
-      it->second->interruptProcedure = nullptr; // parity with originals
-      pushContext(it->second);
-      it = timers.erase(it);
-    }
-
-    // 2) If we already have something to run, pop it
-    if (firstResumingContext) {
+    // 1) If something is already queued to resume, pop it
+    if (firstResumingContext != nullptr) {
       context = firstResumingContext;
       firstResumingContext = context->next;
-      if (!firstResumingContext) lastResumingContext = nullptr;
-
-      assert(context->inExecutionQueue);
+      if (firstResumingContext == nullptr) {
+        lastResumingContext = nullptr;
+      }
+      // Mirror original behavior: clear flags on dequeue
       context->inExecutionQueue = false;
+      context->interruptProcedure = nullptr;
     }
     else {
-      // 3) Otherwise, process one round of IO
+      // 2) Wake timers that have expired
+      const uint64_t now = now_ms();
+      for (auto it = timers.begin(); it != timers.end();) {
+        if (it->first <= now) {
+          pushContext(it->second);
+          it = timers.erase(it);
+        }
+        else {
+          break; // multimap is ordered
+        }
+      }
+
+      // 3) Run one asio handler (if any) – may enqueue contexts
       try {
-        ioContext.poll();
+        ioContext.poll_one();
       }
       catch (...) {
-        // swallow
+        // keep scheduler alive
       }
 
-      if (!firstResumingContext) return;
-
-      context = firstResumingContext;
-      firstResumingContext = context->next;
-      if (!firstResumingContext) lastResumingContext = nullptr;
-
-      assert(context->inExecutionQueue);
-      context->inExecutionQueue = false;
+      // 4) Try again to pop a ready context
+      if (firstResumingContext != nullptr) {
+        context = firstResumingContext;
+        firstResumingContext = context->next;
+        if (firstResumingContext == nullptr) {
+          lastResumingContext = nullptr;
+        }
+        context->inExecutionQueue = false;
+        context->interruptProcedure = nullptr;
+      }
+      else {
+        // Nothing to do right now; match the non-blocking behavior path
+        return;
+      }
     }
 
-    // 4) Context switch (coroutine swap)
+    // Switch to the picked context if it isn't the current one
     if (context != currentContext) {
-      auto* pyield = currentContext->yield;
+      auto* prevYield = currentContext->yield; // current context's yield handle
       currentContext = context;
 
-      if (pyield != nullptr) {
-        if (context->coro != nullptr)
-          (*pyield)(*context->coro);
-        else
-          (*pyield)();
+      if (prevYield != nullptr) {
+        if (context->coro != nullptr) {
+          // Switch into the target coroutine
+          (*prevYield)(*context->coro);
+        }
+        else {
+          // Target is main or not fully initialized: yield without target
+          (*prevYield)();
+        }
       }
-      else if (context->coro) {
-        (*context->coro)();
+      else {
+        // From main into a coroutine the first time
+        if (context->coro) {
+          (*context->coro)();
+        }
       }
     }
   }
@@ -141,7 +175,8 @@ namespace System {
   void Dispatcher::interrupt(NativeContext* context) {
     assert(context != nullptr);
     if (!context->interrupted) {
-      if (context->interruptProcedure) {
+      if (context->interruptProcedure != nullptr) {
+        // Run the registered cancellation/cleanup
         context->interruptProcedure();
         context->interruptProcedure = nullptr;
       }
@@ -162,11 +197,15 @@ namespace System {
   void Dispatcher::pushContext(NativeContext* context) {
     assert(context != nullptr);
 
-    if (context->inExecutionQueue) return;
+    // Prevent double-enqueue
+    if (context->inExecutionQueue) {
+      return;
+    }
 
     context->next = nullptr;
     context->inExecutionQueue = true;
-    if (firstResumingContext) {
+
+    if (firstResumingContext != nullptr) {
       assert(lastResumingContext->next == nullptr);
       lastResumingContext->next = context;
     }
@@ -177,16 +216,16 @@ namespace System {
   }
 
   void Dispatcher::remoteSpawn(std::function<void()>&& procedure) {
-    // Thread-safe: post to io_context so the spawn happens on the dispatcher thread
-    auto f = std::make_shared<std::function<void()>>(std::move(procedure));
-    ioContext.post([this, f]() mutable {
-      this->spawn(std::move(*f));
+    // Post to asio to ensure spawn runs on the dispatcher's thread
+    ioContext.post([this, p = std::move(procedure)]() mutable {
+      this->spawn(std::move(p));
       });
   }
 
   void Dispatcher::spawn(std::function<void()>&& procedure) {
     NativeContext& context = getReusableContext();
 
+    // Insert into the active context group
     if (contextGroup.firstContext != nullptr) {
       context.groupPrev = contextGroup.lastContext;
       assert(contextGroup.lastContext->groupNext == nullptr);
@@ -195,19 +234,34 @@ namespace System {
     else {
       context.groupPrev = nullptr;
       contextGroup.firstContext = &context;
-      contextGroup.firstWaiter = nullptr; // parity with originals
+      contextGroup.firstWaiter = nullptr;
     }
 
     context.interrupted = false;
     context.group = &contextGroup;
     context.groupNext = nullptr;
     context.procedure = std::move(procedure);
+    context.inExecutionQueue = false;
+    context.interruptProcedure = nullptr;
+
     contextGroup.lastContext = &context;
     pushContext(&context);
   }
 
   void Dispatcher::yield() {
-    // Process whatever is ready
+    // Expire timers and process all ready asio handlers (non-blocking)
+    const uint64_t now = now_ms();
+    for (auto it = timers.begin(); it != timers.end();) {
+      if (it->first <= now) {
+        it->second->interruptProcedure = nullptr;
+        pushContext(it->second);
+        it = timers.erase(it);
+      }
+      else {
+        break;
+      }
+    }
+
     try {
       ioContext.poll();
     }
@@ -215,21 +269,46 @@ namespace System {
       // swallow
     }
 
-    if (firstResumingContext) {
+    if (firstResumingContext != nullptr) {
+      // Yield the current fiber and let the scheduler pick next
       pushContext(currentContext);
       dispatch();
     }
   }
 
+  void Dispatcher::addTimer(uint64_t timeMs, NativeContext* context) {
+    timers.emplace(timeMs, context);
+  }
+
+  void Dispatcher::interruptTimer(uint64_t timeMs, NativeContext* context) {
+    // If already scheduled to run, nothing to do
+    if (context->inExecutionQueue) {
+      return;
+    }
+    auto range = timers.equal_range(timeMs);
+    for (auto it = range.first; it != range.second; ++it) {
+      if (it->second == context) {
+        // Wake it immediately and erase the timer
+        pushContext(context);
+        timers.erase(it);
+        break;
+      }
+    }
+  }
+
   NativeContext& Dispatcher::getReusableContext() {
-    if (!firstReusableContext) {
-      auto* pCoro = new coro_t::call_type([&, this](coro_t::yield_type& yield) {
+    if (firstReusableContext == nullptr) {
+      // Create a coroutine whose first action is to publish a NativeContext
+      // that lives on the coroutine's own stack, then yield back here.
+      auto* pCoro = new coro_t::call_type([this](coro_t::yield_type& yield) {
         this->contextProcedure(yield);
         });
-      // Prime coroutine: it will set firstReusableContext to its local NativeContext
+
+      // Run until the coroutine yields after publishing its NativeContext
       (*pCoro)();
+
       assert(firstReusableContext != nullptr);
-      // Attach coroutine handle to the primed reusable context
+      // Associate the coroutine object with the published NativeContext
       firstReusableContext->coro = pCoro;
     }
 
@@ -244,44 +323,37 @@ namespace System {
     --runningContextCount;
   }
 
-  void Dispatcher::addTimer(uint64_t time, NativeContext* context) {
-    timers.insert({ time, context });
-  }
-
-  void Dispatcher::interruptTimer(uint64_t time, NativeContext* context) {
-    auto range = timers.equal_range(time);
-    for (auto it = range.first; it != range.second; ++it) {
-      if (it->second == context) {
-        pushContext(context);
-        timers.erase(it);
-        break;
-      }
-    }
-  }
-
   void Dispatcher::contextProcedure(coro_t::yield_type& yield) {
-    // Create the reusable context object that lives with this coroutine
-    NativeContext context;
+    // This NativeContext lives on the coroutine's own stack; safe for its lifetime
+    NativeContext context{};
+    context.coro = nullptr;                 // set by getReusableContext() after first yield
     context.yield = &yield;
-    context.coro = nullptr; // set by getReusableContext() after priming
-    context.inExecutionQueue = false;
     context.interrupted = false;
+    context.inExecutionQueue = false;
     context.next = nullptr;
+    context.group = nullptr;
+    context.groupPrev = nullptr;
+    context.groupNext = nullptr;
+    context.procedure = nullptr;
+    context.interruptProcedure = nullptr;
 
-    // Make this context available to getReusableContext()
+    // Publish into the free list and yield back to creator
+    assert(firstReusableContext == nullptr);
     firstReusableContext = &context;
-
-    // Return to the creator (priming step)
     yield();
 
     for (;;) {
       ++runningContextCount;
       try {
-        context.procedure();
+        if (context.procedure) {
+          context.procedure();
+        }
       }
-      catch (...) {}
+      catch (...) {
+        // keep scheduler alive
+      }
 
-      // Remove from its group and possibly wake waiters (match original semantics)
+      // Remove from its context group, mirroring originals
       if (context.group != nullptr) {
         if (context.groupPrev != nullptr) {
           assert(context.groupPrev->groupNext == &context);
@@ -303,7 +375,7 @@ namespace System {
             context.groupNext->groupPrev = nullptr;
           }
           else {
-            // Was last in group; if group has waiters, queue them
+            // No more contexts in this group; wake waiters if any
             assert(context.group->lastContext == &context);
             if (context.group->firstWaiter != nullptr) {
               if (firstResumingContext != nullptr) {
@@ -318,10 +390,11 @@ namespace System {
             }
           }
         }
+
         pushReusableContext(context);
       }
 
-      // Hand control back to dispatcher to pick the next runnable
+      // Continue scheduling
       dispatch();
     }
   }
