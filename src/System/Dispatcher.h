@@ -14,8 +14,10 @@ namespace System {
   struct NativeContextGroup;
 
   struct NativeContext {
+    // “Fiber” replacement
     coro_t::call_type* coro{ nullptr };
     coro_t::yield_type* yield{ nullptr };
+
     bool interrupted{ false };
     bool inExecutionQueue{ false };
     NativeContext* next{ nullptr };
@@ -50,14 +52,18 @@ namespace System {
     void remoteSpawn(std::function<void()>&& procedure);
     void yield();
 
-    // API retained for compatibility
+    // Timers (compatible API)
     void addTimer(uint64_t time, NativeContext* context);
     void interruptTimer(uint64_t time, NativeContext* context);
+
+    // Legacy Windows API compat
     void* getCompletionPort() const { return nullptr; }
 
+    // Context pool API (kept intact)
     NativeContext& getReusableContext();
     void pushReusableContext(NativeContext&);
 
+    // Needed by TCP stack
     boost::asio::io_context& getIoContext() { return ioContext; }
 
   private:
@@ -65,13 +71,16 @@ namespace System {
     void contextProcedure(coro_t::yield_type& yield);
 
     boost::asio::io_context ioContext;
+
     NativeContext mainContext;
     NativeContextGroup contextGroup;
-    NativeContext* currentContext;
-    NativeContext* firstResumingContext;
-    NativeContext* lastResumingContext;
-    NativeContext* firstReusableContext;
-    size_t runningContextCount;
+    NativeContext* currentContext{ nullptr };
+    NativeContext* firstResumingContext{ nullptr };
+    NativeContext* lastResumingContext{ nullptr };
+    NativeContext* firstReusableContext{ nullptr };
+    size_t runningContextCount{ 0 };
+
+    // Deadline (ms since steady_clock epoch) -> waiting context
     std::multimap<uint64_t, NativeContext*> timers;
   };
 
