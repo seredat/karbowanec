@@ -1,3 +1,6 @@
+// Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2016-2025, The Karbo developers
+
 #include "TcpConnector.h"
 #include <boost/asio.hpp>
 #include <System/InterruptedException.h>

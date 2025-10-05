@@ -68,6 +68,8 @@ extern "C"
 #include "crypto/crypto-ops.h"
 }
 
+#undef ERROR
+
 using namespace Common;
 using namespace Crypto;
 using namespace CryptoNote;

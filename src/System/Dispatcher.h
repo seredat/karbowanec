@@ -1,3 +1,6 @@
+// Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2016-2025, nuclEar_chaos, The Karbo developers
+
 #pragma once
 
 #include <cstdint>

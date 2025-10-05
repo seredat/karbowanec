@@ -1,4 +1,7 @@
-﻿#include "Dispatcher.h"
+﻿// Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2016-2025, nuclEar_chaos, The Karbo developers
+
+#include "Dispatcher.h"
 
 #include <cassert>
 #include <chrono>
