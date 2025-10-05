@@ -82,6 +82,10 @@ namespace System {
 
     // Deadline (ms since steady_clock epoch) -> waiting context
     std::multimap<uint64_t, NativeContext*> timers;
+
+    boost::asio::steady_timer wakeTimer{ ioContext };
+    bool wakeArmed{ false };
+    uint64_t wakeExpiryMs{ 0 };
   };
 
 } // namespace System
