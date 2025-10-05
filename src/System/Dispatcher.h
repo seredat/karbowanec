@@ -71,7 +71,7 @@ namespace System {
     void pushReusableContext(NativeContext&);
     void interruptTimer(uint64_t time, NativeContext* context);
 
-    boost::asio::io_context& getIoContext() { return m_ioContext; }
+    boost::asio::io_context& getIoContext() { return ioContext; }
 
   private:
     void spawn(std::function<void()>&& procedure);
@@ -94,11 +94,8 @@ namespace System {
     void contextProcedure();
     static void __stdcall contextProcedureStatic(void* context);
 
-    boost::asio::io_context m_ioContext;
-    boost::asio::executor_work_guard<boost::asio::io_context::executor_type> m_workGuard;
-
-    size_t threadCount = std::thread::hardware_concurrency();
-    std::vector<std::thread> threadPool;
+    // asio
+    boost::asio::io_context ioContext;
 
   };
 

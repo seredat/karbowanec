@@ -44,8 +44,7 @@ namespace System {
   }
 
   Dispatcher::Dispatcher()
-    : m_ioContext(threadCount)
-    , m_workGuard(boost::asio::make_work_guard(m_ioContext))
+    : ioContext()
   {
     static_assert(sizeof(CRITICAL_SECTION) == sizeof(Dispatcher::criticalSection), "CRITICAL_SECTION size doesn't fit sizeof(Dispatcher::criticalSection)");
     BOOL result = InitializeCriticalSectionAndSpinCount(reinterpret_cast<LPCRITICAL_SECTION>(criticalSection), 4000);
@@ -85,10 +84,6 @@ namespace System {
           firstReusableContext = nullptr;
           runningContextCount = 0;
 
-          for (size_t i = 0; i < threadCount; ++i) {
-            threadPool.emplace_back([&] { m_ioContext.run(); });
-          }
-
           return;
         }
 
@@ -110,13 +105,13 @@ namespace System {
       interrupt(context);
     }
 
-    for (auto& thread : threadPool) {
-      if (thread.joinable()) {
-        thread.join();
-      }
+    yield();
+
+    for (;;) {
+      std::size_t ran = ioContext.poll();
+      if (ran == 0) break;
     }
 
-    yield();
     assert(timers.empty());
     assert(contextGroup.firstContext == nullptr);
     assert(contextGroup.firstWaiter == nullptr);
@@ -180,6 +175,13 @@ namespace System {
         context->inExecutionQueue = false;
 
         break;
+      }
+
+      try {
+        ioContext.poll(); // run ready handlers
+      }
+      catch (...) {
+        // swallow
       }
 
       DWORD timeout = timers.empty() ? INFINITE : static_cast<DWORD>(std::min(timers.begin()->first - currentTime, static_cast<uint64_t>(INFINITE - 1)));
@@ -323,6 +325,13 @@ namespace System {
         timerContextPair->second->interruptProcedure = nullptr;
         pushContext(timerContextPair->second);
         timerContextPair = timers.erase(timerContextPair);
+      }
+
+      try {
+        ioContext.poll();
+      }
+      catch (...) {
+        // swallow
       }
 
       OVERLAPPED_ENTRY entries[16];

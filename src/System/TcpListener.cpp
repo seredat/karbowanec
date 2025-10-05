@@ -63,6 +63,10 @@ namespace System {
     while (!done) {
       if (dispatcher->interrupted()) {
         // try to cancel accept - interruptProcedure already set will close acceptor
+        boost::system::error_code ignored_ec;
+        if (acceptor && acceptor->is_open()) {
+          acceptor->close(ignored_ec);
+        }
       }
       dispatcher->dispatch();
     }

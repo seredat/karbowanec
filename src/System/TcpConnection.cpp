@@ -117,6 +117,9 @@ namespace System {
     while (!done) {
       if (dispatcher->interrupted()) {
         // interruptProcedure will close socket
+        boost::system::error_code ignored;
+        auto& socket = socketPtr;
+        if (socket && socket->is_open()) socket->close(ignored);
       }
       dispatcher->dispatch();
     }
