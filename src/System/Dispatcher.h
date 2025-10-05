@@ -1,51 +1,36 @@
-// Copyright (c) 2012-2017, The CryptoNote developers, The Bytecoin developers
-// Copyright (c) 2016-2019, The Karbo developers
-//
-// This file is part of Karbo.
-//
-// Karbo is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Lesser General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// Karbo is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Lesser General Public License for more details.
-//
-// You should have received a copy of the GNU Lesser General Public License
-// along with Karbo.  If not, see <http://www.gnu.org/licenses/>.
-
 #pragma once
 
 #include <cstdint>
 #include <functional>
 #include <map>
 #include <queue>
-#include <thread>
 #include <boost/asio.hpp>
+#include <boost/coroutine/symmetric_coroutine.hpp>
 
 namespace System {
+
+  using coro_t = boost::coroutines::symmetric_coroutine<void>;
 
   struct NativeContextGroup;
 
   struct NativeContext {
-    void* fiber{ nullptr };
-    bool interrupted;
-    bool inExecutionQueue;
+    coro_t::call_type* coro{ nullptr };
+    coro_t::yield_type* yield{ nullptr };
+    bool interrupted{ false };
+    bool inExecutionQueue{ false };
     NativeContext* next{ nullptr };
-    NativeContextGroup* group;
-    NativeContext* groupPrev;
-    NativeContext* groupNext;
+    NativeContextGroup* group{ nullptr };
+    NativeContext* groupPrev{ nullptr };
+    NativeContext* groupNext{ nullptr };
     std::function<void()> procedure;
     std::function<void()> interruptProcedure;
   };
 
   struct NativeContextGroup {
-    NativeContext* firstContext;
-    NativeContext* lastContext;
-    NativeContext* firstWaiter;
-    NativeContext* lastWaiter;
+    NativeContext* firstContext{ nullptr };
+    NativeContext* lastContext{ nullptr };
+    NativeContext* firstWaiter{ nullptr };
+    NativeContext* lastWaiter{ nullptr };
   };
 
   class Dispatcher {
@@ -54,6 +39,7 @@ namespace System {
     Dispatcher(const Dispatcher&) = delete;
     ~Dispatcher();
     Dispatcher& operator=(const Dispatcher&) = delete;
+
     void clear();
     void dispatch();
     NativeContext* getCurrentContext() const;
@@ -64,25 +50,21 @@ namespace System {
     void remoteSpawn(std::function<void()>&& procedure);
     void yield();
 
-    // Platform-specific
+    // API retained for compatibility
     void addTimer(uint64_t time, NativeContext* context);
-    void* getCompletionPort() const;
+    void interruptTimer(uint64_t time, NativeContext* context);
+    void* getCompletionPort() const { return nullptr; }
+
     NativeContext& getReusableContext();
     void pushReusableContext(NativeContext&);
-    void interruptTimer(uint64_t time, NativeContext* context);
 
     boost::asio::io_context& getIoContext() { return ioContext; }
 
   private:
     void spawn(std::function<void()>&& procedure);
-    void* completionPort;
-    uint8_t criticalSection[2 * sizeof(long) + 4 * sizeof(void*)];
-    bool remoteNotificationSent;
-    std::queue<std::function<void()>> remoteSpawningProcedures;
-    uint8_t remoteSpawnOverlapped[4 * sizeof(void*)];
-    uint32_t threadId;
-    std::multimap<uint64_t, NativeContext*> timers;
+    void contextProcedure(coro_t::yield_type& yield);
 
+    boost::asio::io_context ioContext;
     NativeContext mainContext;
     NativeContextGroup contextGroup;
     NativeContext* currentContext;
@@ -90,13 +72,7 @@ namespace System {
     NativeContext* lastResumingContext;
     NativeContext* firstReusableContext;
     size_t runningContextCount;
-
-    void contextProcedure();
-    static void __stdcall contextProcedureStatic(void* context);
-
-    // asio
-    boost::asio::io_context ioContext;
-
+    std::multimap<uint64_t, NativeContext*> timers;
   };
 
-}
+} // namespace System
