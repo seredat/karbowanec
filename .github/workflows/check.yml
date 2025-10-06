@@ -88,7 +88,7 @@ jobs:
       - name: Install dependencies
         shell: msys2 {0}
         run: |
-          pacman -U --noconfirm https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-boost-1.83.0-2-any.pkg.tar.zst
+          pacman -U --noconfirm https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-boost-1.84.0-2-any.pkg.tar.zst
 
       - uses: actions/checkout@master
         with:
