@@ -1,5 +1,5 @@
 // Copyright (c) 2021, The Talleo developers
-// Copyright (c) 2021 - 2022, The Karbo developers
+// Copyright (c) 2021 - 2025, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -52,6 +52,8 @@ extern "C"
 #include "CryptoNoteConfig.h"
 #include "CryptoTypes.h"
 #include "version.h"
+
+#undef ERROR
 
 using namespace CryptoNote;
 using namespace Logging;
