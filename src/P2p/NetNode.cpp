@@ -882,7 +882,14 @@ namespace CryptoNote
       tried_peers.insert(random_index);
       PeerlistEntry pe = boost::value_initialized<PeerlistEntry>();
       bool r = use_white_list ? m_peerlist.get_white_peer_by_index(pe, random_index):m_peerlist.get_gray_peer_by_index(pe, random_index);
-      if (!r) { logger(ERROR, BRIGHT_RED) << "Failed to get random peer from peerlist(white:" << use_white_list << ")"; return false; }
+      if (!r) {
+        logger(WARNING) << "Failed to fetch peer (use_white_list="
+          << (use_white_list ? "true" : "false")
+          << ") after index " << random_index
+          << "; white=" << m_peerlist.get_white_peers_count()
+          << " gray=" << m_peerlist.get_gray_peers_count();
+        continue;
+      }
 
       ++try_count;
 
