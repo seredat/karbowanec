@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2016-2025, nuclEar_chaos, The Karbo developers
 
 #include "Dispatcher.h"
@@ -283,7 +283,7 @@ namespace System {
       catch (...) {
         // keep loop alive
       }
-      // Loop back; we’ll re-check queues/timers again
+      // Loop back; we'll re-check queues/timers again
     }
 
     // Switch to the selected context if different

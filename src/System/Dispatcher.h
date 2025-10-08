@@ -17,7 +17,7 @@ namespace System {
   struct NativeContextGroup;
 
   struct NativeContext {
-    // “Fiber” replacement
+    // Fiber replacement
     coro_t::call_type* coro{ nullptr };
     coro_t::yield_type* yield{ nullptr };
 
