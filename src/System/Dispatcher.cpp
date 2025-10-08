@@ -59,7 +59,8 @@ namespace System {
     // Give them a chance to handle interrupts and exit
     yield();
 
-    // Drain any remaining asio work (no work_guard)
+    // Drain any remaining asio work
+    ensureIoContextReady();
     for (;;) {
       std::size_t ran = ioContext.poll();
       if (ran == 0) break;
@@ -194,6 +195,7 @@ namespace System {
 
     // Process all ready asio handlers without blocking
     try {
+      ensureIoContextReady();
       ioContext.poll();
     }
     catch (...) {
@@ -278,6 +280,7 @@ namespace System {
 
       try {
         // Block until either a handler runs (TCP etc.) or the wake timer fires
+        ensureIoContextReady();
         ioContext.run_one();
       }
       catch (...) {
@@ -431,6 +434,12 @@ namespace System {
 
       // Continue scheduling
       dispatch();
+    }
+  }
+
+  void Dispatcher::ensureIoContextReady() {
+    if (ioContext.stopped()) {
+      ioContext.restart();
     }
   }
 

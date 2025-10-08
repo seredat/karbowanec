@@ -72,6 +72,7 @@ namespace System {
   private:
     void spawn(std::function<void()>&& procedure);
     void contextProcedure(coro_t::yield_type& yield);
+    void ensureIoContextReady();
 
     boost::asio::io_context ioContext;
 
