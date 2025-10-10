@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2014-2017, The Monero project
-// Copyright (c) 2016-2020, The Karbo developers
+// Copyright (c) 2016-2025, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -72,6 +72,8 @@ void PeerlistManager::serialize(ISerializer& s) {
     return;
   }
 
+  // protect serialization over live containers
+  std::lock_guard<std::recursive_mutex> lock(mutex_);
   s(m_peers_white, "whitelist");
   s(m_peers_gray, "graylist");
   s(m_peers_anchor, "anchorlist");
@@ -101,9 +103,10 @@ void PeerlistManager::Peerlist::trim() {
   }
 }
 
-PeerlistManager::PeerlistManager() : 
+PeerlistManager::PeerlistManager() :
   m_whitePeerlist(m_peers_white, CryptoNote::P2P_LOCAL_WHITE_PEERLIST_LIMIT),
-  m_grayPeerlist(m_peers_gray, CryptoNote::P2P_LOCAL_GRAY_PEERLIST_LIMIT) {}
+  m_grayPeerlist(m_peers_gray, CryptoNote::P2P_LOCAL_GRAY_PEERLIST_LIMIT) {
+}
 
 //--------------------------------------------------------------------------------------------------
 bool PeerlistManager::init(bool allow_local_ip)
@@ -114,17 +117,21 @@ bool PeerlistManager::init(bool allow_local_ip)
 
 //--------------------------------------------------------------------------------------------------
 void PeerlistManager::trim_white_peerlist() {
+  std::lock_guard<std::recursive_mutex> lock(mutex_);
   m_whitePeerlist.trim();
 }
 //--------------------------------------------------------------------------------------------------
 void PeerlistManager::trim_gray_peerlist() {
+  std::lock_guard<std::recursive_mutex> lock(mutex_);
   m_grayPeerlist.trim();
 }
 
 //--------------------------------------------------------------------------------------------------
 bool PeerlistManager::merge_peerlist(const std::vector<PeerlistEntry>& outer_bs)
-{ 
-  for(const PeerlistEntry& be : outer_bs) {
+{
+  // We call append_with_peer_gray (which also locks). Use recursive mutex to avoid deadlock.
+  std::lock_guard<std::recursive_mutex> lock(mutex_);
+  for (const PeerlistEntry& be : outer_bs) {
     append_with_peer_gray(be);
   }
 
@@ -135,12 +142,14 @@ bool PeerlistManager::merge_peerlist(const std::vector<PeerlistEntry>& outer_bs)
 //--------------------------------------------------------------------------------------------------
 
 bool PeerlistManager::get_white_peer_by_index(PeerlistEntry& p, size_t i) const {
+  std::lock_guard<std::recursive_mutex> lock(mutex_);
   return m_whitePeerlist.get(p, i);
 }
 
 //--------------------------------------------------------------------------------------------------
 
 bool PeerlistManager::get_gray_peer_by_index(PeerlistEntry& p, size_t i) const {
+  std::lock_guard<std::recursive_mutex> lock(mutex_);
   return m_grayPeerlist.get(p, i);
 }
 
@@ -165,10 +174,12 @@ bool PeerlistManager::is_ip_allowed(uint32_t ip) const
 
 bool PeerlistManager::get_peerlist_head(std::vector<PeerlistEntry>& bs_head, uint32_t depth) const
 {
+  std::lock_guard<std::recursive_mutex> lock(mutex_);
+
   const peers_indexed::index<by_time>::type& by_time_index = m_peers_white.get<by_time>();
   //uint32_t cnt = 0;
 
-  BOOST_REVERSE_FOREACH(const peers_indexed::value_type& vl, by_time_index)
+  BOOST_REVERSE_FOREACH(const peers_indexed::value_type & vl, by_time_index)
   {
     //if (cnt++ > depth)
     //  break;
@@ -189,6 +200,8 @@ bool PeerlistManager::get_peerlist_head(std::vector<PeerlistEntry>& bs_head, uin
 
 bool PeerlistManager::get_peerlist_full(std::list<AnchorPeerlistEntry>& pl_anchor, std::vector<PeerlistEntry>& pl_gray, std::vector<PeerlistEntry>& pl_white) const
 {
+  std::lock_guard<std::recursive_mutex> lock(mutex_);
+
   const anchor_peers_indexed::index<by_time>::type& by_time_index_an = m_peers_anchor.get<by_time>();
   const peers_indexed::index<by_time>::type& by_time_index_gr = m_peers_gray.get<by_time>();
   const peers_indexed::index<by_time>::type& by_time_index_wt = m_peers_white.get<by_time>();
@@ -213,13 +226,16 @@ bool PeerlistManager::set_peer_just_seen(PeerIdType peer, uint32_t ip, uint32_t 
 bool PeerlistManager::set_peer_just_seen(PeerIdType peer, const NetworkAddress& addr)
 {
   try {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+
     //find in white list
     PeerlistEntry ple;
     ple.adr = addr;
     ple.id = peer;
     ple.last_seen = time(NULL);
     return append_with_peer_white(ple);
-  } catch (std::exception&) {
+  }
+  catch (std::exception&) {
   }
 
   return false;
@@ -229,6 +245,8 @@ bool PeerlistManager::set_peer_just_seen(PeerIdType peer, const NetworkAddress& 
 bool PeerlistManager::append_with_peer_anchor(const AnchorPeerlistEntry& ple)
 {
   try {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+
     if (!is_ip_allowed(ple.adr.ip))
       return true;
 
@@ -249,6 +267,8 @@ bool PeerlistManager::append_with_peer_anchor(const AnchorPeerlistEntry& ple)
 bool PeerlistManager::append_with_peer_white(const PeerlistEntry& ple)
 {
   try {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+
     if (!is_ip_allowed(ple.adr.ip))
       return true;
 
@@ -257,8 +277,9 @@ bool PeerlistManager::append_with_peer_white(const PeerlistEntry& ple)
     if (by_addr_it_wt == m_peers_white.get<by_addr>().end()) {
       //put new record into white list
       m_peers_white.insert(ple);
-      trim_white_peerlist();
-    } else {
+      m_whitePeerlist.trim();
+    }
+    else {
       //update record in white list 
       m_peers_white.replace(by_addr_it_wt, ple);
     }
@@ -268,7 +289,8 @@ bool PeerlistManager::append_with_peer_white(const PeerlistEntry& ple)
       m_peers_gray.erase(by_addr_it_gr);
     }
     return true;
-  } catch (std::exception&) {
+  }
+  catch (std::exception&) {
   }
   return false;
 }
@@ -277,6 +299,8 @@ bool PeerlistManager::append_with_peer_white(const PeerlistEntry& ple)
 bool PeerlistManager::append_with_peer_gray(const PeerlistEntry& ple)
 {
   try {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+
     if (!is_ip_allowed(ple.adr.ip))
       return true;
 
@@ -291,14 +315,16 @@ bool PeerlistManager::append_with_peer_gray(const PeerlistEntry& ple)
     {
       //put new record into white list
       m_peers_gray.insert(ple);
-      trim_gray_peerlist();
-    } else
+      m_grayPeerlist.trim();
+    }
+    else
     {
       //update record in white list 
       m_peers_gray.replace(by_addr_it_gr, ple);
     }
     return true;
-  } catch (std::exception&) {
+  }
+  catch (std::exception&) {
   }
   return false;
 }
@@ -307,12 +333,14 @@ bool PeerlistManager::append_with_peer_gray(const PeerlistEntry& ple)
 bool PeerlistManager::get_and_empty_anchor_peerlist(std::vector<AnchorPeerlistEntry>& apl)
 {
   try {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+
     auto begin = m_peers_anchor.get<by_time>().begin();
     auto end = m_peers_anchor.get<by_time>().end();
 
-    std::for_each(begin, end, [&apl](const AnchorPeerlistEntry &a) {
+    std::for_each(begin, end, [&apl](const AnchorPeerlistEntry& a) {
       apl.push_back(a);
-    });
+      });
 
     m_peers_anchor.get<by_time>().clear();
     return true;
@@ -326,6 +354,8 @@ bool PeerlistManager::get_and_empty_anchor_peerlist(std::vector<AnchorPeerlistEn
 bool PeerlistManager::remove_from_peer_anchor(const NetworkAddress& addr)
 {
   try {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+
     anchor_peers_indexed::index_iterator<by_addr>::type iterator = m_peers_anchor.get<by_addr>().find(addr);
 
     if (iterator != m_peers_anchor.get<by_addr>().end()) {
@@ -344,6 +374,8 @@ bool PeerlistManager::remove_from_peer_anchor(const NetworkAddress& addr)
 bool PeerlistManager::remove_from_peer_gray(PeerlistEntry& p)
 {
   try {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+
     auto iterator = m_peers_gray.get<by_addr>().find(p.adr);
     if (iterator != m_peers_gray.get<by_addr>().end()) {
       m_peers_gray.erase(iterator);
@@ -358,10 +390,10 @@ bool PeerlistManager::remove_from_peer_gray(PeerlistEntry& p)
 }
 //--------------------------------------------------------------------------------------------------
 
-PeerlistManager::Peerlist& PeerlistManager::getWhite() { 
-  return m_whitePeerlist; 
+PeerlistManager::Peerlist& PeerlistManager::getWhite() {
+  return m_whitePeerlist;
 }
 
-PeerlistManager::Peerlist& PeerlistManager::getGray() { 
-  return m_grayPeerlist; 
+PeerlistManager::Peerlist& PeerlistManager::getGray() {
+  return m_grayPeerlist;
 }

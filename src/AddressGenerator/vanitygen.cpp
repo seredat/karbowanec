@@ -1,5 +1,5 @@
 // Copyright (c) 2021, The Talleo developers
-// Copyright (c) 2021 - 2022, The Karbo developers
+// Copyright (c) 2021 - 2025, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -17,7 +17,6 @@
 // along with Karbo. If not, see <http://www.gnu.org/licenses/>.
 
 #ifdef WIN32
-#define NOMINMAX
 #include <windows.h>
 #endif
 
@@ -53,6 +52,8 @@ extern "C"
 #include "CryptoNoteConfig.h"
 #include "CryptoTypes.h"
 #include "version.h"
+
+#undef ERROR
 
 using namespace CryptoNote;
 using namespace Logging;
@@ -278,7 +279,7 @@ int main(int argc, char** argv) {
         if (!r)
             return 1;
     } catch (const std::exception& e) {
-        logger(ERROR, BRIGHT_RED) << "Exception: " << e.what();
+        logger(Logging::ERROR, BRIGHT_RED) << "Exception: " << e.what();
         return 1;
     }
     return 0;

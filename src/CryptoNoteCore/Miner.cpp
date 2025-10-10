@@ -39,6 +39,8 @@
 #include "CryptoNoteFormatUtils.h"
 #include "TransactionExtra.h"
 
+#undef ERROR
+
 using namespace Logging;
 
 namespace CryptoNote
