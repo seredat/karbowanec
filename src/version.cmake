@@ -1,5 +1,5 @@
 # Read project version from git tag.
-cmake_policy(SET CMP0007 OLD)
+cmake_policy(SET CMP0007 NEW)
 find_package(Git)
 message(STATUS "Found Git: ${GIT_FOUND}")
 if(GIT_FOUND)

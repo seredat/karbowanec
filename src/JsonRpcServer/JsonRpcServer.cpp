@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright(c) 2014 - 2017 XDN - project developers
-// Copyright(c) 2018 - 2022 The Karbo developers
+// Copyright(c) 2018 - 2023 The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -42,7 +42,7 @@
 
 namespace CryptoNote {
 
-JsonRpcServer::JsonRpcServer(System::Dispatcher& sys, System::Event& stopEvent, Logging::ILogger& loggerGroup) :
+JsonRpcServer::JsonRpcServer(System::Dispatcher* sys, System::Event* stopEvent, Logging::ILogger& loggerGroup) :
   m_dispatcher(sys),
   stopEvent(stopEvent),
   logger(loggerGroup, "JsonRpcServer"),
@@ -56,16 +56,10 @@ JsonRpcServer::~JsonRpcServer() {
 
 void JsonRpcServer::start(const std::string& bindAddress, uint16_t bindPort, uint16_t bindPortSSL) {
   if (m_enable_ssl) {
-    m_workers.emplace_back(std::unique_ptr<System::RemoteContext<void>>(
-      new System::RemoteContext<void>(m_dispatcher, std::bind(&JsonRpcServer::listen_ssl, this, bindAddress, bindPortSSL)))
-    );
+    m_workers.push_back(std::thread(std::bind(&JsonRpcServer::listen_ssl, this, bindAddress, bindPortSSL)));
   }
 
-  m_workers.emplace_back(std::unique_ptr<System::RemoteContext<void>>(
-    new System::RemoteContext<void>(m_dispatcher, std::bind(&JsonRpcServer::listen, this, bindAddress, bindPort)))
-  );
-
-  stopEvent.wait();
+  m_workers.push_back(std::thread(std::bind(&JsonRpcServer::listen, this, bindAddress, bindPort)));
 }
 
 void JsonRpcServer::stop() {
@@ -74,6 +68,12 @@ void JsonRpcServer::stop() {
   }
 
   http->stop();
+
+  for (auto& th : m_workers) {
+    if (th.joinable()) {
+      th.join();
+    }
+  }
 
   m_workers.clear();
 }

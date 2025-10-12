@@ -1728,10 +1728,10 @@ void Blockchain::print_blockchain(uint64_t start_index, uint64_t end_index) {
       << "\nid\t\t" << get_block_hash(m_blocks[i].bl)
       << "\ndifficulty\t\t" << blockDifficulty(i) << ", nonce " << m_blocks[i].bl.nonce << ", tx_count " << m_blocks[i].bl.transactionHashes.size() << ENDL;
   }
-  logger(DEBUGGING) <<
+  logger(INFO, BRIGHT_WHITE) <<
     "Current blockchain:" << ENDL << ss.str();
   logger(INFO, BRIGHT_WHITE) <<
-    "Blockchain printed with log level 1";
+    "Blockchain printed";
 }
 
 void Blockchain::print_blockchain_index() {

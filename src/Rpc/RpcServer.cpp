@@ -1,7 +1,8 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2014-2018, The Monero Project
 // Copyright (c) 2016, The Forknote developers
-// Copyright (c) 2016-2022, The Karbo developers
+// Copyright (c) 2018-2023 Conceal Network & Conceal Devs
+// Copyright (c) 2016-2023, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -245,16 +246,6 @@ RpcServer::RpcServer(
 
   https = new httplib::SSLServer(m_config.getChainFile().c_str(), m_config.getKeyFile().c_str());
 
-  m_http_queue = new RpcThreadPool(std::max<size_t>(8, std::thread::hardware_concurrency() > 0 ? std::thread::hardware_concurrency() - 1 : 0));
-  http->new_task_queue = [this] {
-    return m_http_queue;
-  };
-
-  m_https_queue = new RpcThreadPool(std::max<size_t>(8, std::thread::hardware_concurrency() > 0 ? std::thread::hardware_concurrency() - 1 : 0));
-  https->new_task_queue = [this] {
-    return m_https_queue;
-  };
-
   http->Get(".*", [this](const httplib::Request& req, httplib::Response& res) {
     processRequest(req, res);
   });
@@ -282,17 +273,13 @@ void RpcServer::start() {
     uint16_t ssl_port = m_config.getBindPortSSL(); // make sure to use separate port for SSL server
     logger(Logging::DEBUGGING, Logging::BRIGHT_MAGENTA) << "bind https to port " << ssl_port << ENDL;
 
-    m_workers.emplace_back(std::unique_ptr<System::RemoteContext<void>>(
-      new System::RemoteContext<void>(m_dispatcher, std::bind(&RpcServer::listen_ssl, this, address, ssl_port)))
-    );
+    m_workers.push_back(std::thread(std::bind(&RpcServer::listen_ssl, this, address, ssl_port)));
   }
 
   uint16_t port = m_config.getBindPort();
   logger(Logging::DEBUGGING, Logging::BRIGHT_MAGENTA) << "bind http to port " << port << ENDL;
 
-  m_workers.emplace_back(std::unique_ptr<System::RemoteContext<void>>(
-    new System::RemoteContext<void>(m_dispatcher, std::bind(&RpcServer::listen, this, address, port)))
-  );
+  m_workers.push_back(std::thread(std::bind(&RpcServer::listen, this, address, port)));
 }
 
 void RpcServer::stop() {
@@ -301,6 +288,12 @@ void RpcServer::stop() {
   }
 
   http->stop();
+
+  for (auto& th : m_workers) {
+    if (th.joinable()) {
+      th.join();
+    }
+  }
 
   m_workers.clear();
 }
@@ -320,7 +313,7 @@ void RpcServer::listen_ssl(const std::string address, const uint16_t port) {
 }
 
 size_t RpcServer::getRpcConnectionsCount() {
-  return m_http_queue->connecions_count() + m_https_queue->connecions_count();
+  return http->connections_count() + https->connections_count();
 }
 
 void RpcServer::processRequest(const httplib::Request& request, httplib::Response& response) {
@@ -477,7 +470,7 @@ void RpcServer::processRequest(const httplib::Request& request, httplib::Respons
             uint32_t height = static_cast<uint32_t>(std::stoul(hash_str));
             if (m_core.getCurrentBlockchainHeight() <= height) {
               throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_TOO_BIG_HEIGHT,
-                std::string("To big height: ") + std::to_string(height) +
+                std::string("Too big height: ") + std::to_string(height) +
                 ", current blockchain height = " + std::to_string(m_core.getCurrentBlockchainHeight() - 1) };
             }
             Crypto::Hash block_hash = m_core.getBlockIdByHeight(height);
@@ -1194,6 +1187,11 @@ bool RpcServer::on_get_transactions_with_output_global_indexes_by_heights(const 
       }
       std::vector<uint32_t> range = req.heights;
 
+      if (range.back() < range.front()) {
+        throw JsonRpc::JsonRpcError{CORE_RPC_ERROR_CODE_WRONG_PARAM,
+          std::string("Invalid heights range: ") + std::to_string(range.front()) + " must be < " + std::to_string(range.back())};
+      }
+
       if (range.back() - range.front() > BLOCK_LIST_MAX_COUNT) {
         throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_WRONG_PARAM,
           std::string("Requested blocks count: ") + std::to_string(range.back() - range.front()) + " exceeded max limit of " + std::to_string(BLOCK_LIST_MAX_COUNT) };
@@ -1490,6 +1488,7 @@ bool RpcServer::on_get_explorer(const COMMAND_EXPLORER::request& req, COMMAND_EX
     " &bull; " + "Difficulty: <b>" + std::to_string(m_core.getNextBlockDifficulty()) + "</b>" +
     " &bull; " + "Alt. blocks: <b>" + std::to_string(m_core.getAlternativeBlocksCount()) + "</b>" +
     " &bull; " + "Transactions: <b>" + std::to_string(m_core.getBlockchainTotalTransactions() - top_block_index + 1) + "</b>" +
+    " &bull; " + "Emission: <b>" + m_core.currency().formatAmount(m_core.getTotalGeneratedAmount()) + "</b>" +
     " &bull; " + "Next reward: <b>" + m_core.currency().formatAmount(m_core.currency().calculateReward(m_core.getTotalGeneratedAmount())) + "</b>" +
     "</p>\n";
 
@@ -2213,8 +2212,7 @@ bool RpcServer::on_send_raw_transaction(const COMMAND_RPC_SEND_RAW_TRANSACTION::
   if (!Common::fromHex(req.tx_as_hex, tx_blob))
   {
     logger(Logging::INFO) << "[on_send_raw_tx]: Failed to parse transaction from hexbuff: " << req.tx_as_hex;
-    res.status = "Failed";
-    return true;
+    throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_WRONG_PARAM, "Failed to parse transaction from hexbuff" };
   }
 
   Crypto::Hash transactionHash = Crypto::cn_fast_hash(tx_blob.data(), tx_blob.size());
@@ -2224,15 +2222,13 @@ bool RpcServer::on_send_raw_transaction(const COMMAND_RPC_SEND_RAW_TRANSACTION::
   if (!m_core.handle_incoming_tx(tx_blob, tvc, false))
   {
     logger(Logging::INFO) << "[on_send_raw_tx]: Failed to process tx";
-    res.status = "Failed";
-    return true;
+    throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_INTERNAL_ERROR, "Failed to process tx" };
   }
 
   if (tvc.m_verification_failed)
   {
-    logger(Logging::INFO) << "[on_send_raw_tx]: transaction verification failed";
-    res.status = "Failed";
-    return true;
+    logger(Logging::INFO) << "[on_send_raw_tx]: Transaction verification failed";
+    throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_WRONG_PARAM, "Transaction verification failed" };
   }
 
   if (!tvc.m_should_be_relayed)
