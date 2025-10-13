@@ -61,7 +61,7 @@ jobs:
           key: android-prebuilts-arm64-boost178-openssl111k
 
       - name: Fetch Boost 1.78 prebuilt
-        if: steps.cache.outputs.cache-hit != 'true'
+        #if: steps.cache.outputs.cache-hit != 'true'
         run: |
           git clone --depth 1 -b boost-1_78_0 https://github.com/PurpleI2P/Boost-for-Android-Prebuilt.git $HOME/opt/android/boost
           echo "BOOST_ROOT=$HOME/opt/android/boost" >> $GITHUB_ENV
@@ -69,7 +69,7 @@ jobs:
           echo "BOOST_LIBRARYDIR=$HOME/opt/android/boost/$ANDROID_ABI/lib" >> $GITHUB_ENV
 
       - name: Fetch OpenSSL prebuilt
-        if: steps.cache.outputs.cache-hit != 'true'
+        #if: steps.cache.outputs.cache-hit != 'true'
         run: |
           git clone --depth 1 https://github.com/PurpleI2P/OpenSSL-for-Android-Prebuilt.git ${HOME}/opt/android/openssl
           echo "OPENSSL_ROOT=${HOME}/opt/android/openssl/openssl-1.1.1k-clang" >> $GITHUB_ENV
