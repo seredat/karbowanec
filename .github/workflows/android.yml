@@ -1,0 +1,133 @@
+name: Build Android
+
+on:
+  push:
+    branches:
+      - android
+      - 'android/**'
+  pull_request:
+    branches:
+      - android
+
+jobs:
+  build-android:
+    name: Android arm64-v8a
+    runs-on: ubuntu-24.04
+
+    env:
+      ANDROID_ABI: arm64-v8a
+      ANDROID_API: 28
+      BUILD_DIR: build/arm64-v8a
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build wget unzip git build-essential python3 libssl-dev zip
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK components
+        run: |
+          yes | sdkmanager --licenses >/dev/null
+          sdkmanager "platform-tools" \
+                     "build-tools;34.0.0" \
+                     "platforms;android-${ANDROID_API}" \
+                     "ndk;28.2.13676358"
+
+      - name: Set NDK path
+        run: |
+          NDK_PATH=$(ls -d $ANDROID_HOME/ndk/* | sort -r | head -n 1)
+          echo "NDK_PATH=$NDK_PATH" >> $GITHUB_ENV
+          echo "Using NDK at $NDK_PATH"
+
+      - name: Patch NDK toolchain
+        run: |
+          TOOLCHAIN_FILE="$NDK_PATH/build/cmake/android.toolchain.cmake"
+          sed -i 's/aarch64-none-linux-android/aarch64-linux-android/g' "$TOOLCHAIN_FILE"
+
+      - name: Cache Boost and OpenSSL
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/opt/android/boost
+            ~/opt/android/openssl
+          key: android-prebuilts-arm64-boost178-openssl111k
+
+      - name: Fetch Boost 1.78 prebuilt
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 -b boost-1_78_0 https://github.com/PurpleI2P/Boost-for-Android-Prebuilt.git $HOME/opt/android/boost
+          echo "BOOST_ROOT=$HOME/opt/android/boost" >> $GITHUB_ENV
+          echo "BOOST_INCLUDEDIR=$HOME/opt/android/boost/include" >> $GITHUB_ENV
+          echo "BOOST_LIBRARYDIR=$HOME/opt/android/boost/$ANDROID_ABI/lib" >> $GITHUB_ENV
+
+      - name: Fetch OpenSSL prebuilt
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 https://github.com/PurpleI2P/OpenSSL-for-Android-Prebuilt.git ${HOME}/opt/android/openssl
+          echo "OPENSSL_ROOT=${HOME}/opt/android/openssl/openssl-1.1.1k-clang" >> $GITHUB_ENV
+
+      - name: Normalize Boost layout
+        run: |
+          if [ -d "${HOME}/opt/android/boost/ndk_21_boost_1_78_0/include" ]; then
+            mv ${HOME}/opt/android/boost/ndk_21_boost_1_78_0/include ${HOME}/opt/android/boost/include
+            mv ${HOME}/opt/android/boost/ndk_21_boost_1_78_0/libs ${HOME}/opt/android/boost/
+          fi
+
+      - name: Configure CMake
+        run: |
+          mkdir -p $BUILD_DIR
+          cd $BUILD_DIR
+          cmake ../.. \
+            -DCMAKE_TOOLCHAIN_FILE=$NDK_PATH/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=$ANDROID_ABI \
+            -DANDROID_PLATFORM=android-${ANDROID_API} \
+            -DCMAKE_C_COMPILER_TARGET=aarch64-linux-android \
+            -DCMAKE_CXX_COMPILER_TARGET=aarch64-linux-android \
+            -DSTATIC=ON \
+            -DANDROID=true \
+            -DOPENSSL_ROOT_DIR=$OPENSSL_ROOT \
+            -DOPENSSL_SSL_LIBRARY=$OPENSSL_ROOT/$ANDROID_ABI/lib/libssl.a \
+            -DOPENSSL_CRYPTO_LIBRARY=$OPENSSL_ROOT/$ANDROID_ABI/lib/libcrypto.a \
+            -DOPENSSL_INCLUDE_DIR=$OPENSSL_ROOT/include \
+            -DBOOST_ROOT=$BOOST_ROOT \
+            -DBOOST_INCLUDEDIR=$BOOST_INCLUDEDIR \
+            -DBOOST_LIBRARYDIR=$BOOST_LIBRARYDIR \
+            -DCMAKE_CXX_FLAGS="-I${BOOST_INCLUDEDIR} -L${BOOST_LIBRARYDIR} -DBOOST_ALL_NO_LIB" \
+            -DCMAKE_EXE_LINKER_FLAGS="-L${BOOST_LIBRARYDIR}" \
+            -DDISABLE_FIND_BOOST=ON \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+            -G Ninja
+
+      - name: Build binaries
+        run: |
+          cd $BUILD_DIR
+          ninja
+
+      - name: Package binaries
+        run: |
+          cd $BUILD_DIR/src
+          mkdir -p karbo-$ANDROID_ABI
+          for bin in karbowanecd simplewallet greenwallet optimizer walletd vanitygen; do
+            if [ -f "$bin" ]; then
+              strip "$bin" || true
+              cp "$bin" karbo-$ANDROID_ABI/
+            fi
+          done
+          cd karbo-$ANDROID_ABI
+          zip -r ../karbo-$ANDROID_ABI.zip .
+          echo "artifact_path=$BUILD_DIR/src/karbo-$ANDROID_ABI.zip" >> $GITHUB_OUTPUT
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: karbo-${{ env.ANDROID_ABI }}
+          path: build/arm64-v8a/src/karbo-arm64-v8a.zip
