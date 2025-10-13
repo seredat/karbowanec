@@ -91,8 +91,8 @@ jobs:
           build_folder="build/"
           krb_ver=$(echo ${{ github.ref }} | sed 's|refs/tags/||')
           release_name="Karbo-cli-macOS-$krb_ver"
-          brew install --force openssl boost gcc
-          brew link openssl boost --force
+          brew install --force openssl gcc
+          brew link openssl --force
           mkdir "$build_folder"
           cd "$build_folder"
           cmake -DCMAKE_C_FLAGS="-mmacosx-version-min=10.12" -DCMAKE_CXX_FLAGS="-mmacosx-version-min=10.12" -DOPENSSL_USE_STATIC_LIBS=ON -DBOOST_ROOT=$BOOST_ROOT -DBoost_INCLUDE_DIR=$Boost_INCLUDE_DIR -DBoost_LIBRARY_DIR=$Boost_LIBRARY_DIR -DBoost_NO_SYSTEM_PATHS=ON -DBoost_USE_STATIC_LIBS=ON -DBoost_LIBRARYDIR=$BOOST_LIBRARY_DIR -DBoost_COMPILER=-clang -DBoost_ARCHITECTURE=-x64 ..
