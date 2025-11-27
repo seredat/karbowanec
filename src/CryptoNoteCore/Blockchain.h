@@ -93,7 +93,7 @@ namespace CryptoNote {
     uint32_t getCurrentBlockchainHeight(); //TODO rename to getCurrentBlockchainSize
     Crypto::Hash getTailId();
     Crypto::Hash getTailId(uint32_t& height);
-    difficulty_type getDifficultyForNextBlock(const Crypto::Hash &prevHash);
+    Difficulty getDifficultyForNextBlock(const Crypto::Hash &prevHash);
     uint64_t getBlockTimestamp(uint32_t height);
     uint64_t getCoinsInCirculation();
     uint64_t getCoinsInCirculation(uint32_t height);
@@ -115,8 +115,8 @@ namespace CryptoNote {
     bool checkTransactionInputs(const Transaction& tx, uint32_t& pmax_used_block_height, Crypto::Hash& max_used_block_id, BlockInfo* tail = 0);
     uint64_t getCurrentCumulativeBlocksizeLimit();
     uint64_t blockDifficulty(size_t i);
-    uint64_t blockCumulativeDifficulty(size_t i);
-    bool getblockEntry(size_t i, uint64_t& block_cumulative_size, difficulty_type& difficulty, uint64_t& already_generated_coins, uint64_t& reward, uint64_t& transactions_count, uint64_t& timestamp);
+    Difficulty blockCumulativeDifficulty(size_t i);
+    bool getblockEntry(size_t i, uint64_t& block_cumulative_size, uint64_t& difficulty, uint64_t& already_generated_coins, uint64_t& reward, uint64_t& transactions_count, uint64_t& timestamp);
     bool getBlockContainingTransaction(const Crypto::Hash& txId, Crypto::Hash& blockId, uint32_t& blockHeight);
     bool getAlreadyGeneratedCoins(const Crypto::Hash& hash, uint64_t& generatedCoins);
     bool getBlockSize(const Crypto::Hash& hash, size_t& size);
@@ -212,7 +212,7 @@ namespace CryptoNote {
     void rebuildCache();
     bool storeCache();
 
-    bool checkProofOfWork(Crypto::cn_context& context, const Block& block, difficulty_type currentDiffic, Crypto::Hash& proofOfWork);
+    bool checkProofOfWork(Crypto::cn_context& context, const Block& block, Difficulty currentDiffic, Crypto::Hash& proofOfWork);
     bool getBlockLongHash(Crypto::cn_context &context, const Block& b, Crypto::Hash& res);
 
   private:
@@ -243,7 +243,7 @@ namespace CryptoNote {
       Block bl;
       uint32_t height;
       uint64_t block_cumulative_size;
-      difficulty_type cumulative_difficulty;
+      Difficulty cumulative_difficulty;
       uint64_t already_generated_coins;
       std::vector<TransactionEntry> transactions;
 
@@ -312,7 +312,7 @@ namespace CryptoNote {
 
     bool switch_to_alternative_blockchain(const std::list<Crypto::Hash>& alt_chain, bool discard_disconnected_chain);
     bool handle_alternative_block(const Block& b, const Crypto::Hash& id, block_verification_context& bvc, bool sendNewAlternativeBlockMessage = true);
-    bool checkProofOfWork(Crypto::cn_context& context, const Block& block, difficulty_type currentDiffic, Crypto::Hash& proofOfWork, const std::list<Crypto::Hash>& alt_chain, bool no_blobs = false);
+    bool checkProofOfWork(Crypto::cn_context& context, const Block& block, Difficulty currentDiffic, Crypto::Hash& proofOfWork, const std::list<Crypto::Hash>& alt_chain, bool no_blobs = false);
     bool getBlockLongHash(Crypto::cn_context& context, const Block& b, Crypto::Hash& res, const std::list<Crypto::Hash>& alt_chain, bool no_blobs = false);
     bool prevalidate_miner_transaction(const Block& b, uint32_t height);
     bool validate_miner_transaction(const Block& b, uint32_t height, size_t cumulativeBlockSize, uint64_t alreadyGeneratedCoins, uint64_t fee, uint64_t& reward, int64_t& emissionChange);
