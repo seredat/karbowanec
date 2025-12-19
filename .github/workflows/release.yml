@@ -80,8 +80,9 @@ jobs:
         with:
           boost_version: 1.83.0
           platform: macos
-          platform_version: 15
+          platform_version: 14
           toolset: clang
+          arch: aarch64
 
       - name: Build
         id: build
