@@ -74,7 +74,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install Boost
+      - name: Install Boost (ARM64)
         uses: MarkusJx/install-boost@v2
         id: install-boost
         with:
@@ -112,7 +112,10 @@ jobs:
             -DBoost_INCLUDE_DIR="$Boost_INCLUDE_DIR" \
             -DBoost_LIBRARY_DIR="$Boost_LIBRARY_DIR" \
             -DBoost_NO_SYSTEM_PATHS=ON \
-            -DBoost_USE_STATIC_LIBS=ON
+            -DBoost_USE_STATIC_LIBS=OFF \
+            -DBoost_COMPILER=-clang \
+            -DBoost_ARCHITECTURE=-a64 \
+            -DBoost_THREADAPI=pthread
 
           make -j$(sysctl -n hw.ncpu)
 
