@@ -143,9 +143,9 @@ jobs:
         uses: MarkusJx/install-boost@v2
         id: install-boost
         with:
-          boost_version: 1.83.0
+          boost_version: 1.86.0
           platform: macos
-          platform_version: 14
+          platform_version: 15
           toolset: clang
           arch: aarch64
 
