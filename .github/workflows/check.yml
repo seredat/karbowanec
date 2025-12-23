@@ -176,9 +176,11 @@ jobs:
             -DBOOST_ROOT="$BOOST_ROOT" \
             -DBoost_INCLUDE_DIR="$Boost_INCLUDE_DIR" \
             -DBoost_LIBRARY_DIR="$Boost_LIBRARY_DIR" \
-            -DBoost_DIR="$BOOST_ROOT/lib/cmake/Boost-1.86.0" \
             -DBoost_NO_SYSTEM_PATHS=ON \
-            -DBoost_USE_STATIC_LIBS=OFF
+            -DBoost_USE_STATIC_LIBS=OFF \
+            -DBoost_COMPILER=-clang \
+            -DBoost_ARCHITECTURE=-a64 \
+            -DBoost_THREADAPI=pthread
 
           make -j$(sysctl -n hw.ncpu)
 
