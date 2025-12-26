@@ -129,6 +129,7 @@ namespace CryptoNote {
     bool isInCheckpointZone(const uint32_t height);
 
     bool getHashingBlob(const uint32_t height, BinaryArray& blob);
+    std::vector<BinaryArray> getHashingBlobs();
 
     template<class visitor_t> bool scanOutputKeysForIndexes(const KeyInput& tx_in_to_key, visitor_t& vis, uint32_t* pmax_related_block_height = NULL);
 
