@@ -48,7 +48,12 @@ jobs:
           $release_name = "karbo-cli-win64-$krb_ver"
           mkdir "$build_folder"
           cd "$build_folder"
-          cmake -G "Visual Studio 17 2022" -A x64 -DBOOST_ROOT="$env:BOOST_ROOT" -DBOOST_INCLUDE_DIRS="$env:BOOST_ROOT/include" ..
+          cmake -G "Visual Studio 17 2022" -A x64 `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded `
+            -DBOOST_ROOT="$env:BOOST_ROOT" `
+            -DBOOST_INCLUDE_DIRS="$env:BOOST_ROOT/include" `
+            ..
           msbuild Karbowanec.sln /p:Configuration=Release /m /v:detailed
           cd src\Release
           Compress-Archive -Path *.exe -DestinationPath "$release_name.zip"
@@ -102,6 +107,7 @@ jobs:
           $krb_ver="${{ github.sha }}".SubString(0,7)
           $release_name="karbo-cli-win64-mingw-$krb_ver"
           echo "release_name=${release_name}" >> $env:GITHUB_OUTPUT
+
       - name: Build
         shell: msys2 {0}
         id: build
@@ -111,6 +117,7 @@ jobs:
           cd build
           cmake .. -DCMAKE_BUILD_TYPE=Release -DSTATIC=ON
           cmake --build . --config Release
+
       - name: Prepare release
         shell: msys2 {0}
         run: |
@@ -121,6 +128,7 @@ jobs:
           mv build/src/optimizer.exe build/karbo
           mv build/src/walletd.exe build/karbo
           mv build/src/vanitygen.exe build/karbo
+
       - name: Upload To GH Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -170,6 +178,7 @@ jobs:
 
           cmake .. \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON \
             -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
             -DOPENSSL_USE_STATIC_LIBS=ON \
@@ -225,7 +234,12 @@ jobs:
           release_name=Karbo-cli-ubuntu24.04-"$krb_ver"
           mkdir -p "$build_folder"
           cd "$build_folder"
-          cmake -D ARCH=default -D CMAKE_BUILD_TYPE=Release -D CMAKE_POSITION_INDEPENDENT_CODE:BOOL=true -D BOOST_IGNORE_SYSTEM_PATHS_DEFAULT=ON -D BOOST_ROOT=/usr ../..
+          cmake -D ARCH=default -D CMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON \
+            -DCMAKE_CXX_FLAGS_RELEASE="-O3 -DNDEBUG" \
+            -D CMAKE_POSITION_INDEPENDENT_CODE:BOOL=true \
+            -D BOOST_IGNORE_SYSTEM_PATHS_DEFAULT=ON \
+            -D BOOST_ROOT=/usr ../..
           make
           mkdir -p "$release_name"
           exeFiles=()
