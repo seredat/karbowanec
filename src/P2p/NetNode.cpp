@@ -566,7 +566,7 @@ namespace CryptoNote
   }
   //-----------------------------------------------------------------------------------
   
-  bool NodeServer::deinit()  {
+  bool NodeServer::deinit() {
     return store_config();
   }
 
@@ -584,7 +584,7 @@ namespace CryptoNote
       std::ofstream p2p_data;
       p2p_data.open(state_file_path, std::ios_base::binary | std::ios_base::out | std::ios::trunc);
       if (p2p_data.fail())  {
-        logger(INFO) << "Failed to save config to file " << state_file_path;
+        logger(INFO) << "Failed to save P2P state to file " << state_file_path;
         return false;
       };
 
@@ -861,7 +861,7 @@ namespace CryptoNote
   //-----------------------------------------------------------------------------------
   bool NodeServer::make_new_connection_from_peerlist(bool use_white_list)
   {
-    size_t local_peers_count = use_white_list ? m_peerlist.get_white_peers_count():m_peerlist.get_gray_peers_count();
+    size_t local_peers_count = use_white_list ? m_peerlist.get_white_peers_count() : m_peerlist.get_gray_peers_count();
     if(!local_peers_count)
       return false;//no peers
 
@@ -871,21 +871,28 @@ namespace CryptoNote
 
     size_t try_count = 0;
     size_t rand_count = 0;
-    while(rand_count < (max_random_index+1)*3 &&  try_count < 10 && !m_stop) {
+    while(rand_count < (max_random_index+1)*3 && try_count < 10 && !m_stop) {
       ++rand_count;
       size_t random_index = get_random_index_with_fixed_probability(max_random_index);
       if (!(random_index < local_peers_count)) { logger(ERROR, BRIGHT_RED) << "random_starter_index < peers_local.size() failed!!"; return false; }
+
+      // if in the meantime we have less peers than max_random_index, adjust it
+      size_t current_count = use_white_list ? m_peerlist.get_white_peers_count() : m_peerlist.get_gray_peers_count();
+      if (random_index >= current_count) {
+        max_random_index = current_count ? current_count - 1 : 0;
+        continue;
+      }
 
       if(tried_peers.count(random_index))
         continue;
 
       tried_peers.insert(random_index);
       PeerlistEntry pe = boost::value_initialized<PeerlistEntry>();
-      bool r = use_white_list ? m_peerlist.get_white_peer_by_index(pe, random_index):m_peerlist.get_gray_peer_by_index(pe, random_index);
+      bool r = use_white_list ? m_peerlist.get_white_peer_by_index(pe, random_index) : m_peerlist.get_gray_peer_by_index(pe, random_index);
       if (!r) {
-        logger(WARNING) << "Failed to fetch peer (use_white_list="
-          << (use_white_list ? "true" : "false")
-          << ") after index " << random_index
+        logger(WARNING) << "Failed to fetch "
+          << (use_white_list ? "white" : "grey")
+          << " peer after index " << random_index
           << "; white=" << m_peerlist.get_white_peers_count()
           << " gray=" << m_peerlist.get_gray_peers_count();
         continue;
@@ -910,7 +917,6 @@ namespace CryptoNote
     return false;
   }
   //-----------------------------------------------------------------------------------
-  
  
   bool NodeServer::make_new_connection_from_anchor_peerlist(const std::vector<AnchorPeerlistEntry>& anchor_peerlist)
   {
