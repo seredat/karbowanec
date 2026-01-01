@@ -85,7 +85,7 @@ void Configuration::initOptions(po::options_description& desc) {
       ("log-file,l", po::value<std::string>(), "log file")
       ("server-root", po::value<std::string>(), "server root. The service will use it as working directory. Don't set it if don't want to change it")
       ("log-level", po::value<size_t>(), "log level")
-      ("scan-height", po::value<uint32_t>(), "The height to begin scanning a wallet from");
+      ("scan-height", po::value<uint32_t>(), "The height to begin scanning a wallet from")
       ("address", "print wallet addresses and exit");
 }
 
