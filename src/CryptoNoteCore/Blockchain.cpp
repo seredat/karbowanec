@@ -1235,16 +1235,16 @@ bool Blockchain::getBlockLongHash(Crypto::cn_context& context, const Block& b, C
     cn_fast_hash(pot.data(), pot.size(), hash_1);
 
     for (uint8_t j = 1; j <= 8; j++) {
-      auto& b = hash_1.data;
-      uint32_t n = (uint32_t(b[(j - 1) * 4])     << 24) |
-                   (uint32_t(b[(j - 1) * 4 + 1]) << 16) |
-                   (uint32_t(b[(j - 1) * 4 + 2]) << 8)  |
-                   (uint32_t(b[(j - 1) * 4 + 3]));
+      const uint8_t* d = hash_1.data;
+      uint32_t n = (uint32_t(d[(j - 1) * 4])     << 24) |
+                   (uint32_t(d[(j - 1) * 4 + 1]) << 16) |
+                   (uint32_t(d[(j - 1) * 4 + 2]) << 8)  |
+                   (uint32_t(d[(j - 1) * 4 + 3]));
 
       uint32_t height_j = n % maxHeight;
       bool found_alt = false;
 
-      // Check alt_chain first (no real performance impact)
+      // Alt-chain lookup first (no real performance impact)
       for (const auto& ch_ent : alt_chain) {
         const Block& ab = m_alternative_chains[ch_ent].bl;
         uint32_t ah = boost::get<BaseInput>(ab.baseTransaction.inputs[0]).blockIndex;
@@ -1267,7 +1267,7 @@ bool Blockchain::getBlockLongHash(Crypto::cn_context& context, const Block& b, C
           pot.insert(pot.end(), ba.begin(), ba.end());
         }
         else {
-          BinaryArray& ba = m_blobs[height_j];
+          const BinaryArray& ba = m_blobs[height_j];
           pot.insert(pot.end(), ba.begin(), ba.end());
         }
       }
