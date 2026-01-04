@@ -1202,17 +1202,27 @@ bool Blockchain::getBlockLongHash(Crypto::cn_context& context, const Block& b, C
 }
 
 /*
- * Computes the "long hash" of a block for Proof-of-Work
+ * Computes the "long hash" of a block for Proof-of-Work.
  *
  * For blocks prior to version 5, falls back to the legacy PoW function.
- * For version 5+ blocks:
+ *
+ * For version 5 blocks:
  *   - Starts with the block's signed hashing blob.
- *   - Iteratively mixes the blob 128 times, each iteration accessing
- *     8 pseudo-random previous blocks' hashing blobs (from main chain
- *     or alt chain) to "stir" the data and increase memory hardness.
- *   - Uses cached main-chain blobs when allowed.
- *   - Final result is processed with yespower (y_slow_hash) to produce
- *     the PoW hash.
+ *   - Iteratively mixes the blob 128 times; in each iteration, accesses
+ *     8 pseudo-random previous blocks' hashing blobs (from the main chain
+ *     or alternative chains) to expand and "stir" the data.
+ *   - Uses cached main-chain blobs when allowed to reduce reconstruction cost.
+ *
+ * For version 6 and later:
+ *   - Introduces a deterministic sequence value derived from the intermediate
+ *     hash to create a strict dependency between iterations.
+ *   - Each memory access depends on the result of the previous step,
+ *     enforcing sequential memory access reducing multi-core scaling,
+ *     making the algorithm latency-bound rather than throughput-bound,
+ *     thus more egalitarian.
+ *
+ * The final mixed data is processed with yespower (y_slow_hash) to produce
+ * the Proof-of-Work hash.
  */
 bool Blockchain::getBlockLongHash(Crypto::cn_context& context, const Block& b, Crypto::Hash& res, const std::list<Crypto::Hash>& alt_chain, bool no_blobs) {
   if (b.majorVersion < CryptoNote::BLOCK_MAJOR_VERSION_5)
@@ -1220,7 +1230,7 @@ bool Blockchain::getBlockLongHash(Crypto::cn_context& context, const Block& b, C
 
   BinaryArray pot;
   // reserve space to reduce reallocations
-  pot.reserve(80 * 1024); // 80 KB estimated from average blob size
+  pot.reserve(80 * 1024); // ~80 KB estimated from average blob size
 
   if (!get_signed_block_hashing_blob(b, pot))
     return false;
@@ -1231,20 +1241,44 @@ bool Blockchain::getBlockLongHash(Crypto::cn_context& context, const Block& b, C
 
 #define ITER 128
 
+  // v6 sequential state
+  uint32_t seq = 0;
+  if (b.majorVersion >= CryptoNote::BLOCK_MAJOR_VERSION_6) {
+    // initialize seq deterministically from block header hash
+    std::memcpy(&seq, hash_1.data, sizeof(seq));
+  }
+
   for (uint32_t i = 0; i < ITER; i++) {
     cn_fast_hash(pot.data(), pot.size(), hash_1);
 
     for (uint8_t j = 1; j <= 8; j++) {
-      auto& b = hash_1.data;
-      uint32_t n = (uint32_t(b[(j - 1) * 4])     << 24) |
-                   (uint32_t(b[(j - 1) * 4 + 1]) << 16) |
-                   (uint32_t(b[(j - 1) * 4 + 2]) << 8)  |
-                   (uint32_t(b[(j - 1) * 4 + 3]));
 
-      uint32_t height_j = n % maxHeight;
-      bool found_alt = false;
+      const uint8_t* d = hash_1.data;
+      uint32_t n = (uint32_t(d[(j - 1) * 4])     << 24) |
+                   (uint32_t(d[(j - 1) * 4 + 1]) << 16) |
+                   (uint32_t(d[(j - 1) * 4 + 2]) << 8)  |
+                   (uint32_t(d[(j - 1) * 4 + 3]));
 
-      // Check alt_chain first (no real performance impact)
+      uint32_t height_j;
+      if (b.majorVersion < CryptoNote::BLOCK_MAJOR_VERSION_6) {
+        height_j = n % maxHeight; // modulo bias is negligible and non-exploitable
+      }
+      else {
+        // sequential dependency
+        seq ^= n;
+        seq ^= seq >> 16;
+        seq *= 0x7feb352d;
+        seq ^= seq >> 15;
+        seq *= 0x846ca68b;
+        seq ^= seq >> 16;
+
+        // bias-free mapping
+        height_j = (uint64_t(seq) * maxHeight) >> 32;
+      }
+
+      bool found_alt = false; // reset for each j
+
+      // Alt-chain lookup first (no real performance impact)
       for (const auto& ch_ent : alt_chain) {
         const Block& ab = m_alternative_chains[ch_ent].bl;
         uint32_t ah = boost::get<BaseInput>(ab.baseTransaction.inputs[0]).blockIndex;
@@ -1254,6 +1288,12 @@ bool Blockchain::getBlockLongHash(Crypto::cn_context& context, const Block& b, C
             return false;
           pot.insert(pot.end(), ba.begin(), ba.end());
           found_alt = true;
+          // v6: mix memory content into seq
+          if (b.majorVersion >= CryptoNote::BLOCK_MAJOR_VERSION_6 && ba.size() >= 4) {
+            uint32_t w;
+            std::memcpy(&w, ba.data(), sizeof(w));
+            seq ^= w;
+          }
           break;
         }
       }
@@ -1265,10 +1305,22 @@ bool Blockchain::getBlockLongHash(Crypto::cn_context& context, const Block& b, C
           if (!get_block_hashing_blob(bj, ba))
             return false;
           pot.insert(pot.end(), ba.begin(), ba.end());
+          // v6: mix memory content into seq
+          if (b.majorVersion >= CryptoNote::BLOCK_MAJOR_VERSION_6 && ba.size() >= 4) {
+            uint32_t w;
+            std::memcpy(&w, ba.data(), sizeof(w));
+            seq ^= w;
+          }
         }
         else {
-          BinaryArray& ba = m_blobs[height_j];
+          const BinaryArray& ba = m_blobs[height_j];
           pot.insert(pot.end(), ba.begin(), ba.end());
+          // v6: mix memory content into seq
+          if (b.majorVersion >= CryptoNote::BLOCK_MAJOR_VERSION_6 && ba.size() >= 4) {
+            uint32_t w;
+            std::memcpy(&w, ba.data(), sizeof(w));
+            seq ^= w;
+          }
         }
       }
     }
