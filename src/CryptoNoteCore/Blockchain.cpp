@@ -1201,6 +1201,13 @@ bool Blockchain::getBlockLongHash(Crypto::cn_context& context, const Block& b, C
   return getBlockLongHash(context, b, res, dummy_alt_chain, false);
 }
 
+static inline uint32_t load_u32_be(const uint8_t* data, size_t offset) {
+  return (uint32_t(data[offset])     << 24) |
+         (uint32_t(data[offset + 1]) << 16) |
+         (uint32_t(data[offset + 2]) << 8)  |
+         (uint32_t(data[offset + 3]));
+}
+
 /*
  * Computes the "long hash" of a block for Proof-of-Work.
  *
@@ -1244,8 +1251,11 @@ bool Blockchain::getBlockLongHash(Crypto::cn_context& context, const Block& b, C
   // v6 sequential state
   uint32_t seq = 0;
   if (b.majorVersion >= CryptoNote::BLOCK_MAJOR_VERSION_6) {
-    // initialize seq deterministically from block header hash
-    std::memcpy(&seq, hash_1.data, sizeof(seq));
+    // compute initial hash for seq derivation
+    cn_fast_hash(pot.data(), pot.size(), hash_1);
+    // initialize seq from 128 bits of hash entropy
+    const uint8_t* d = hash_1.data;
+    seq = load_u32_be(d, 0) ^ load_u32_be(d, 4) ^ load_u32_be(d, 8) ^ load_u32_be(d, 12);
   }
 
   for (uint32_t i = 0; i < ITER; i++) {
@@ -1254,10 +1264,7 @@ bool Blockchain::getBlockLongHash(Crypto::cn_context& context, const Block& b, C
     for (uint8_t j = 1; j <= 8; j++) {
 
       const uint8_t* d = hash_1.data;
-      uint32_t n = (uint32_t(d[(j - 1) * 4])     << 24) |
-                   (uint32_t(d[(j - 1) * 4 + 1]) << 16) |
-                   (uint32_t(d[(j - 1) * 4 + 2]) << 8)  |
-                   (uint32_t(d[(j - 1) * 4 + 3]));
+      uint32_t n = load_u32_be(d, (j - 1) * 4);
 
       uint32_t height_j;
       if (b.majorVersion < CryptoNote::BLOCK_MAJOR_VERSION_6) {
