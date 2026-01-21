@@ -1,4 +1,8 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2014 The Boolberry
+// Copyright (c) 2014-2019, The Monero Project
+// Copyright (c) 2016-2022, The Karbowanec developers
+// 
 //
 // This file is part of Karbo.
 //
@@ -459,6 +463,30 @@ void serialize(TransactionExtraMergeMiningTag& tag, ISerializer& serializer) {
 void serialize(KeyPair& keyPair, ISerializer& serializer) {
   serializer(keyPair.secretKey, "secret_key");
   serializer(keyPair.publicKey, "public_key");
+}
+
+void serialize(CryptoNote::Difficulty& difficulty, ISerializer& serializer) {
+  if (serializer.type() == ISerializer::OUTPUT) {
+    // store high part
+    CryptoNote::Difficulty x_ = difficulty >> 64;
+    uint64_t v = x_.convert_to<uint64_t>();
+    serializer(v, "hi");
+    
+    // store low part
+    x_ = difficulty << 64 >> 64;
+    v = x_.convert_to<uint64_t>();
+    serializer(v, "lo");
+  }
+  else {
+    // load high part
+    uint64_t v = 0;
+    serializer(v, "hi");
+    difficulty = v;
+    // load low part
+    difficulty = difficulty << 64;
+    serializer(v, "lo");
+    difficulty += v;
+  }
 }
 
 

@@ -1,4 +1,7 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2014 The Boolberry
+// Copyright (c) 2014-2019, The Monero Project
+// Copyright (c) 2016-2022, The Karbowanec developers
 //
 // This file is part of Karbo.
 //
@@ -20,11 +23,15 @@
 #include <cstdint>
 #include <vector>
 
+#include <boost/multiprecision/cpp_int.hpp>
+
 #include "crypto/hash.h"
 
 namespace CryptoNote
 {
-    typedef std::uint64_t difficulty_type;
+    typedef boost::multiprecision::uint128_t Difficulty;
 
-    bool check_hash(const Crypto::Hash &hash, difficulty_type difficulty);
+    bool check_hash(const Crypto::Hash &hash, Difficulty difficulty);
+    bool check_hash_64(const Crypto::Hash& hash, uint64_t difficulty);
+    bool check_hash_128(const Crypto::Hash& hash, Difficulty difficulty);
 }

@@ -1,5 +1,8 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
-//
+// Copyright (c) 2014 The Boolberry
+// Copyright (c) 2014-2019, The Monero Project
+// Copyright (c) 2016-2022, The Karbowanec developers
+// 
 // This file is part of Karbo.
 //
 // Karbo is free software: you can redistribute it and/or modify
@@ -20,6 +23,7 @@
 #include "CryptoNoteBasic.h"
 #include "crypto/chacha8.h"
 #include "Serialization/ISerializer.h"
+#include "Difficulty.h"
 #include "crypto/crypto.h"
 
 namespace Crypto {
@@ -65,5 +69,7 @@ void serialize(AccountPublicAddress& address, ISerializer& serializer);
 void serialize(AccountKeys& keys, ISerializer& s);
 
 void serialize(KeyPair& keyPair, ISerializer& serializer);
+
+void serialize(CryptoNote::Difficulty& difficulty, ISerializer& serializer);
 
 }
