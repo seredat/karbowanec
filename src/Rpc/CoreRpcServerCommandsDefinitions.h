@@ -100,7 +100,7 @@ struct COMMAND_RPC_GET_TRANSACTIONS {
     void serialize(ISerializer &s) {
       KV_MEMBER(txs_as_hex)
       KV_MEMBER(missed_txs)
-      KV_MEMBER(status)    
+      KV_MEMBER(status)
     }
   };
 };
@@ -228,7 +228,7 @@ struct COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_response {
   std::string status;
 
   void serialize(ISerializer &s) {
-    KV_MEMBER(outs);
+    KV_MEMBER(outs)
     KV_MEMBER(status)
   }
 };
@@ -238,7 +238,7 @@ struct COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_response_json {
   std::string status;
 
   void serialize(ISerializer &s) {
-    KV_MEMBER(outs);
+    KV_MEMBER(outs)
     KV_MEMBER(status)
   }
 };
@@ -338,7 +338,7 @@ struct COMMAND_EXPLORER_GET_TRANSACTION_DETAILS_BY_HASH {
     std::string hash;
 
     void serialize(ISerializer& s) {
-      KV_MEMBER(hash);
+      KV_MEMBER(hash)
     }
   };
 
@@ -362,7 +362,7 @@ struct COMMAND_RPC_EXPLORER_SEARCH {
     std::string query;
 
     void serialize(ISerializer& s) {
-      KV_MEMBER(query);
+      KV_MEMBER(query)
     }
   };
 
@@ -371,8 +371,8 @@ struct COMMAND_RPC_EXPLORER_SEARCH {
     std::string status;
 
     void serialize(ISerializer& s) {
-      KV_MEMBER(result);
-      KV_MEMBER(status);
+      KV_MEMBER(result)
+      KV_MEMBER(status)
     }
   };
 };
@@ -427,7 +427,7 @@ struct COMMAND_RPC_GET_INFO {
       KV_MEMBER(start_time)
       KV_MEMBER(block_major_version)
       KV_MEMBER(already_generated_coins)
-      KV_MEMBER(contact)      
+      KV_MEMBER(contact)
     }
   };
 };
@@ -976,7 +976,7 @@ struct COMMAND_RPC_GET_BLOCKS_DETAILS_BY_HEIGHTS {
     std::vector<uint32_t> blockHeights;
 
     void serialize(ISerializer& s) {
-      KV_MEMBER(blockHeights);
+      KV_MEMBER(blockHeights)
     }
   };
 
@@ -996,7 +996,7 @@ struct COMMAND_RPC_GET_BLOCKS_DETAILS_BY_HASHES {
     std::vector<Crypto::Hash> blockHashes;
 
     void serialize(ISerializer& s) {
-      KV_MEMBER(blockHashes);
+      KV_MEMBER(blockHashes)
     }
   };
 
@@ -1092,7 +1092,7 @@ struct COMMAND_RPC_GET_TRANSACTION_HASHES_BY_PAYMENT_ID {
 
     void serialize(ISerializer &s) {
       KV_MEMBER(status)
-      KV_MEMBER(transactionHashes);
+      KV_MEMBER(transactionHashes)
     }
   };
 };
@@ -1102,7 +1102,7 @@ struct COMMAND_RPC_GET_TRANSACTIONS_DETAILS_BY_HASHES {
     std::vector<Crypto::Hash> transactionHashes;
 
     void serialize(ISerializer &s) {
-      KV_MEMBER(transactionHashes);
+      KV_MEMBER(transactionHashes)
     }
   };
 
@@ -1122,7 +1122,7 @@ struct COMMAND_RPC_GET_TRANSACTION_DETAILS_BY_HASH {
     std::string hash;
 
     void serialize(ISerializer &s) {
-      KV_MEMBER(hash);
+      KV_MEMBER(hash)
     }
   };
 
@@ -1161,7 +1161,7 @@ struct COMMAND_RPC_GET_TRANSACTIONS_DETAILS_BY_HEIGHTS {
     {
       KV_MEMBER(transactions)
       KV_MEMBER(missed_txs)
-      KV_MEMBER(status)       
+      KV_MEMBER(status)
     }
   };
 };
@@ -1347,7 +1347,7 @@ struct COMMAND_RPC_GET_STATS_BY_HEIGHTS {
     std::vector<uint32_t> heights;
 
     void serialize(ISerializer& s) {
-      KV_MEMBER(heights);
+      KV_MEMBER(heights)
     }
   };
 
@@ -1357,9 +1357,9 @@ struct COMMAND_RPC_GET_STATS_BY_HEIGHTS {
     std::string status;
 
     void serialize(ISerializer& s) {
-      KV_MEMBER(stats);
-      KV_MEMBER(duration);
-      KV_MEMBER(status);
+      KV_MEMBER(stats)
+      KV_MEMBER(duration)
+      KV_MEMBER(status)
     }
   };
 };
@@ -1370,8 +1370,8 @@ struct COMMAND_RPC_GET_STATS_BY_HEIGHTS_RANGE {
     uint32_t end_height;
 
     void serialize(ISerializer& s) {
-      KV_MEMBER(start_height);
-      KV_MEMBER(end_height);
+      KV_MEMBER(start_height)
+      KV_MEMBER(end_height)
     }
   };
 
@@ -1381,9 +1381,9 @@ struct COMMAND_RPC_GET_STATS_BY_HEIGHTS_RANGE {
     std::string status;
 
     void serialize(ISerializer& s) {
-      KV_MEMBER(stats);
-      KV_MEMBER(duration);
-      KV_MEMBER(status);
+      KV_MEMBER(stats)
+      KV_MEMBER(duration)
+      KV_MEMBER(status)
     }
   };
 };
@@ -1393,7 +1393,7 @@ struct COMMAND_RPC_RESOLVE_OPEN_ALIAS {
     std::string url;
 
     void serialize(ISerializer& s) {
-      KV_MEMBER(url);
+      KV_MEMBER(url)
     }
   };
 
@@ -1402,8 +1402,8 @@ struct COMMAND_RPC_RESOLVE_OPEN_ALIAS {
     std::string status;
 
     void serialize(ISerializer& s) {
-      KV_MEMBER(address);
-      KV_MEMBER(status);
+      KV_MEMBER(address)
+      KV_MEMBER(status)
     }
   };
 };
@@ -1431,9 +1431,44 @@ struct COMMAND_RPC_CHECK_PAYMENT_BY_PAYMENT_ID {
 
     void serialize(ISerializer &s) {
       KV_MEMBER(status)
-      KV_MEMBER(transaction_hashes);
-      KV_MEMBER(received_amount);
-      KV_MEMBER(confirmations);
+      KV_MEMBER(transaction_hashes)
+      KV_MEMBER(received_amount)
+      KV_MEMBER(confirmations)
+    }
+  };
+};
+
+struct COMMAND_RPC_GET_HASHING_BLOB {
+  struct request {
+    uint32_t height;
+  
+    void serialize(ISerializer& s) {
+      KV_MEMBER(height)
+    }
+  };
+
+  struct response {
+    BinaryArray blob;
+    std::string status;
+
+    void serialize(ISerializer& s) {
+      KV_MEMBER(blob)
+      KV_MEMBER(status)
+    }
+  };
+};
+
+struct COMMAND_RPC_GET_HASHING_BLOBS {
+  typedef EMPTY_STRUCT request;
+
+  struct response {
+    //std::vector<BinaryArray> blobs;
+    std::vector<std::string> blobs;
+    std::string status;
+
+    void serialize(ISerializer& s) {
+      KV_MEMBER(blobs)
+      KV_MEMBER(status)
     }
   };
 };

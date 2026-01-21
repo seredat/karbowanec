@@ -866,6 +866,14 @@ bool Core::getBlockLongHash(Crypto::cn_context &context, const Block& b, Crypto:
   return m_blockchain.getBlockLongHash(context, b, res);
 }
 
+bool Core::getHashingBlob(const uint32_t height, BinaryArray& blob) {
+  return m_blockchain.getHashingBlob(height, blob);
+}
+
+std::vector<BinaryArray> Core::getHashingBlobs() {
+  return m_blockchain.getHashingBlobs();
+}
+
 //void Core::get_all_known_block_ids(std::list<Crypto::Hash> &main, std::list<Crypto::Hash> &alt, std::list<Crypto::Hash> &invalid) {
 //  m_blockchain.get_all_known_block_ids(main, alt, invalid);
 //}
