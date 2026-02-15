@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2014-2017, The Monero project
-// Copyright (c) 2016-2025, The Karbo developers
+// Copyright (c) 2016-2026, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -79,8 +79,8 @@ public:
   PeerlistManager();
 
   bool init(bool allow_local_ip);
-  size_t get_white_peers_count() const { return m_peers_white.size(); }
-  size_t get_gray_peers_count() const { return m_peers_gray.size(); }
+  size_t get_white_peers_count() const;
+  size_t get_gray_peers_count() const;
   bool merge_peerlist(const std::vector<PeerlistEntry>& outer_bs);
   bool get_peerlist_head(std::vector<PeerlistEntry>& bs_head, uint32_t depth = CryptoNote::P2P_DEFAULT_PEERS_IN_HANDSHAKE) const;
   bool get_peerlist_full(std::list<AnchorPeerlistEntry>& pl_anchor, std::vector<PeerlistEntry>& pl_gray, std::vector<PeerlistEntry>& pl_white) const;
