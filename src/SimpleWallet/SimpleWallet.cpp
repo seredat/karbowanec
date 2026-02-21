@@ -108,8 +108,6 @@ const command_line::arg_descriptor<std::string> arg_wallet_file = { "wallet-file
 const command_line::arg_descriptor<std::string> arg_generate_new_wallet = { "generate-new-wallet", "Generate new wallet and save it to <arg>", "" };
 const command_line::arg_descriptor<std::string> arg_daemon_address = { "daemon-address", "Use daemon instance at <host>:<port>", "" };
 const command_line::arg_descriptor<std::string> arg_daemon_host = { "daemon-host", "Use daemon instance at host <arg> instead of localhost", "" };
-const command_line::arg_descriptor<std::string> arg_daemon_cert = { "daemon-cert", "Custom cert file for performing verification", "" };
-const command_line::arg_descriptor<bool> arg_daemon_no_verify = { "daemon-no-verify", "Disable verification procedure", false };
 const command_line::arg_descriptor<std::string> arg_password = { "password", "Wallet password", "", true };
 const command_line::arg_descriptor<std::string> arg_change_password = { "change-password", "Change wallet password and exit", "", true };
 const command_line::arg_descriptor<std::string> arg_mnemonic_seed = { "mnemonic-seed", "Specify mnemonic seed for wallet recovery", "" };
@@ -2484,8 +2482,6 @@ int main(int argc, char* argv[]) {
   command_line::add_arg(desc_params, arg_daemon_address);
   command_line::add_arg(desc_params, arg_daemon_host);
   command_line::add_arg(desc_params, arg_daemon_port);
-  command_line::add_arg(desc_params, arg_daemon_cert);
-  command_line::add_arg(desc_params, arg_daemon_no_verify);
   command_line::add_arg(desc_params, arg_command);
   command_line::add_arg(desc_params, arg_log_file);
   command_line::add_arg(desc_params, arg_log_level);
@@ -2592,10 +2588,8 @@ int main(int argc, char* argv[]) {
     }
 
     std::string daemon_address = command_line::get_arg(vm, arg_daemon_address);
-    std::string daemon_cert = command_line::get_arg(vm, arg_daemon_cert);
     std::string daemon_host = command_line::get_arg(vm, arg_daemon_host);
     uint16_t daemon_port = command_line::get_arg(vm, arg_daemon_port);
-    bool daemon_no_verify = command_line::get_arg(vm, arg_daemon_no_verify);
     std::string daemon_path = "/";
     bool daemon_ssl = false;
 

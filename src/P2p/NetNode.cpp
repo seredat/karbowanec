@@ -639,7 +639,7 @@ namespace CryptoNote
       CryptoNote::serialize(*this, a);
       return true;
     } catch (const std::exception& e) {
-      logger(TRACE) << "store_config failed: " << e.what();
+      logger(WARNING) << "store_config failed: " << e.what();
     }
 
     return false;
@@ -1426,8 +1426,8 @@ namespace CryptoNote
         logger(DEBUGGING) << "PEER EVICTED FROM GRAY PEER LIST IP address: " << Common::ipAddressToString(pe.adr.ip) << " Peer ID: " << std::hex << pe.id;
       }
     } else {
-      pe.last_seen = time(nullptr);
-      m_peerlist.append_with_peer_white(pe);
+      //pe.last_seen = time(nullptr);
+      //m_peerlist.append_with_peer_white(pe);
       logger(DEBUGGING) << "PEER PROMOTED TO WHITE PEER LIST IP address: " << Common::ipAddressToString(pe.adr.ip) << " Peer ID: " << std::hex << pe.id;
     }
 
