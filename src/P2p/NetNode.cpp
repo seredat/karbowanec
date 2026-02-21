@@ -1419,7 +1419,7 @@ namespace CryptoNote
     if (!m_peerlist.get_gray_peer_by_index(pe, random_index))
       return false;
 
-    if (!try_to_connect_and_handshake_with_new_peer(pe.adr, false, 0, gray, pe.last_seen)) {
+    if (!try_to_connect_and_handshake_with_new_peer(pe.adr, false, pe.last_seen, gray, 0)) {
       time_t now = time(nullptr);
       if (now - pe.last_seen >= LAST_SEEN_EVICT_THRESHOLD) {
         m_peerlist.remove_from_peer_gray(pe);
