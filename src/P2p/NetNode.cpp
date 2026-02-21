@@ -620,7 +620,7 @@ namespace CryptoNote
 
       return true;
     } catch (const std::exception& e) {
-      logger(TRACE) << "store_config failed: " << e.what();
+      logger(INFO) << "store_config failed: " << e.what();
     }
 
     return false;
