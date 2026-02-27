@@ -2430,7 +2430,9 @@ bool simple_wallet::print_address(const std::vector<std::string> &args/* = std::
 }
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::save_address_to_file(const std::vector<std::string> &args/* = std::vector<std::string>()*/) {
-  std::string walletAddressFile = prepareWalletAddressFilename(m_wallet_file_arg.empty() ? m_generate_new : m_wallet_file_arg);
+  std::string walletAddressFile = prepareWalletAddressFilename(m_wallet_file_arg.empty() ?
+                                                               m_generate_new :
+                                                               Common::RemoveExtension(m_wallet_file_arg));
   boost::system::error_code ignore;
   if (boost::filesystem::exists(walletAddressFile, ignore)) {
     fail_msg_writer() << "Address file already exists: " + walletAddressFile;
