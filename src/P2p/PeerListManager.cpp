@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2014-2017, The Monero project
-// Copyright (c) 2016-2026, The Karbo developers
+// Copyright (c) 2016-2025, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -123,18 +123,6 @@ void PeerlistManager::trim_white_peerlist() {
 void PeerlistManager::trim_gray_peerlist() {
   std::lock_guard<std::recursive_mutex> lock(mutex_);
   m_grayPeerlist.trim();
-}
-
-//--------------------------------------------------------------------------------------------------
-size_t PeerlistManager::get_white_peers_count() const {
-  std::lock_guard<std::recursive_mutex> lock(mutex_);
-  return m_peers_white.size();
-}
-
-//--------------------------------------------------------------------------------------------------
-size_t PeerlistManager::get_gray_peers_count() const {
-  std::lock_guard<std::recursive_mutex> lock(mutex_);
-  return m_peers_gray.size();
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -330,11 +318,8 @@ bool PeerlistManager::append_with_peer_gray(const PeerlistEntry& ple)
     }
     else
     {
-      // update only if the incoming timestamp is newer,
-      // otherwise old remote entries can age gray peers backwards.
-      if (ple.last_seen > by_addr_it_gr->last_seen) {
-        m_peers_gray.replace(by_addr_it_gr, ple);
-      }
+      //update record in white list 
+      m_peers_gray.replace(by_addr_it_gr, ple);
     }
     return true;
   }

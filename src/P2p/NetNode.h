@@ -225,7 +225,5 @@ namespace CryptoNote
     std::map<uint32_t, uint64_t> m_host_fails_score;
 
     mutable std::mutex mutex;
-    mutable std::mutex m_connectionsMutex;
-    mutable std::mutex m_configStoreMutex;
   };
 }
