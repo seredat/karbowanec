@@ -13,15 +13,11 @@
 #include "Common/JsonValue.h"
 #include "Common/StringTools.h"
 #include "Common/base64.hpp"
+#include "HTTP/HttpClient.h"
+#include "HTTP/HttpRequest.h"
+#include "HTTP/HttpResponse.h"
 #include "Serialization/ISerializer.h"
 #include "Serialization/SerializationTools.h"
-
-// Forward declarations
-namespace CryptoNote {
-  class HttpClient;
-  class HttpRequest;
-  class HttpResponse;
-}
 
 namespace CryptoNote {
 
