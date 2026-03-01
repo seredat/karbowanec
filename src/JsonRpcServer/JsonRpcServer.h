@@ -77,8 +77,6 @@ private:
   std::unique_ptr<CryptoNote::HttpServer> m_httpServer;
   std::unique_ptr<CryptoNote::HttpServer> m_httpsServer;
 
-  std::list<std::thread> m_workers;
-
   std::string m_chain_file;
   std::string m_key_file;
 
