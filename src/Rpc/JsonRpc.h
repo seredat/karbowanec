@@ -1,20 +1,7 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
-// Copyright (c) 2016-2022, The Karbo developers
+// Copyright (c) 2016-2026, The Karbo developers
 //
 // This file is part of Karbo.
-//
-// Karbo is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Lesser General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// Karbo is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Lesser General Public License for more details.
-//
-// You should have received a copy of the GNU Lesser General Public License
-// along with Karbo.  If not, see <http://www.gnu.org/licenses/>.
 
 #pragma once
 
@@ -24,11 +11,17 @@
 
 #include "CoreRpcServerCommandsDefinitions.h"
 #include "Common/JsonValue.h"
-#include "Common/base64.hpp"
 #include "Common/StringTools.h"
-#include "HTTP/httplib.h"
+#include "Common/base64.hpp"
 #include "Serialization/ISerializer.h"
 #include "Serialization/SerializationTools.h"
+
+// Forward declarations
+namespace CryptoNote {
+  class HttpClient;
+  class HttpRequest;
+  class HttpResponse;
+}
 
 namespace CryptoNote {
 
@@ -189,10 +182,10 @@ private:
 };
 
 
-void invokeJsonRpcCommand(httplib::Client& httpClient, JsonRpcRequest& req, JsonRpcResponse& res, const std::string& user = "", const std::string& password = "");
+void invokeJsonRpcCommand(HttpClient& httpClient, JsonRpcRequest& req, JsonRpcResponse& res, const std::string& user = "", const std::string& password = "");
 
 template <typename Request, typename Response>
-void invokeJsonRpcCommand(httplib::Client& httpClient, const std::string& method, const Request& req, Response& res, const std::string& user = "", const std::string& password = "") {
+void invokeJsonRpcCommand(HttpClient& httpClient, const std::string& method, const Request& req, Response& res, const std::string& user = "", const std::string& password = "") {
   JsonRpcRequest jsReq;
   JsonRpcResponse jsRes;
 
@@ -201,27 +194,67 @@ void invokeJsonRpcCommand(httplib::Client& httpClient, const std::string& method
 
   invokeJsonRpcCommand(httpClient, jsReq, jsRes, user, password);
 
-  jsRes.getResult(res);
+  if (!jsRes.getResult(res)) {
+    throw std::runtime_error("Failed to get result from JSON-RPC response");
+  }
 }
 
 template <typename Request, typename Response>
-void invokeJsonCommand(httplib::Client& client, const std::string& url, const Request& req, Response& res, const std::string& user = "", const std::string& password = "") {
-  httplib::Request hreq;
-  httplib::Response hres;
+void invokeJsonCommand(HttpClient& client, const std::string& url,
+  const Request& req, Response& res,
+  const std::string& method = "POST",
+  const std::string& user = "", const std::string& password = "") {
+  HttpRequest hreq;
+  HttpResponse hres;
 
+  hreq.setMethod(method);
+  hreq.setUrl(url);
+  hreq.addHeader("Content-Type", "application/json");
+  hreq.addHeader("User-Agent", "NodeRpcProxy");
 
   if (!user.empty() || !password.empty()) {
-    client.set_basic_auth(user.c_str(), password.c_str());
+    hreq.addHeader("Authorization", "Basic " + base64::encode(Common::asBinaryArray(user + ":" + password)));
   }
 
-  auto rsp = client.Post(url.c_str(), storeToJson(req), "application/json");
+  hreq.setBody(storeToJson(req));
 
-  if (!rsp || rsp->status != 200) {
-    throw std::runtime_error("JSON-RPC call failed");
+  client.request(hreq, hres);
+
+  if (hres.getStatus() != HttpResponse::STATUS_200) {
+    throw std::runtime_error("HTTP status: " + std::to_string(hres.getStatus()));
   }
 
-  if (!loadFromJson(res, rsp->body)) {
+  if (!loadFromJson(res, hres.getBody())) {
     throw std::runtime_error("Failed to parse JSON response");
+  }
+}
+
+template <typename Request, typename Response>
+void invokeBinaryCommand(HttpClient& client, const std::string& url,
+  const Request& req, Response& res,
+  const std::string& user = "", const std::string& password = "") {
+  HttpRequest hreq;
+  HttpResponse hres;
+
+  hreq.setMethod("POST");
+  hreq.setUrl(url);
+  hreq.addHeader("Content-Type", "application/octet-stream");
+  hreq.addHeader("User-Agent", "NodeRpcProxy");
+
+  if (!user.empty() || !password.empty()) {
+    hreq.addHeader("Authorization", "Basic " + base64::encode(Common::asBinaryArray(user + ":" + password)));
+  }
+
+  hreq.setBody(storeToBinaryKeyValue(req));
+
+  client.request(hreq, hres);
+
+  if (hres.getStatus() != HttpResponse::STATUS_200) {
+    throw std::runtime_error("HTTP status: " + std::to_string(hres.getStatus()));
+  }
+
+  if (!loadFromBinaryKeyValue(res, hres.getBody())) {
+    throw std::runtime_error("Failed to parse binary response");
   }
 }
 

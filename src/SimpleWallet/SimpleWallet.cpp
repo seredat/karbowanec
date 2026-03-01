@@ -2,7 +2,7 @@
 // Copyright (c) 2014-2016, XDN developers
 // Copyright (c) 2014-2017, The Monero Project
 // Copyright (c) 2014-2017, The Forknote developers
-// Copyright (c) 2016-2022, The Karbo developers
+// Copyright (c) 2016-2026, The Karbo developers
 //
 // All rights reserved.
 //
@@ -671,11 +671,6 @@ simple_wallet::simple_wallet(System::Dispatcher& dispatcher, const CryptoNote::C
   m_consoleHandler.setHandler("verify_message", std::bind(&simple_wallet::verify_message, this, std::placeholders::_1), "Verify a signature of the message");
   m_consoleHandler.setHandler("help", std::bind(&simple_wallet::help, this, std::placeholders::_1), "Show this help");
   m_consoleHandler.setHandler("exit", std::bind(&simple_wallet::exit, this, std::placeholders::_1), "Close wallet");
-
-  std::stringstream userAgent;
-  userAgent << "NodeRpcProxy/" << PROJECT_VERSION_LONG;
-  m_requestHeaders = { {"User-Agent", userAgent.str()}, { "Connection", "keep-alive" } };
-
 }
 //----------------------------------------------------------------------------------------------------
 
@@ -1798,32 +1793,24 @@ bool simple_wallet::start_mining(const std::vector<std::string>& args) {
   std::string err;
 
   try {
-    httplib::Client cli(m_daemon_address);
-    if (m_daemon_ssl && m_daemon_no_verify) {
-      cli.enable_server_certificate_verification(!m_daemon_no_verify);
-    }
-    const auto rsp = cli.Post(rpc_url.c_str(), m_requestHeaders, storeToJson(req), "application/json");
-    if (rsp) {
-      if (rsp->status == 200) {
-        if (!loadFromJson(res, rsp->body)) {
-          err = "Failed to parse JSON response";
-        }
-      }
-      err = interpret_rpc_response(res.status);
-    }
-    else {
-      err = "No response...";
-    }
+    HttpClient httpClient(m_dispatcher, m_daemon_host, m_daemon_port);
 
-    if (err.empty()) {
+    JsonRpc::invokeJsonCommand(httpClient, rpc_url, req, res);
+
+    std::string err = interpret_rpc_response(res.status);
+    if (err.empty())
       success_msg_writer() << "Mining started in daemon";
-    }
-    else {
-      fail_msg_writer() << "Mining has not started due to an error: " << err;
-    }
-  } catch (const std::exception& e) {
+    else
+      fail_msg_writer() << "Mining has not started: " << err;
+
+  }
+  catch (const ConnectException&) {
+    printConnectionError();
+  }
+  catch (const std::exception& e) {
     fail_msg_writer() << "Failed to invoke RPC method: " << e.what();
   }
+
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -1836,32 +1823,23 @@ bool simple_wallet::stop_mining(const std::vector<std::string>& args)
   std::string err;
 
   try {
-    httplib::Client cli(m_daemon_address);
-    if (m_daemon_ssl && m_daemon_no_verify) {
-      cli.enable_server_certificate_verification(!m_daemon_no_verify);
-    }
-    const auto rsp = cli.Post(rpc_url.c_str(), m_requestHeaders, storeToJson(req), "application/json");
-    if (rsp) {
-      if (rsp->status == 200) {
-        if (!loadFromJson(res, rsp->body)) {
-          err = "Failed to parse JSON response";
-        }
-      }
-      err = interpret_rpc_response(res.status);
-    }
-    else {
-      err = "No response...";
-    }
+    HttpClient httpClient(m_dispatcher, m_daemon_host, m_daemon_port);
 
-    if (err.empty()) {
+    JsonRpc::invokeJsonCommand(httpClient, rpc_url, req, res);
+
+    std::string err = interpret_rpc_response(res.status);
+    if (err.empty())
       success_msg_writer() << "Mining stopped in daemon";
-    }
-    else {
+    else
       fail_msg_writer() << "Mining has not stopped: " << err;
-    }
-  } catch (const std::exception& e) {
+  }
+  catch (const ConnectException&) {
+    printConnectionError();
+  }
+  catch (const std::exception& e) {
     fail_msg_writer() << "Failed to invoke RPC method: " << e.what();
   }
+
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -2686,7 +2664,7 @@ int main(int argc, char* argv[]) {
       return 1;
     }
 
-    Tools::wallet_rpc_server wrpc(logManager, *wallet, *node, currency, walletFileName);
+    Tools::wallet_rpc_server wrpc(dispatcher, logManager, *wallet, *node, currency, walletFileName);
 
     if (!wrpc.init(vm)) {
       logger(ERROR, BRIGHT_RED) << "Failed to initialize wallet rpc server";

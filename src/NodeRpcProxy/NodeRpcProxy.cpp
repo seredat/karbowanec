@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
-// Copyright (c) 2016-2022, The Karbo developers
+// Copyright (c) 2016-2026, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -92,10 +92,6 @@ NodeRpcProxy::NodeRpcProxy(const std::string& nodeHost, unsigned short nodePort,
     m_greyPeerlistSize(0),
     m_node_url((m_daemon_ssl ? "https://" : "http://") + m_nodeHost + ":" + std::to_string(m_nodePort))
 {
-  std::stringstream userAgent;
-  userAgent << "NodeRpcProxy";
-  m_requestHeaders = { {"User-Agent", userAgent.str()}, { "Connection", "keep-alive" } };
-
   resetInternalState();
 }
 
@@ -183,11 +179,19 @@ void NodeRpcProxy::workerThread(const INode::Callback& initialized_callback) {
     m_dispatcher = &dispatcher;
     ContextGroup contextGroup(dispatcher);
     m_context_group = &contextGroup;
-    httplib::Client httpClient(m_node_url);
-    m_httpClient = &httpClient;
-    m_httpClient->enable_server_certificate_verification(false);
-    m_httpClient->set_connection_timeout(1000);
-    m_httpClient->set_keep_alive(true);
+
+    // Create HttpClient
+    if (m_daemon_ssl) {
+      // SSL client
+      m_httpClient = std::make_unique<CryptoNote::HttpClient>(
+        dispatcher, m_nodeHost, m_nodePort, m_daemon_cert);
+    }
+    else {
+      // Plain HTTP client
+      m_httpClient = std::make_unique<CryptoNote::HttpClient>(
+        dispatcher, m_nodeHost, m_nodePort);
+    }
+
     Event httpEvent(dispatcher);
     m_httpEvent = &httpEvent;
     m_httpEvent->set();
@@ -209,17 +213,17 @@ void NodeRpcProxy::workerThread(const INode::Callback& initialized_callback) {
           pullTimer.sleep(std::chrono::milliseconds(m_pullInterval));
         }
       }
-    });
+      });
 
     contextGroup.wait();
-    // Make sure all remote spawns are executed
     m_dispatcher->yield();
-  } catch (std::exception&) {
+  }
+  catch (std::exception&) {
   }
 
   m_dispatcher = nullptr;
   m_context_group = nullptr;
-  m_httpClient = nullptr;
+  m_httpClient.reset();
   m_httpEvent = nullptr;
   m_connected = false;
   m_rpcProxyObserverManager.notify(&INodeRpcProxyObserver::connectionStatusUpdated, m_connected);
@@ -986,89 +990,48 @@ void NodeRpcProxy::scheduleRequest(std::function<std::error_code()>&& procedure,
 template <typename Request, typename Response>
 std::error_code NodeRpcProxy::binaryCommand(const std::string& comm, const Request& req, Response& res) {
   std::error_code ec;
-  std::string rpc_url = this->m_daemon_path + comm;
   try {
     EventLock eventLock(*m_httpEvent);
-
-    const auto rsp = m_httpClient->Post(rpc_url.c_str(), m_requestHeaders, storeToBinaryKeyValue(req), "application/octet-stream");
-    if (rsp) {
-      if (rsp->status == 200) {
-        if (!loadFromBinaryKeyValue(res, rsp->body)) {
-          throw std::runtime_error("Failed to parse binary response");
-        }
-      }
-      ec = interpretResponseStatus(std::to_string(rsp->status));
-    }
-    else {
-      ec = make_error_code(error::CONNECT_ERROR);
-    }
-  } catch (const std::exception&) {
+    std::string rpc_url = m_daemon_path + comm;
+    JsonRpc::invokeBinaryCommand(*m_httpClient, rpc_url, req, res);
+    ec = std::error_code();  // Success
+  }
+  catch (const std::exception&) {
     ec = make_error_code(error::NETWORK_ERROR);
   }
-
   return ec;
 }
 
 template <typename Request, typename Response>
 std::error_code NodeRpcProxy::jsonCommand(const std::string& comm, const Request& req, Response& res) {
   std::error_code ec;
-  std::string rpc_url = this->m_daemon_path + comm;
   try {
     EventLock eventLock(*m_httpEvent);
-
-    const auto rsp = m_httpClient->Post(rpc_url.c_str(), m_requestHeaders, storeToJson(req), "application/json");
-    if (rsp) {
-      if (rsp->status == 200) {
-        if (!loadFromJson(res, rsp->body)) {
-          throw std::runtime_error("Failed to parse JSON response");
-        }
-      }
-      ec = interpretResponseStatus(std::to_string(rsp->status));
-    }
-    else {
-      ec = make_error_code(error::CONNECT_ERROR);
-    }
-  } catch (const std::exception&) {
+    std::string rpc_url = m_daemon_path + comm;
+    std::string method = (comm == "getinfo") ? "GET" : "POST";
+    JsonRpc::invokeJsonCommand(*m_httpClient, rpc_url, req, res, method);
+    ec = std::error_code();  // Success
+  }
+  catch (const std::exception&) {
     ec = make_error_code(error::NETWORK_ERROR);
   }
-
   return ec;
 }
 
 template <typename Request, typename Response>
 std::error_code NodeRpcProxy::jsonRpcCommand(const std::string& method, const Request& req, Response& res) {
-  std::error_code ec = make_error_code(error::INTERNAL_NODE_ERROR);
-  std::string rpc_url = this->m_daemon_path + "json_rpc";
+  std::error_code ec;
   try {
     EventLock eventLock(*m_httpEvent);
-    JsonRpc::JsonRpcRequest jsReq;
-    jsReq.setMethod(method);
-    jsReq.setParams(req);
-    JsonRpc::JsonRpcResponse jsRes;
-
-    const auto rsp = m_httpClient->Post(rpc_url.c_str(), m_requestHeaders, jsReq.getBody(), "application/json");
-    if (rsp) {
-      if (rsp->status == 200) {
-        jsRes.parse(rsp->body);
-
-        JsonRpc::JsonRpcError err;
-        if (jsRes.getError(err)) {
-          throw err;
-        }
-
-        if (!jsRes.getResult(res)) {
-          throw std::runtime_error("Failed to parse JSON response");
-        }
-      }
-      ec = interpretResponseStatus(std::to_string(rsp->status));
-    }
-    else {
-      ec = make_error_code(error::CONNECT_ERROR);
-    }
-  } catch (const std::exception&) {
+    JsonRpc::invokeJsonRpcCommand(*m_httpClient, method, req, res);
+    ec = std::error_code();  // Success
+  }
+  catch (const ConnectException&) {
+    ec = make_error_code(error::CONNECT_ERROR);
+  }
+  catch (const std::exception&) {
     ec = make_error_code(error::NETWORK_ERROR);
   }
-
   return ec;
 }
 
