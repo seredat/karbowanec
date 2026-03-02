@@ -1760,6 +1760,26 @@ bool simple_wallet::change_password(const std::vector<std::string>& args) {
   return true;
 }
 
+std::unique_ptr<CryptoNote::HttpClient> simple_wallet::createDaemonHttpClient() {
+  if (m_daemon_ssl) {
+    return std::make_unique<CryptoNote::HttpClient>(
+      m_dispatcher,
+      m_daemon_host,
+      m_daemon_port,
+      m_daemon_cert,
+      m_daemon_cert,
+     !m_daemon_no_verify
+    );
+  }
+  else {
+    return std::make_unique<CryptoNote::HttpClient>(
+      m_dispatcher,
+      m_daemon_host,
+      m_daemon_port
+    );
+  }
+}
+
 bool simple_wallet::start_mining(const std::vector<std::string>& args) {
   COMMAND_RPC_START_MINING::request req;
 
@@ -1783,7 +1803,7 @@ bool simple_wallet::start_mining(const std::vector<std::string>& args) {
 
   if (!ok) {
     fail_msg_writer() << "invalid arguments. Please use start_mining [<number_of_threads>], " <<
-      "<number_of_threads> should be from 1 to " << max_mining_threads_count;
+      "where <number_of_threads> should be from 1 to " << max_mining_threads_count;
     return true;
   }
 
@@ -1793,9 +1813,9 @@ bool simple_wallet::start_mining(const std::vector<std::string>& args) {
   std::string err;
 
   try {
-    HttpClient httpClient(m_dispatcher, m_daemon_host, m_daemon_port);
+    auto httpClient = createDaemonHttpClient();
 
-    JsonRpc::invokeJsonCommand(httpClient, rpc_url, req, res);
+    JsonRpc::invokeJsonCommand(*httpClient, rpc_url, req, res);
 
     std::string err = interpret_rpc_response(res.status);
     if (err.empty())
@@ -1823,9 +1843,9 @@ bool simple_wallet::stop_mining(const std::vector<std::string>& args)
   std::string err;
 
   try {
-    HttpClient httpClient(m_dispatcher, m_daemon_host, m_daemon_port);
+    auto httpClient = createDaemonHttpClient();
 
-    JsonRpc::invokeJsonCommand(httpClient, rpc_url, req, res);
+    JsonRpc::invokeJsonCommand(*httpClient, rpc_url, req, res);
 
     std::string err = interpret_rpc_response(res.status);
     if (err.empty())

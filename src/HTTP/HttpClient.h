@@ -25,15 +25,15 @@ public:
 class HttpClient {
 public:
   HttpClient(System::Dispatcher& dispatcher, const std::string& address, uint16_t port);
-  
+
   // SSL client
   HttpClient(System::Dispatcher& dispatcher, const std::string& address, uint16_t port,
-             const std::string& certFile, const std::string& keyFile = "");
-  
+             const std::string& certFile, const std::string& keyFile = "", bool sslVerify = true);
+
   ~HttpClient();
 
   void request(const HttpRequest& req, HttpResponse& res);
-  
+
   bool isConnected() const;
   void disconnect();
 
@@ -44,11 +44,11 @@ private:
   System::Dispatcher& m_dispatcher;
   std::string m_address;
   uint16_t m_port;
-  
+ 
   bool m_connected{false};
   System::TcpConnection m_connection;
   std::unique_ptr<System::TcpStreambuf> m_streamBuf;
-  
+
   // SSL support
   bool m_useSsl{false};
   std::unique_ptr<boost::asio::ssl::context> m_sslContext;

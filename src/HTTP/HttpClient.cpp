@@ -28,7 +28,8 @@ HttpClient::HttpClient(System::Dispatcher& dispatcher,
                        const std::string& address,
                        uint16_t port,
                        const std::string& certFile,
-                       const std::string& keyFile)
+                       const std::string& keyFile,
+                       bool sslVerify)
   : m_dispatcher(dispatcher),
     m_address(address),
     m_port(port),
@@ -39,20 +40,31 @@ HttpClient::HttpClient(System::Dispatcher& dispatcher,
   try {
     m_sslContext = std::make_unique<boost::asio::ssl::context>(
       boost::asio::ssl::context::tls_client);
-    
-    // Set verification mode
-    m_sslContext->set_verify_mode(boost::asio::ssl::verify_peer);
-    
-    // Load certificate
-    if (!certFile.empty()) {
-      m_sslContext->load_verify_file(certFile);
+
+    if (sslVerify) {
+      // Enable certificate verification
+      m_sslContext->set_verify_mode(boost::asio::ssl::verify_peer);
+
+      if (!certFile.empty()) {
+        // Use custom CA certificate file
+        m_sslContext->load_verify_file(certFile);
+      }
+      else {
+        // Use system's default CA certificates (for public SSL sites)
+        m_sslContext->set_default_verify_paths();
+      }
     }
-    
-    // Load private key if provided
+    else {
+      // Disable certificate verification (for self-signed certs, testing, etc.)
+      m_sslContext->set_verify_mode(boost::asio::ssl::verify_none);
+    }
+
+    // Load private key if provided (for client certificate authentication)
+    // This is separate from verification - it's for mutual TLS
     if (!keyFile.empty()) {
       m_sslContext->use_private_key_file(keyFile, boost::asio::ssl::context::pem);
     }
-    
+
   } catch (const std::exception& e) {
     throw ConnectException("Failed to initialize SSL context: " + std::string(e.what()));
   }

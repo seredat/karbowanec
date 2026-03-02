@@ -136,6 +136,8 @@ namespace CryptoNote
 
     void printConnectionError() const;
 
+    std::unique_ptr<CryptoNote::HttpClient> createDaemonHttpClient();
+
     //---------------- IWalletLegacyObserver -------------------------
     virtual void initCompleted(std::error_code result) override;
     virtual void externalTransactionCreated(CryptoNote::TransactionId transactionId) override;

@@ -184,7 +184,7 @@ void NodeRpcProxy::workerThread(const INode::Callback& initialized_callback) {
     if (m_daemon_ssl) {
       // SSL client
       m_httpClient = std::make_unique<CryptoNote::HttpClient>(
-        dispatcher, m_nodeHost, m_nodePort, m_daemon_cert);
+        dispatcher, m_nodeHost, m_nodePort, m_daemon_cert, "", !m_daemon_no_verify);
     }
     else {
       // Plain HTTP client
