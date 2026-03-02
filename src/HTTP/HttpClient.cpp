@@ -8,155 +8,167 @@
 #include <System/Ipv4Resolver.h>
 #include <System/Ipv4Address.h>
 #include <System/TcpConnector.h>
+#include <System/SslTcpStreambuf.h>
 
 namespace CryptoNote {
 
-ConnectException::ConnectException(const std::string& whatArg) 
-  : std::runtime_error(whatArg.c_str()) {
-}
-
-HttpClient::HttpClient(System::Dispatcher& dispatcher, 
-                       const std::string& address, 
-                       uint16_t port)
-  : m_dispatcher(dispatcher), 
-    m_address(address), 
+  HttpClient::HttpClient(System::Dispatcher& dispatcher,
+    const std::string& address,
+    uint16_t port)
+    : m_dispatcher(dispatcher),
+    m_address(address),
     m_port(port),
     m_useSsl(false) {
-}
+  }
 
-HttpClient::HttpClient(System::Dispatcher& dispatcher,
-                       const std::string& address,
-                       uint16_t port,
-                       const std::string& certFile,
-                       const std::string& keyFile,
-                       bool sslVerify)
-  : m_dispatcher(dispatcher),
+  HttpClient::HttpClient(System::Dispatcher& dispatcher,
+    const std::string& address,
+    uint16_t port,
+    const std::string& certFile,
+    const std::string& keyFile,
+    bool sslVerify)
+    : m_dispatcher(dispatcher),
     m_address(address),
     m_port(port),
     m_useSsl(true),
+    m_sslVerify(sslVerify),
     m_certFile(certFile),
     m_keyFile(keyFile) {
-  
-  try {
-    m_sslContext = std::make_unique<boost::asio::ssl::context>(
-      boost::asio::ssl::context::tls_client);
 
-    if (sslVerify) {
+    try {
+      m_sslContext = std::make_unique<boost::asio::ssl::context>(
+        boost::asio::ssl::context::tls_client);
+
+      if (sslVerify) {
       // Enable certificate verification
-      m_sslContext->set_verify_mode(boost::asio::ssl::verify_peer);
+        m_sslContext->set_verify_mode(boost::asio::ssl::verify_peer);
 
-      if (!certFile.empty()) {
+        if (!certFile.empty()) {
         // Use custom CA certificate file
-        m_sslContext->load_verify_file(certFile);
+          m_sslContext->load_verify_file(certFile);
+        }
+        else {
+        // Use system's default CA certificates (for public SSL sites)
+          m_sslContext->set_default_verify_paths();
+        }
       }
       else {
-        // Use system's default CA certificates (for public SSL sites)
-        m_sslContext->set_default_verify_paths();
-      }
-    }
-    else {
       // Disable certificate verification (for self-signed certs, testing, etc.)
-      m_sslContext->set_verify_mode(boost::asio::ssl::verify_none);
-    }
+        m_sslContext->set_verify_mode(boost::asio::ssl::verify_none);
+      }
 
     // Load private key if provided (for client certificate authentication)
     // This is separate from verification - it's for mutual TLS
-    if (!keyFile.empty()) {
-      m_sslContext->use_private_key_file(keyFile, boost::asio::ssl::context::pem);
+      if (!keyFile.empty()) {
+        m_sslContext->use_private_key_file(keyFile, boost::asio::ssl::context::pem);
+      }
+
     }
-
-  } catch (const std::exception& e) {
-    throw ConnectException("Failed to initialize SSL context: " + std::string(e.what()));
-  }
-}
-
-HttpClient::~HttpClient() {
-  if (m_connected) {
-    disconnect();
-  }
-}
-
-void HttpClient::request(const HttpRequest& req, HttpResponse& res) {
-  if (!m_connected) {
-    if (m_useSsl) {
-      connectSsl();
-    } else {
-      connect();
+    catch (const std::exception& e) {
+      throw ConnectException("Failed to initialize SSL context: " + std::string(e.what()));
     }
   }
 
-  try {
-    std::iostream stream(m_streamBuf.get());
-    HttpParser parser;
-    
-    stream << req;
-    stream.flush();
-    
-    if (!stream) {
-      throw std::runtime_error("Failed to send request");
+  HttpClient::~HttpClient() {
+    if (m_connected) {
+      disconnect();
     }
-    
-    parser.receiveResponse(stream, res);
-    
-  } catch (const std::exception&) {
-    disconnect();
-    throw;
-  }
-}
-
-void HttpClient::connect() {
-  try {
-    auto ipAddr = System::Ipv4Resolver(m_dispatcher).resolve(m_address);
-    m_connection = System::TcpConnector(m_dispatcher).connect(ipAddr, m_port);
-    m_streamBuf.reset(new System::TcpStreambuf(m_connection));
-    m_connected = true;
-  } catch (const std::exception& e) {
-    throw ConnectException(e.what());
-  }
-}
-
-void HttpClient::connectSsl() {
-  try {
-    // First establish TCP connection
-    auto ipAddr = System::Ipv4Resolver(m_dispatcher).resolve(m_address);
-    m_connection = System::TcpConnector(m_dispatcher).connect(ipAddr, m_port);
-    
-    // TODO: Perform SSL handshake
-    // This requires access to the underlying socket which is not directly available
-    // from TcpConnection's current implementation
-    
-    // For now, fall back to plain connection
-    m_streamBuf.reset(new System::TcpStreambuf(m_connection));
-    m_connected = true;
-    
-    // Log warning about SSL not being fully implemented
-    // In production, you'd need to refactor TcpConnection to expose the socket
-    
-  } catch (const std::exception& e) {
-    throw ConnectException(e.what());
-  }
-}
-
-bool HttpClient::isConnected() const {
-  return m_connected;
-}
-
-void HttpClient::disconnect() {
-  m_streamBuf.reset();
-  
-  try {
-    m_connection.write(nullptr, 0); // Socket shutdown
-  } catch (const std::exception&) {
-    // Ignoring possible exception
   }
 
-  try {
-    m_connection = System::TcpConnection();
-  } catch (const std::exception&) {
-    // Ignoring possible exception
+  void HttpClient::request(const HttpRequest& req, HttpResponse& res) {
+    if (!m_connected) {
+      if (m_useSsl) {
+        connectSsl();
+      }
+      else {
+        connect();
+      }
+    }
+
+    try {
+      std::iostream* stream = nullptr;
+
+      if (m_useSsl) {
+        stream = new std::iostream(m_sslStreamBuf.get());
+      }
+      else {
+        stream = new std::iostream(m_streamBuf.get());
+      }
+
+      std::unique_ptr<std::iostream> streamPtr(stream);
+      HttpParser parser;
+
+      *stream << req;
+      stream->flush();
+
+      if (!(*stream)) {
+        throw std::runtime_error("Failed to send request");
+      }
+
+      parser.receiveResponse(*stream, res);
+
+    }
+    catch (const std::exception&) {
+      disconnect();
+      throw;
+    }
   }
 
-  m_connected = false;
-}
+  void HttpClient::connect() {
+    try {
+      auto ipAddr = System::Ipv4Resolver(m_dispatcher).resolve(m_address);
+      m_connection = System::TcpConnector(m_dispatcher).connect(ipAddr, m_port);
+      m_streamBuf.reset(new System::TcpStreambuf(m_connection));
+      m_connected = true;
+    }
+    catch (const std::exception& e) {
+      throw ConnectException(e.what());
+    }
+  }
+
+  void HttpClient::connectSsl() {
+    try {
+      // Establish TCP connection
+      auto ipAddr = System::Ipv4Resolver(m_dispatcher).resolve(m_address);
+      m_connection = System::TcpConnector(m_dispatcher).connect(ipAddr, m_port);
+
+      // Create SSL stream buffer (wraps the socket)
+      m_sslStreamBuf.reset(new System::SslTcpStreambuf(m_connection, *m_sslContext, false));
+
+      // Perform SSL handshake
+      m_sslStreamBuf->handshake();
+
+      m_connected = true;
+
+    }
+    catch (const std::exception& e) {
+      throw ConnectException(std::string("SSL connection failed: ") + e.what());
+    }
+  }
+
+  bool HttpClient::isConnected() const {
+    return m_connected;
+  }
+
+  void HttpClient::disconnect() {
+    m_sslStreamBuf.reset();
+    m_streamBuf.reset();
+
+    try {
+      m_connection.write(nullptr, 0); // Socket shutdown
+    }
+    catch (const std::exception&) {
+      // Ignoring possible exception
+    }
+
+    try {
+      m_connection = System::TcpConnection();
+    }
+    catch (const std::exception&) {
+      // Ignoring possible exception
+    }
+
+    m_connected = false;
+  }
 
 } // namespace CryptoNote

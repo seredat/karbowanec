@@ -14,6 +14,7 @@
 #include <System/Dispatcher.h>
 #include <System/TcpConnection.h>
 #include <System/TcpStream.h>
+#include <System/SslTcpStreambuf.h>
 
 namespace CryptoNote {
 
@@ -28,7 +29,7 @@ public:
 
   // SSL client
   HttpClient(System::Dispatcher& dispatcher, const std::string& address, uint16_t port,
-             const std::string& certFile, const std::string& keyFile = "", bool sslVerify = true);
+    const std::string& certFile, const std::string& keyFile = "", bool sslVerify = true);
 
   ~HttpClient();
 
@@ -44,13 +45,15 @@ private:
   System::Dispatcher& m_dispatcher;
   std::string m_address;
   uint16_t m_port;
- 
-  bool m_connected{false};
+
+  bool m_connected{ false };
   System::TcpConnection m_connection;
   std::unique_ptr<System::TcpStreambuf> m_streamBuf;
+  std::unique_ptr<System::SslTcpStreambuf> m_sslStreamBuf;
 
   // SSL support
-  bool m_useSsl{false};
+  bool m_useSsl{ false };
+  bool m_sslVerify{ true };
   std::unique_ptr<boost::asio::ssl::context> m_sslContext;
   std::string m_certFile;
   std::string m_keyFile;
