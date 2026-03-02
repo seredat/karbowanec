@@ -350,7 +350,6 @@ namespace CryptoNote
 
   bool NodeServer::add_host_fail(const uint32_t address_ip)
   {
-    std::unique_lock<std::mutex> lock(mutex);
     uint64_t fails = ++m_host_fails_score[address_ip];
     logger(DEBUGGING) << "Host " << Common::ipAddressToString(address_ip) << " fail score=" << fails;
     if (fails >= P2P_IP_FAILS_BEFORE_BLOCK)
@@ -369,7 +368,6 @@ namespace CryptoNote
 
   bool NodeServer::is_remote_host_allowed(const uint32_t address_ip)
   {
-    std::unique_lock<std::mutex> lock(mutex);
     auto i = m_blocked_hosts.find(address_ip);
     if (i == m_blocked_hosts.end())
       return true;
@@ -381,7 +379,6 @@ namespace CryptoNote
 
   bool NodeServer::is_addr_recently_failed(const uint32_t address_ip)
   {
-    std::unique_lock<std::mutex> lock(mutex);
     auto i = m_host_fails_score.find(address_ip);
     if (i != m_host_fails_score.end())
       return true;
@@ -392,14 +389,12 @@ namespace CryptoNote
 
   bool NodeServer::ban_host(const uint32_t address_ip, time_t seconds)
   {
-	  std::unique_lock<std::mutex> lock(mutex);
-	  return block_host(address_ip, seconds);
+    return block_host(address_ip, seconds);
   }
   
   bool NodeServer::unban_host(const uint32_t address_ip)
   {
-	  std::unique_lock<std::mutex> lock(mutex);
-	  return unblock_host(address_ip);
+    return unblock_host(address_ip);
   }
   //-----------------------------------------------------------------------------------
 
