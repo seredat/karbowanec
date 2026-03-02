@@ -11,6 +11,7 @@
 #include <System/InterruptedException.h>
 #include <System/TcpStream.h>
 #include <System/Ipv4Address.h>
+#include <System/SslTcpStreambuf.h>
 
 using namespace Logging;
 
@@ -160,48 +161,68 @@ void HttpServer::acceptLoop() {
 }
 
 void HttpServer::connectionWorker(System::TcpConnection connection) {
-  // Get peer address
   std::pair<System::Ipv4Address, uint16_t> addr(static_cast<System::Ipv4Address>(0), 0);
   try {
     addr = connection.getPeerAddressAndPort();
-  } catch (const std::exception&) {
+  }
+  catch (const std::exception&) {
     logger(WARNING) << "Could not get IP of connection";
   }
 
-  logger(DEBUGGING) << "Incoming connection from " << addr.first.toDottedDecimal() 
+  logger(DEBUGGING) << "Incoming connection from " << addr.first.toDottedDecimal()
                     << ":" << addr.second;
 
   try {
-    // TODO: If SSL is enabled, perform handshake here
-    // For now, SSL is not fully implemented due to TcpConnection socket access limitations
-    
+    std::unique_ptr<std::streambuf> streambuf;
+
     if (m_useSsl) {
-      logger(WARNING) << "SSL requested but not fully implemented - using plain connection";
+      // Create SSL stream buffer
+      auto sslBuf = std::make_unique<System::SslTcpStreambuf>(
+        connection, *m_sslContext, true);
+
+      // Perform SSL handshake
+      try {
+        sslBuf->handshake();
+        logger(DEBUGGING) << "SSL handshake completed for "
+          << addr.first.toDottedDecimal() << ":" << addr.second;
+      }
+      catch (const std::exception& e) {
+        logger(WARNING) << "SSL handshake failed for "
+          << addr.first.toDottedDecimal() << ":" << addr.second
+          << " - " << e.what();
+        return;
+      }
+
+      streambuf = std::move(sslBuf);
+    }
+    else {
+      // Plain TCP
+      streambuf = std::make_unique<System::TcpStreambuf>(connection);
     }
 
-    System::TcpStreambuf streambuf(connection);
-    std::iostream stream(&streambuf);
+    std::iostream stream(streambuf.get());
     HttpParser parser;
 
     for (;;) {
       HttpRequest req;
       HttpResponse resp;
-      
-      // Add CORS header
+
       resp.addHeader("Access-Control-Allow-Origin", "*");
 
       try {
         parser.receiveRequest(stream, req);
-      } catch (const std::exception& e) {
+      }
+      catch (const std::exception& e) {
         logger(DEBUGGING) << "Failed to parse request: " << e.what();
         break;
       }
 
       if (authenticate(req)) {
         processRequest(req, resp);
-      } else {
-        logger(WARNING) << "Authorization required from " 
-                       << addr.first.toDottedDecimal() << ":" << addr.second;
+      }
+      else {
+        logger(WARNING) << "Authorization required from "
+          << addr.first.toDottedDecimal() << ":" << addr.second;
         fillUnauthorizedResponse(resp);
       }
 
@@ -213,12 +234,14 @@ void HttpServer::connectionWorker(System::TcpConnection connection) {
       }
     }
 
-    logger(DEBUGGING) << "Closing connection from " << addr.first.toDottedDecimal() 
-                     << ":" << addr.second;
+    logger(DEBUGGING) << "Closing connection from " << addr.first.toDottedDecimal()
+      << ":" << addr.second;
 
-  } catch (System::InterruptedException&) {
+  }
+  catch (System::InterruptedException&) {
     logger(DEBUGGING) << "Connection interrupted";
-  } catch (const std::exception& e) {
+  }
+  catch (const std::exception& e) {
     logger(DEBUGGING) << "Connection error: " << e.what();
   }
 }

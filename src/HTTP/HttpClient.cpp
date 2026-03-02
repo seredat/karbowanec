@@ -12,6 +12,10 @@
 
 namespace CryptoNote {
 
+  ConnectException::ConnectException(const std::string& whatArg) 
+    : std::runtime_error(whatArg.c_str()) {
+  }
+
   HttpClient::HttpClient(System::Dispatcher& dispatcher,
     const std::string& address,
     uint16_t port)
