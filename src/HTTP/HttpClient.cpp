@@ -137,7 +137,11 @@ namespace CryptoNote {
       m_connection = System::TcpConnector(m_dispatcher).connect(ipAddr, m_port);
 
       // Create SSL stream buffer (wraps the socket)
-      m_sslStreamBuf.reset(new System::SslTcpStreambuf(m_connection, *m_sslContext, false));
+      m_sslStreamBuf.reset(new System::SslTcpStreambuf(
+        m_dispatcher,
+        m_connection,
+        *m_sslContext,
+        false));
 
       // Perform SSL handshake
       m_sslStreamBuf->handshake();

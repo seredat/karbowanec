@@ -178,7 +178,10 @@ void HttpServer::connectionWorker(System::TcpConnection connection) {
     if (m_useSsl) {
       // Create SSL stream buffer
       auto sslBuf = std::make_unique<System::SslTcpStreambuf>(
-        connection, *m_sslContext, true);
+        m_dispatcher,
+        connection,
+        *m_sslContext,
+        true);
 
       // Perform SSL handshake
       try {
