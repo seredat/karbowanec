@@ -110,9 +110,24 @@ void HttpServer::startSsl(const std::string& address, uint16_t port,
 }
 
 void HttpServer::stop() {
+  if (m_stopping.exchange(true)) {
+    return;  // Already stopped
+  }
+  
   logger(INFO) << "Stopping HTTP server...";
+
+  // Close listener
+  try {
+    m_listener.close();
+    logger(INFO) << "Listener closed";
+  }
+  catch (const std::exception& e) {
+    logger(INFO) << "Error closing listener: " << e.what();
+  }
+  
   workingContextGroup.interrupt();
   workingContextGroup.wait();
+  
   logger(INFO) << "HTTP server stopped";
 }
 
@@ -129,16 +144,25 @@ void HttpServer::acceptLoop() {
     System::TcpConnection connection;
     bool accepted = false;
 
-    while (!accepted) {
+    while (!accepted && !m_stopping) {
       try {
         connection = m_listener.accept();
         accepted = true;
       } catch (System::InterruptedException&) {
-        throw;
+        //throw;
+        return;
       } catch (const std::exception& e) {
+        if (m_stopping) {
+          return;
+        }
+
         logger(WARNING) << "Accept failed: " << e.what();
         // try again
       }
+    }
+
+    if (m_stopping) {
+      return;  // Exit before doing anything else
     }
 
     // Register connection

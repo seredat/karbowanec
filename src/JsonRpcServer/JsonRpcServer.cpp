@@ -53,7 +53,6 @@ JsonRpcServer::JsonRpcServer(System::Dispatcher* sys, System::Event* stopEvent, 
 }
 
 JsonRpcServer::~JsonRpcServer() {
-  stop();
 }
 
 void JsonRpcServer::start(const std::string& bindAddress, uint16_t bindPort, uint16_t bindPortSSL, const std::string& user, const std::string& password) {

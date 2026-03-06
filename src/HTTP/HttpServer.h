@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <functional>
 #include <string>
 #include <unordered_set>
@@ -66,6 +67,8 @@ private:
   
   // Request handler
   RequestHandler m_requestHandler;
+
+  std::atomic<bool> m_stopping{ false };
 };
 
 } // namespace CryptoNote

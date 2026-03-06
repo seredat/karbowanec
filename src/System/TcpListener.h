@@ -20,6 +20,7 @@ public:
     TcpListener& operator=(TcpListener&& other) noexcept;
 
     TcpConnection accept();
+    void close();
 
 private:
     Dispatcher* dispatcher{nullptr};
