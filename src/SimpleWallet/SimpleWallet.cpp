@@ -2692,9 +2692,8 @@ int main(int argc, char* argv[]) {
     }
 
     Tools::SignalHandler::install([&m_stopComplete, &dispatcher, &wrpc, &wallet] {
-      wrpc.stop();
-
       dispatcher.remoteSpawn([&] {
+        wrpc.stop();
         m_stopComplete.set();
       });
 
