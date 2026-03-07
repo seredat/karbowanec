@@ -1767,7 +1767,7 @@ std::unique_ptr<CryptoNote::HttpClient> simple_wallet::createDaemonHttpClient() 
       m_daemon_host,
       m_daemon_port,
       m_daemon_cert,
-      m_daemon_cert,
+      "",
      !m_daemon_no_verify
     );
   }
