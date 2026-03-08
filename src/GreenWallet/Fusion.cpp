@@ -1,6 +1,6 @@
 // Copyright (c) 2018, The TurtleCoin Developers
 // Copyright (c) 2018-2019, The Karbo Developers
-// 
+//
 // Please see the included LICENSE file for more information.
 
 /////////////////////////////
@@ -21,7 +21,7 @@
 
 #define _GLIBCXX_USE_NANOSLEEP 1
 
-size_t makeFusionTransaction(CryptoNote::WalletGreen &wallet, 
+size_t makeFusionTransaction(CryptoNote::WalletGreen &wallet,
                              uint64_t threshold)
 {
     uint64_t bestThreshold = threshold;
@@ -52,7 +52,7 @@ size_t makeFusionTransaction(CryptoNote::WalletGreen &wallet,
 
     try
     {
-        return wallet.createFusionTransaction(bestThreshold, 
+        return wallet.createFusionTransaction(bestThreshold,
                                               WalletConfig::defaultMixin);
     }
     catch (const std::runtime_error &e)
@@ -122,7 +122,7 @@ bool optimize(CryptoNote::WalletGreen &wallet, uint64_t threshold)
             }
             else
             {
-                std::cout << SuccessMsg("Created " 
+                std::cout << SuccessMsg("Created "
                             + std::to_string(fusionTransactionHashes.size())
                                     + " fusion transactions!") << std::endl;
             }
@@ -156,7 +156,7 @@ bool optimize(CryptoNote::WalletGreen &wallet, uint64_t threshold)
 
     while (true)
     {
-        const std::vector<CryptoNote::WalletTransactionWithTransfers> 
+        const std::vector<CryptoNote::WalletTransactionWithTransfers>
             unconfirmedTransactions = wallet.getUnconfirmedTransactions();
 
         std::vector<Crypto::Hash> unconfirmedTxHashes;
@@ -176,10 +176,10 @@ bool optimize(CryptoNote::WalletGreen &wallet, uint64_t threshold)
             /* If the fusion transaction hash is present in the unconfirmed
                transactions pool, we need to wait for it to complete. */
             if (std::find(unconfirmedTxHashes.begin(),
-                          unconfirmedTxHashes.end(), tx) 
+                          unconfirmedTxHashes.end(), tx)
                        != unconfirmedTxHashes.end())
             {
-                fusionCompleted = false; 
+                fusionCompleted = false;
             }
             else
             {
@@ -190,7 +190,7 @@ bool optimize(CryptoNote::WalletGreen &wallet, uint64_t threshold)
                    output message */
                 fusionTransactionHashes.erase(std::remove
                     (fusionTransactionHashes.begin(),
-                     fusionTransactionHashes.end(), tx), 
+                     fusionTransactionHashes.end(), tx),
                      fusionTransactionHashes.end());
             }
         }
@@ -211,7 +211,7 @@ bool optimize(CryptoNote::WalletGreen &wallet, uint64_t threshold)
                 std::cout << WarningMsg(" fusion transactions still to be "
                                         "confirmed.");
             }
-            
+
             std::cout << std::endl
                       << SuccessMsg("Will try again in 1 minute...")
                       << std::endl;
@@ -231,15 +231,15 @@ bool optimize(CryptoNote::WalletGreen &wallet, uint64_t threshold)
     return true;
 }
 
-bool fusionTX(CryptoNote::WalletGreen &wallet, 
+bool fusionTX(CryptoNote::WalletGreen &wallet,
               CryptoNote::TransactionParameters p)
 {
     std::cout << WarningMsg("Your transaction is too large to be accepted by "
                             "the network!")
               << std::endl << "We're attempting to optimize your "
               << "wallet, which hopefully will make the transaction small "
-              << "enough to fit in a block." << std::endl 
-              << "Please wait, this will take some time..." << std::endl 
+              << "enough to fit in a block." << std::endl
+              << "Please wait, this will take some time..." << std::endl
               << std::endl;
 
     /* We could check if optimization succeeded, but it's not really needed
@@ -252,7 +252,7 @@ bool fusionTX(CryptoNote::WalletGreen &wallet,
     while (wallet.getActualBalance() < p.destinations[0].amount + p.fee)
     {
         /* Break after a minute just in case something has gone wrong */
-        if ((std::chrono::system_clock::now() - startTime) > 
+        if ((std::chrono::system_clock::now() - startTime) >
              std::chrono::minutes(5))
         {
             std::cout << WarningMsg("Fusion transactions have "

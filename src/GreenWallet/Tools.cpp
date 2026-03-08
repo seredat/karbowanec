@@ -1,6 +1,6 @@
 // Copyright (c) 2018, The TurtleCoin Developers
 // Copyright (c) 2018-2019, The Karbo Developers
-// 
+//
 // Please see the included LICENSE file for more information.
 
 ////////////////////////////
@@ -283,7 +283,7 @@ bool shutdown(std::shared_ptr<WalletInfo> walletInfo, CryptoNote::INode &node,
 {
     if (alreadyShuttingDown)
     {
-        std::cout << "Patience please, we're already shutting down!" 
+        std::cout << "Patience please, we're already shutting down!"
                   << std::endl;
 
         return false;
@@ -340,6 +340,6 @@ bool shutdown(std::shared_ptr<WalletInfo> walletInfo, CryptoNote::INode &node,
     timelyShutdown.join();
 
     std::cout << "Bye." << std::endl;
-    
+
     return true;
 }

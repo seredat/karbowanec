@@ -1,4 +1,5 @@
-// Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2012-2017, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2016-2019, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -16,6 +17,10 @@
 // along with Karbo.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "ErrorMessage.h"
+
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 
 #include <cstddef>
 #include <windows.h>

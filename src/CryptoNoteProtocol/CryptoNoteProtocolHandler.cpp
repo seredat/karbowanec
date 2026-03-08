@@ -39,6 +39,8 @@
 
 #include "crypto/random.h"
 
+#undef ERROR
+
 using namespace Logging;
 using namespace Common;
 
@@ -197,19 +199,23 @@ bool CryptoNoteProtocolHandler::process_payload_sync_data(const CORE_SYNC_DATA& 
     }
   } else {
     int64_t diff = static_cast<int64_t>(hshd.current_height - 1) - static_cast<int64_t>(get_current_blockchain_height());
+    uint64_t blocks = std::abs(diff);
+    uint64_t days = blocks / (24 * 60 * 60 / m_currency.difficultyTarget());
 
-    // drop and eventually ban if peer is on fork too deep behind us 
+    // drop connection and eventually ban if peer is on fork too deep behind us
     if (diff < 0 && std::abs(diff) > (int64_t)CryptoNote::parameters::CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW && m_core.isInCheckpointZone(hshd.current_height)) {
-      logger(Logging::DEBUGGING) << context << "Sync data returned a new top block candidate: " << get_current_blockchain_height() << " -> " << hshd.current_height - 1
-        << ". Your node is " << std::abs(diff) << " blocks (" << std::abs(diff) / (24 * 60 * 60 / m_currency.difficultyTarget()) << " days) "
-        << "ahead. The block candidate is too deep behind and in checkpoint zone, dropping connection";
+      logger(Logging::DEBUGGING) << context << "There's a new top block candidate: " << get_current_blockchain_height() << " -> " << hshd.current_height - 1
+        << ". Your node is " << std::to_string(blocks) << " " << ((blocks == 1) ? "block" : "blocks")
+        << (days > 0 ? " (" + std::to_string(days) + " " + ((days == 1) ? "day" : "days") + ") " : " ")
+        << "ahead. The block candidate is too deep behind and in checkpoint zone, dropping connection.";
       m_p2p->drop_connection(context, true);
     }
 
     logger(diff >= 0 ? (is_initial ? Logging::INFO : Logging::DEBUGGING) : Logging::TRACE, Logging::BRIGHT_YELLOW) << context <<
-      "Sync data returned a new top block candidate: " << get_current_blockchain_height() << " -> " << hshd.current_height - 1
-      << " [Your node is " << std::abs(diff) << " blocks (" << std::abs(diff) / (24 * 60 * 60 / m_currency.difficultyTarget()) << " days) "
-      << (diff >= 0 ? std::string("behind") : std::string("ahead")) << "] " << std::endl << "Synchronization started";
+      "There's a new top block candidate: " << get_current_blockchain_height() << " -> " << hshd.current_height - 1
+      << ". Your node is " << std::to_string(blocks) << " " << ((blocks == 1) ? "block" : "blocks")
+      << (days > 0 ? " (" + std::to_string(days) + " " + ((days == 1) ? "day" : "days") + ") " : " ")
+      << (diff >= 0 ? std::string("behind") : std::string("ahead")) << ". Synchronization started." << std::endl;
 
     logger(Logging::DEBUGGING) << "Remote top block height: " << hshd.current_height - 1 << ", id: " << hshd.top_id;
     //let the socket to send response to handshake, but request callback, to let send request data after response
@@ -1093,9 +1099,7 @@ void CryptoNoteProtocolHandler::relay_transactions(NOTIFY_NEW_TRANSACTIONS::requ
       if (!m_stemPool.hasTransaction(transactionHash)) {
         logger(Logging::DEBUGGING) << "Adding relayed transaction " << transactionHash << " to stempool";
         auto txblob = *tx_blob_it;
-        m_dispatcher.remoteSpawn([this, transactionHash, txblob] {
           m_stemPool.addTransaction(transactionHash, txblob);
-        });
         txHashes.push_back(transactionHash);
       }
     }

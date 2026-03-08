@@ -32,6 +32,7 @@
 #pragma once
 
 #include <condition_variable>
+#include <chrono>
 #include <future>
 #include <memory>
 #include <mutex>

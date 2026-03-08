@@ -200,6 +200,20 @@ struct DeleteAddress {
   };
 };
 
+struct HasAddress {
+  struct Request {
+    std::string address;
+
+    void serialize(CryptoNote::ISerializer& serializer);
+  };
+
+  struct Response {
+    bool isOurs;
+
+    void serialize(CryptoNote::ISerializer& serializer);
+  };
+};
+
 struct GetSpendKeys {
   struct Request {
     std::string address;

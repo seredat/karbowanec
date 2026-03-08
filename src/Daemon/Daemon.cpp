@@ -121,26 +121,6 @@ namespace
     return loggerConfiguration;
   }
 
-  // https://stackoverflow.com/questions/2941491/compare-versions-as-strings
-  void Parse(int result[4], const std::string& input)
-  {
-    std::istringstream parser(input);
-    parser >> result[0];
-    for (int idx = 1; idx < 4; idx++)
-    {
-      parser.get(); //Skip period
-      parser >> result[idx];
-    }
-  }
-
-  bool LessThanVersion(const std::string& a, const std::string& b)
-  {
-    int parsedA[4], parsedB[4];
-    Parse(parsedA, a);
-    Parse(parsedB, b);
-    return std::lexicographical_compare(parsedA, parsedA + 4, parsedB, parsedB + 4);
-  }
-
 } // end anonymous namespace
 
 int main(int argc, char* argv[])
@@ -338,32 +318,6 @@ int main(int argc, char* argv[])
       if (!Tools::create_directories_if_necessary(coreConfig.configFolder)) {
         throw std::runtime_error("Can't create directory: " + coreConfig.configFolder);
       }
-    }
-
-    // check for update
-    try {
-      httplib::Client cli("https://api.github.com");
-      auto rsp = cli.Get(CHECK_FOR_UPDATE_ENDPOINT);
-      if (rsp) {
-        if (rsp->status == 200) {
-          Common::JsonValue psResp = Common::JsonValue::fromString(rsp->body);
-          Common::JsonValue::Array a = psResp.getArray();
-          const auto& o = a.at(0);
-          if (o.contains("name")) {
-            const JsonValue& vo = o("name");
-            std::string remote_v = vo.toString();
-            remote_v.erase(remove(remote_v.begin(), remote_v.end(), '"'), remote_v.end());
-            remote_v.erase(0, 2);
-            std::string ours_v = PROJECT_VERSION;
-            if (LessThanVersion(ours_v, remote_v)) {
-              logger(INFO, BRIGHT_RED) << "NEW VERSION IS AVAILABLE. PLEASE UPDATE!\n";
-            }
-          }
-        }
-      }
-    }
-    catch (std::exception& e) {
-      logger(ERROR, BRIGHT_RED) << "Failed to check for update: " << e.what();
     }
 
     CryptoNote::CryptoNoteProtocolHandler cprotocol(currency, dispatcher, m_core, nullptr, logManager);

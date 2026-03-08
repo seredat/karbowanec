@@ -1,6 +1,6 @@
 // Copyright (c) 2018, The TurtleCoin Developers
 // Copyright (c) 2018-2019, The Karbo Developers
-// 
+//
 // Please see the included LICENSE file for more information.
 
 ////////////////////////////////
@@ -11,7 +11,7 @@
 
 std::vector<Command> startupCommands()
 {
-    return 
+    return
     {
         Command("open", "Open a wallet already on your system"),
         Command("create", "Create a new wallet"),

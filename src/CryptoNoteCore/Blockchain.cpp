@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers, The Monero developers
 // Copyright (c) 2018, Ryo Currency Project
-// Copyright (c) 2016-2022, The Karbo developers
+// Copyright (c) 2016-2026, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -1191,57 +1191,74 @@ bool Blockchain::getBlockLongHash(Crypto::cn_context& context, const Block& b, C
   return getBlockLongHash(context, b, res, dummy_alt_chain, false);
 }
 
+/*
+ * Computes the "long hash" of a block for Proof-of-Work
+ *
+ * For blocks prior to version 5, falls back to the legacy PoW function.
+ * For version 5+ blocks:
+ *   - Starts with the block's signed hashing blob.
+ *   - Iteratively mixes the blob 128 times, each iteration accessing
+ *     8 pseudo-random previous blocks' hashing blobs (from main chain
+ *     or alt chain) to "stir" the data and increase memory hardness.
+ *   - Uses cached main-chain blobs when allowed.
+ *   - Final result is processed with yespower (y_slow_hash) to produce
+ *     the PoW hash.
+ */
 bool Blockchain::getBlockLongHash(Crypto::cn_context& context, const Block& b, Crypto::Hash& res, const std::list<Crypto::Hash>& alt_chain, bool no_blobs) {
   if (b.majorVersion < CryptoNote::BLOCK_MAJOR_VERSION_5)
     return get_block_longhash(context, b, res);
 
   BinaryArray pot;
+  // reserve space to reduce reallocations
+  pot.reserve(80 * 1024); // 80 KB estimated from average blob size
+
   if (!get_signed_block_hashing_blob(b, pot))
     return false;
 
   Crypto::Hash hash_1, hash_2;
-  uint32_t currentHeight = boost::get<BaseInput>(b.baseTransaction.inputs[0]).blockIndex;
-  uint32_t maxHeight = std::min<uint32_t>(getCurrentBlockchainHeight() - 1, currentHeight - 1 - static_cast<uint32_t>(m_currency.minedMoneyUnlockWindow()));
+  const uint32_t currentHeight = boost::get<BaseInput>(b.baseTransaction.inputs[0]).blockIndex;
+  const uint32_t maxHeight = std::min<uint32_t>(getCurrentBlockchainHeight() - 1, currentHeight - 1 - static_cast<uint32_t>(m_currency.minedMoneyUnlockWindow()));
 
 #define ITER 128
+
   for (uint32_t i = 0; i < ITER; i++) {
     cn_fast_hash(pot.data(), pot.size(), hash_1);
 
     for (uint8_t j = 1; j <= 8; j++) {
-      uint8_t chunk[4] = {
-        hash_1.data[j * 4 - 4],
-        hash_1.data[j * 4 - 3],
-        hash_1.data[j * 4 - 2],
-        hash_1.data[j * 4 - 1]
-      };
-
-      uint32_t n = (chunk[0] << 24) |
-                   (chunk[1] << 16) |
-                   (chunk[2] << 8)  |
-                   (chunk[3]);
+      const uint8_t* d = hash_1.data;
+      uint32_t n = (uint32_t(d[(j - 1) * 4])     << 24) |
+                   (uint32_t(d[(j - 1) * 4 + 1]) << 16) |
+                   (uint32_t(d[(j - 1) * 4 + 2]) << 8)  |
+                   (uint32_t(d[(j - 1) * 4 + 3]));
 
       uint32_t height_j = n % maxHeight;
       bool found_alt = false;
+
+      // Alt-chain lookup first (no real performance impact)
       for (const auto& ch_ent : alt_chain) {
-        const Block& b = m_alternative_chains[ch_ent].bl;
-        uint32_t ah = boost::get<BaseInput>(b.baseTransaction.inputs[0]).blockIndex;
+        const Block& ab = m_alternative_chains[ch_ent].bl;
+        uint32_t ah = boost::get<BaseInput>(ab.baseTransaction.inputs[0]).blockIndex;
         if (ah == height_j) {
           BinaryArray ba;
-          if (!get_block_hashing_blob(b, ba)) return false;
-          pot.insert(std::end(pot), std::begin(ba), std::end(ba));
+          if (!get_block_hashing_blob(ab, ba))
+            return false;
+          pot.insert(pot.end(), ba.begin(), ba.end());
           found_alt = true;
+          break;
         }
       }
+
       if (!found_alt) {
         if (no_blobs || m_allowDeepReorg) {
-          std::lock_guard<decltype(m_blockchain_lock)> lk(m_blockchain_lock);
           const Block& bj = m_blocks[height_j].bl;
           BinaryArray ba;
-          if (!get_block_hashing_blob(bj, ba)) return false;
-          pot.insert(std::end(pot), std::begin(ba), std::end(ba));
-        } else {
-          BinaryArray& ba = m_blobs[height_j];
-          pot.insert(std::end(pot), std::begin(ba), std::end(ba));
+          if (!get_block_hashing_blob(bj, ba))
+            return false;
+          pot.insert(pot.end(), ba.begin(), ba.end());
+        }
+        else {
+          const BinaryArray& ba = m_blobs[height_j];
+          pot.insert(pot.end(), ba.begin(), ba.end());
         }
       }
     }
@@ -1251,7 +1268,6 @@ bool Blockchain::getBlockLongHash(Crypto::cn_context& context, const Block& b, C
     return false;
 
   res = hash_2;
-
   return true;
 }
 
@@ -1718,10 +1734,10 @@ void Blockchain::print_blockchain(uint64_t start_index, uint64_t end_index) {
       << "\nid\t\t" << get_block_hash(m_blocks[i].bl)
       << "\ndifficulty\t\t" << blockDifficulty(i) << ", nonce " << m_blocks[i].bl.nonce << ", tx_count " << m_blocks[i].bl.transactionHashes.size() << ENDL;
   }
-  logger(DEBUGGING) <<
+  logger(INFO, BRIGHT_WHITE) <<
     "Current blockchain:" << ENDL << ss.str();
   logger(INFO, BRIGHT_WHITE) <<
-    "Blockchain printed with log level 1";
+    "Blockchain printed";
 }
 
 void Blockchain::print_blockchain_index() {

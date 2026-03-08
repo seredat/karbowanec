@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright(c) 2014 - 2017 XDN - project developers
-// Copyright(c) 2018 - 2022 The Karbo developers
+// Copyright(c) 2018 - 2023 The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -20,6 +20,7 @@
 #pragma once
 
 #include <system_error>
+#include <thread>
 
 #include "System/Dispatcher.h"
 #include "System/Event.h"
@@ -46,7 +47,7 @@ namespace CryptoNote {
 
 class JsonRpcServer {
 public:
-  JsonRpcServer(System::Dispatcher& sys, System::Event& stopEvent, Logging::ILogger& loggerGroup);
+  JsonRpcServer(System::Dispatcher* sys, System::Event* stopEvent, Logging::ILogger& loggerGroup);
   JsonRpcServer(const JsonRpcServer&) = delete;
 
   ~JsonRpcServer();
@@ -74,13 +75,13 @@ private:
   void listen_ssl(const std::string address, const uint16_t port);
   bool authenticate(const httplib::Request& request) const;
 
-  System::Dispatcher& m_dispatcher;
-  System::Event& stopEvent;
+  System::Dispatcher* m_dispatcher;
+  System::Event* stopEvent;
   Logging::LoggerRef logger;
   httplib::Server* http;
   httplib::SSLServer* https;
 
-  std::vector<std::unique_ptr<System::RemoteContext<void>>> m_workers;
+  std::list<std::thread> m_workers;
 
   std::string m_chain_file;
   std::string m_key_file;

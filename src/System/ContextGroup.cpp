@@ -1,4 +1,5 @@
-// Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2012-2017, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2016-2019, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -83,6 +84,10 @@ void ContextGroup::wait() {
   if (contextGroup.firstContext != nullptr) {
     NativeContext* context = dispatcher->getCurrentContext();
     context->next = nullptr;
+
+    assert(!context->inExecutionQueue);
+    context->inExecutionQueue = true;
+
     if (contextGroup.firstWaiter != nullptr) {
       assert(contextGroup.lastWaiter->next == nullptr);
       contextGroup.lastWaiter->next = context;

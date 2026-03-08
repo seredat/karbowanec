@@ -48,6 +48,7 @@ private:
   void runRpcProxy(Logging::LoggerRef& log);
   
   void runWalletService(const CryptoNote::Currency& currency, CryptoNote::INode& node);
+  void runWalletServiceOr(const CryptoNote::Currency& currency, CryptoNote::INode& node);
 
   System::Dispatcher* dispatcher;
   System::Event* stopEvent;

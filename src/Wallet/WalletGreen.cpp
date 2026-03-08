@@ -68,6 +68,8 @@ extern "C"
 #include "crypto/crypto-ops.h"
 }
 
+#undef ERROR
+
 using namespace Common;
 using namespace Crypto;
 using namespace CryptoNote;
@@ -1262,7 +1264,7 @@ uint64_t WalletGreen::getBlockTimestamp(const uint32_t blockHeight) {
   auto getBlockTimestampCompleted = std::promise<std::error_code>();
   auto getBlockTimestampWaitFuture = getBlockTimestampCompleted.get_future();
 
-  m_node.getBlockTimestamp(std::move(blockHeight), std::ref(timestamp),
+  m_node.getBlockTimestamp(blockHeight, std::ref(timestamp),
     [&getBlockTimestampCompleted](std::error_code ec) {
     auto detachedPromise = std::move(getBlockTimestampCompleted);
     detachedPromise.set_value(ec);
@@ -1513,7 +1515,7 @@ WalletGreen::TransfersRange WalletGreen::getTransactionTransfersRange(size_t tra
 size_t WalletGreen::transfer(const TransactionParameters& transactionParameters, Crypto::SecretKey& txSecretKey) {
   size_t id = WALLET_INVALID_TRANSACTION_ID;
   Tools::ScopeExit releaseContext([this, &id] {
-    m_dispatcher.yield();
+    //m_dispatcher.yield();
 
     if (id != WALLET_INVALID_TRANSACTION_ID) {
       auto& tx = m_transactions[id];
@@ -1827,7 +1829,7 @@ size_t WalletGreen::doTransfer(const TransactionParameters& transactionParameter
 size_t WalletGreen::makeTransaction(const TransactionParameters& sendingTransaction) {
   size_t id = WALLET_INVALID_TRANSACTION_ID;
   Tools::ScopeExit releaseContext([this, &id] {
-    m_dispatcher.yield();
+    //m_dispatcher.yield();
 
     if (id != WALLET_INVALID_TRANSACTION_ID) {
       auto& tx = m_transactions[id];
@@ -1901,14 +1903,21 @@ void WalletGreen::commitTransaction(size_t transactionId) {
     throw std::system_error(make_error_code(error::TX_TRANSFER_IMPOSSIBLE));
   }
 
-  System::Event completion(m_dispatcher);
   std::error_code ec;
 
-  m_node.relayTransaction(m_uncommitedTransactions[transactionId], [&ec, &completion, this](std::error_code error) {
-    ec = error;
-    this->m_dispatcher.remoteSpawn(std::bind(asyncRequestCompletion, std::ref(completion)));
-  });
-  completion.wait();
+  try {
+    auto relayTransactionCompleted = std::promise<std::error_code>();
+    auto relayTransactionWaitFuture = relayTransactionCompleted.get_future();
+
+    m_node.relayTransaction(m_uncommitedTransactions[transactionId], [&ec, &relayTransactionCompleted, this](std::error_code error) {
+      auto detachedPromise = std::move(relayTransactionCompleted);
+      detachedPromise.set_value(ec);
+      });
+    ec = relayTransactionWaitFuture.get();
+  }
+  catch (const std::exception& e) {
+    m_logger(ERROR, BRIGHT_RED) << "Failed to relay uncommited transaction: " << e.what();
+  }
 
   if (!ec) {
     updateTransactionStateAndPushEvent(transactionId, WalletTransactionState::SUCCEEDED);
@@ -2328,15 +2337,22 @@ std::unique_ptr<CryptoNote::ITransaction> WalletGreen::makeTransaction(const std
 }
 
 void WalletGreen::sendTransaction(const CryptoNote::Transaction& cryptoNoteTransaction) {
-  System::Event completion(m_dispatcher);
   std::error_code ec;
 
   throwIfStopped();
-  m_node.relayTransaction(cryptoNoteTransaction, [&ec, &completion, this](std::error_code error) {
-    ec = error;
-    this->m_dispatcher.remoteSpawn(std::bind(asyncRequestCompletion, std::ref(completion)));
-  });
-  completion.wait();
+  try {
+    auto relayTransactionCompleted = std::promise<std::error_code>();
+    auto relayTransactionWaitFuture = relayTransactionCompleted.get_future();
+
+    m_node.relayTransaction(cryptoNoteTransaction, [&ec, &relayTransactionCompleted, this](std::error_code error) {
+      auto detachedPromise = std::move(relayTransactionCompleted);
+    detachedPromise.set_value(ec);
+    });
+    ec = relayTransactionWaitFuture.get();
+  }
+  catch (const std::exception& e) {
+    m_logger(ERROR, BRIGHT_RED) << "Failed to relay transaction: " << e.what();
+  }
 
   if (ec) {
     m_logger(ERROR, BRIGHT_RED) << "Failed to relay transaction: " << ec << ", " << ec.message() <<
@@ -2422,7 +2438,6 @@ void WalletGreen::requestMixinOuts(
     amounts.push_back(out.out.amount);
   }
 
-  System::Event requestFinished(m_dispatcher);
   std::error_code mixinError;
 
   throwIfStopped();
@@ -2430,12 +2445,20 @@ void WalletGreen::requestMixinOuts(
   auto requestMixinCount = mixIn + 1; //+1 to allow to skip real output
 
   m_logger(DEBUGGING) << "Requesting random outputs";
-  m_node.getRandomOutsByAmounts(std::move(amounts), requestMixinCount, mixinResult, [&requestFinished, &mixinError, this] (std::error_code ec) {
-    mixinError = ec;
-    this->m_dispatcher.remoteSpawn(std::bind(asyncRequestCompletion, std::ref(requestFinished)));
-  });
+  try {
+    auto getRandomOutsByAmountsCompleted = std::promise<std::error_code>();
+    auto getRandomOutsByAmountsWaitFuture = getRandomOutsByAmountsCompleted.get_future();
 
-  requestFinished.wait();
+    m_node.getRandomOutsByAmounts(std::move(amounts), requestMixinCount, mixinResult, [&getRandomOutsByAmountsCompleted, &mixinError, this](std::error_code ec) {
+     auto detachedPromise = std::move(getRandomOutsByAmountsCompleted);
+      detachedPromise.set_value(ec);
+    });
+
+    mixinError = getRandomOutsByAmountsWaitFuture.get();
+  }
+  catch (const std::exception& e) {
+    m_logger(ERROR, BRIGHT_RED) << "Failed to request random outputs: " << e.what();
+  }
 
   checkIfEnoughMixins(mixinResult, requestMixinCount);
 
@@ -3230,14 +3253,20 @@ void WalletGreen::stopBlockchainSynchronizer() {
 }
 
 void WalletGreen::addUnconfirmedTransaction(const ITransactionReader& transaction) {
-  System::RemoteContext<std::error_code> context(m_dispatcher, [this, &transaction] {
-    return m_blockchainSynchronizer.addUnconfirmedTransaction(transaction).get();
-  });
+  try {
+    auto addUnconfirmedTransactionCompleted = std::promise<std::error_code>();
+    auto addUnconfirmedTransactionWaitFuture = addUnconfirmedTransactionCompleted.get_future();
 
-  auto ec = context.get();
-  if (ec) {
-    m_logger(ERROR, BRIGHT_RED) << "Failed to add unconfirmed transaction: " << ec << ", " << ec.message();
-    throw std::system_error(ec, "Failed to add unconfirmed transaction");
+    addUnconfirmedTransactionWaitFuture = m_blockchainSynchronizer.addUnconfirmedTransaction(transaction);
+
+    std::error_code ec = addUnconfirmedTransactionWaitFuture.get();
+
+    if (ec) {
+      m_logger(ERROR, BRIGHT_RED) << "Failed to add unconfirmed transaction: " << ec << ", " << ec.message();
+      throw std::system_error(ec, "Failed to add unconfirmed transaction");
+    }
+  } catch (const std::exception& e) {
+    m_logger(ERROR, BRIGHT_RED) << "Failed to add unconfirmed transaction: " << e.what();
   }
 
   m_logger(DEBUGGING) << "Unconfirmed transaction added to BlockchainSynchronizer, hash " << transaction.getTransactionHash();
@@ -3358,7 +3387,7 @@ size_t WalletGreen::createFusionTransaction(uint64_t threshold, uint64_t mixin,
 
   size_t id = WALLET_INVALID_TRANSACTION_ID;
   Tools::ScopeExit releaseContext([this, &id] {
-    m_dispatcher.yield();
+    //m_dispatcher.yield();
 
     if (id != WALLET_INVALID_TRANSACTION_ID) {
       auto& tx = m_transactions[id];

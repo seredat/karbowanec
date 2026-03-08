@@ -19,6 +19,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+add_definitions(-DNOMINMAX)
+
 # ARCH defines the target architecture, either by an explicit identifier or
 # one of the following two keywords. By default, ARCH a value of 'native':
 # target arch = host arch, binary is not portable. When ARCH is set to the
@@ -585,6 +587,22 @@ if(ANDROID AND CMAKE_C_COMPILER_ID STREQUAL "Clang")
     find_library(ATOMIC atomic)
     list(APPEND EXTRA_LIBRARIES ${ATOMIC})
   endif()
+endif()
+
+if (MSVC)
+  add_compile_options(
+    /O2        # Max optimization
+    /Ob2       # Inline aggressively
+    /Oi        # Intrinsics
+    /Ot        # Favor speed
+    /GL        # Link-time code generation
+  )
+
+  add_link_options(
+    /LTCG      # Link-time optimization
+  )
+
+  add_compile_definitions(NDEBUG)
 endif()
 
 include("${CMAKE_CURRENT_SOURCE_DIR}/src/version.cmake")
