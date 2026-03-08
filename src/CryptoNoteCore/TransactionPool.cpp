@@ -58,11 +58,6 @@ namespace CryptoNote {
           auto r = m_keyImages.insert(boost::get<KeyInput>(in).keyImage);
           (void)r; //just to make compiler to shut up
           assert(r.second);
-        } else if (in.type() == typeid(MultisignatureInput)) {
-          const auto& msig = boost::get<MultisignatureInput>(in);
-          auto r = m_usedOutputs.insert(std::make_pair(msig.amount, msig.outputIndex));
-          (void)r; //just to make compiler to shut up
-          assert(r.second);
         }
       }
 
@@ -80,11 +75,6 @@ namespace CryptoNote {
       for (const auto& in : tx.inputs) {
         if (in.type() == typeid(KeyInput)) {
           if (m_keyImages.count(boost::get<KeyInput>(in).keyImage)) {
-            return false;
-          }
-        } else if (in.type() == typeid(MultisignatureInput)) {
-          const auto& msig = boost::get<MultisignatureInput>(in);
-          if (m_usedOutputs.count(std::make_pair(msig.amount, msig.outputIndex))) {
             return false;
           }
         }
@@ -621,13 +611,6 @@ namespace CryptoNote {
           //it is now empty hash container for this key_image
           m_spent_key_images.erase(it);
         }
-      } else if (in.type() == typeid(MultisignatureInput)) {
-        if (!keptByBlock) {
-          const auto& msig = boost::get<MultisignatureInput>(in);
-          auto output = GlobalOutput(msig.amount, msig.outputIndex);
-          assert(m_spentOutputs.count(output));
-          m_spentOutputs.erase(output);
-        }
       }
     }
 
@@ -653,13 +636,6 @@ namespace CryptoNote {
           logger(ERROR, BRIGHT_RED) << "internal error: try to insert duplicate iterator in key_image set";
           return false;
         }
-      } else if (in.type() == typeid(MultisignatureInput)) {
-        if (!keptByBlock) {
-          const auto& msig = boost::get<MultisignatureInput>(in);
-          auto r = m_spentOutputs.insert(GlobalOutput(msig.amount, msig.outputIndex));
-          (void)r;
-          assert(r.second);
-        }
       }
     }
 
@@ -672,11 +648,6 @@ namespace CryptoNote {
       if (in.type() == typeid(KeyInput)) {
         const auto& tokey_in = boost::get<KeyInput>(in);
         if (m_spent_key_images.count(tokey_in.keyImage)) {
-          return true;
-        }
-      } else if (in.type() == typeid(MultisignatureInput)) {
-        const auto& msig = boost::get<MultisignatureInput>(in);
-        if (m_spentOutputs.count(GlobalOutput(msig.amount, msig.outputIndex))) {
           return true;
         }
       }
