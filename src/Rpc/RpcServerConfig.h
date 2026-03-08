@@ -45,6 +45,8 @@ public:
   uint64_t    getNodeFeeAmount() const;
   std::string getNodeFeeViewKey() const;
   std::string getContactInfo() const;
+  std::string getRpcUser() const;
+  std::string getRpcPassword() const;
 
 private:
   std::string m_data_dir;
@@ -62,6 +64,8 @@ private:
   std::string nodeFeeAmountStr;
   uint64_t    nodeFeeAmount = 0;
   std::string nodeFeeViewKey;
+  std::string rpcUser;
+  std::string rpcPassword;
 };
 
 }

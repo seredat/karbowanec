@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2016, The Forknote developers
-// Copyright (c) 2016-2022, The Karbo developers
+// Copyright (c) 2016-2026, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -20,11 +20,11 @@
 #pragma once
 
 #include <list>
-#include <thread>
 #include <functional>
 #include <unordered_map>
-
-#include "HTTP/httplib.h"
+#include "HTTP/HttpServer.h"
+#include "HTTP/HttpRequest.h"
+#include "HTTP/HttpResponse.h"
 #include "Logging/LoggerRef.h"
 #include "ITransaction.h"
 #include "CoreRpcServerCommandsDefinitions.h"
@@ -34,6 +34,7 @@
 #include "Rpc/RpcServerConfig.h"
 #include "Rpc/JsonRpc.h"
 #include "System/Dispatcher.h"
+#include "System/ContextGroup.h"
 #include "System/RemoteContext.h"
 
 namespace CryptoNote {
@@ -58,7 +59,13 @@ public:
   
   void start();
   void stop();
-  typedef std::function<bool(RpcServer*, const httplib::Request& req, httplib::Response& res)> HandlerFunction;
+  
+  // HTTP handler function type
+  typedef std::function<bool(RpcServer*, const CryptoNote::HttpRequest&, CryptoNote::HttpResponse&)> HandlerFunction;
+
+  // JSON-RPC handler function type
+  typedef std::function<void(RpcServer*, const JsonRpc::JsonRpcRequest&, JsonRpc::JsonRpcResponse&)> JsonMemberMethod;
+
   std::string getCorsDomain();
   size_t getRpcConnectionsCount();
 
@@ -70,11 +77,11 @@ private:
     const bool allowBusyCore;
   };
 
-  typedef void (RpcServer::* HandlerPtr)(const httplib::Request& request, httplib::Response& response);
+  typedef void (RpcServer::* HandlerPtr)(const CryptoNote::HttpRequest& request, CryptoNote::HttpResponse& response);
   static std::unordered_map<std::string, RpcHandler<HandlerFunction>> s_handlers;
 
-  void processRequest(const httplib::Request& request, httplib::Response& response);
-  bool processJsonRpcRequest(const httplib::Request& request, httplib::Response& response);
+  void processRequest(const CryptoNote::HttpRequest& request, CryptoNote::HttpResponse& response);
+  bool processJsonRpcRequest(const CryptoNote::HttpRequest& request, CryptoNote::HttpResponse& response);
   
   // binary handlers
   bool on_get_blocks(const COMMAND_RPC_GET_BLOCKS_FAST::request& req, COMMAND_RPC_GET_BLOCKS_FAST::response& res);
@@ -163,8 +170,9 @@ private:
   CryptoNote::NodeServer& m_p2p;
   CryptoNote::BlockchainExplorerDataBuilder blockchainExplorerDataBuilder;
   const ICryptoNoteProtocolQuery& m_protocolQuery;
-  httplib::SSLServer* https;
-  httplib::Server* http;
+  std::unique_ptr<CryptoNote::HttpServer> m_httpServer;
+  std::unique_ptr<CryptoNote::HttpServer> m_httpsServer;
+  System::ContextGroup m_workingContextGroup;
 
   bool m_restricted_rpc;
   std::string m_cors_domain;
@@ -173,8 +181,6 @@ private:
   std::string m_contact_info;
   Crypto::SecretKey m_view_key;
   CryptoNote::AccountPublicAddress m_fee_acc;
-
-  std::list<std::thread> m_workers;
 
 };
 
