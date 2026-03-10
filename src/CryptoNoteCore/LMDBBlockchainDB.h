@@ -78,6 +78,10 @@ public:
   // ── block_meta ────────────────────────────────────────────────────────────
   bool putBlockMeta(uint32_t height, const DbBlockMeta& meta);
   bool getBlockMeta(uint32_t height, DbBlockMeta& meta) const;
+  // Reads metas for [fromHeight, toHeight] inclusive in a single cursor scan
+  // (one read txn, no per-entry open/close overhead).
+  bool getBlockMetaRange(uint32_t fromHeight, uint32_t toHeight,
+                         std::vector<DbBlockMeta>& out) const;
   bool removeLastBlockMeta();
 
   // ── block_data ────────────────────────────────────────────────────────────

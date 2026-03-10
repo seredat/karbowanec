@@ -198,16 +198,17 @@ bool Blockchain::init(const std::string& config_folder, bool load_existing) {
     return false;
   }
 
-  // One-time migration from legacy SwappedVector files
-  if (m_db.getChainHeight() == 0) {
+  // Migration from legacy SwappedVector files.
+  // Always checked when old block files exist so an interrupted migration
+  // (LMDB non-empty but incomplete) is automatically resumed.
+  {
     std::string blocksFile = appendPath(config_folder, m_currency.blocksFileName());
-    // blocksFile check uses boost::filesystem or similar; use FILE* probe
     FILE* f = fopen(blocksFile.c_str(), "rb");
     if (f) {
       fclose(f);
-      logger(INFO, BRIGHT_WHITE) << "Old block data detected, migrating to LMDB...";
+      logger(INFO, BRIGHT_WHITE) << "Old block data detected, checking migration status...";
       if (!migrateFromSwappedVector(config_folder)) {
-        logger(WARNING, BRIGHT_YELLOW) << "Migration failed or produced no data, starting fresh.";
+        logger(WARNING, BRIGHT_YELLOW) << "Migration failed, continuing with current LMDB state.";
       }
     }
   }
@@ -438,40 +439,64 @@ difficulty_type Blockchain::getDifficultyForNextBlock(const Crypto::Hash& prevHa
   if (prevHash == NULL_HASH) return 1;
 
   std::lock_guard<decltype(m_blockchain_lock)> lk(m_blockchain_lock);
-  std::vector<uint64_t> timestamps;
-  std::vector<difficulty_type> cumulative_difficulties;
 
   uint32_t chainHeight = m_db.getChainHeight();
-  uint8_t BlockMajorVersion = getBlockMajorVersionForHeight(chainHeight);
+  uint8_t  BlockMajorVersion = getBlockMajorVersionForHeight(chainHeight);
   uint32_t difficultyBlocksCount = std::min<uint32_t>(
     std::max<uint32_t>(chainHeight > 0 ? chainHeight - 1 : 1, 1),
     static_cast<uint32_t>(m_currency.difficultyBlocksCountByBlockVersion(BlockMajorVersion)));
-  uint32_t processed = 0;
 
+  std::vector<uint64_t>       timestamps;
+  std::vector<difficulty_type> cumulative_difficulties;
+
+  // ── Fast path: prevHash is the main-chain tip (normal sync) ──────────────
+  // Instead of walking backwards by hash link (N separate LMDB txns), read
+  // all N block_meta records in a single cursor scan.
+  uint32_t prevHeight = 0;
+  if (m_db.getHashHeight(prevHash, prevHeight)) {
+    uint32_t fromHeight = (prevHeight + 1 >= difficultyBlocksCount)
+                          ? prevHeight + 1 - difficultyBlocksCount : 0;
+
+    std::vector<DbBlockMeta> metas;
+    m_db.getBlockMetaRange(fromHeight, prevHeight, metas);
+
+    timestamps.reserve(metas.size());
+    cumulative_difficulties.reserve(metas.size());
+    for (const auto& m : metas) {
+      timestamps.push_back(m.timestamp);
+      cumulative_difficulties.push_back(m.cumulativeDifficulty);
+    }
+
+    return m_currency.nextDifficulty(chainHeight, BlockMajorVersion,
+                                      timestamps, cumulative_difficulties);
+  }
+
+  // ── Slow path: prevHash is on an alternative chain ───────────────────────
+  // Walk backwards through the alt-chain then the main chain by hash links.
+  uint32_t processed = 0;
   Crypto::Hash h = prevHash;
   do {
-    uint32_t bh = 0;
-    uint64_t ts = 0;
+    uint64_t       ts      = 0;
     difficulty_type cumDiff = 0;
-    Crypto::Hash prevH{};
+    Crypto::Hash   prevH{};
 
-    if (m_db.getHashHeight(h, bh)) {
+    auto it = m_alternative_chains.find(h);
+    if (it != m_alternative_chains.end()) {
+      const BlockEntry& b = it->second;
+      ts      = b.bl.timestamp;
+      cumDiff = b.cumulative_difficulty;
+      prevH   = b.bl.previousBlockHash;
+    } else {
+      uint32_t bh = 0;
+      if (!m_db.getHashHeight(h, bh)) {
+        logger(ERROR) << "Can't find block " << h << " for difficulty calculation";
+        return 0;
+      }
       DbBlockMeta meta{};
       m_db.getBlockMeta(bh, meta);
       ts      = meta.timestamp;
       cumDiff = meta.cumulativeDifficulty;
       memcpy(prevH.data, meta.prevHash, 32);
-    } else {
-      auto it = m_alternative_chains.find(h);
-      if (it != m_alternative_chains.end()) {
-        const BlockEntry& b = it->second;
-        ts      = b.bl.timestamp;
-        cumDiff = b.cumulative_difficulty;
-        prevH   = b.bl.previousBlockHash;
-      } else {
-        logger(ERROR) << "Can't find block " << h << " for difficulty calculation";
-        return 0;
-      }
     }
 
     timestamps.push_back(ts);
@@ -498,12 +523,13 @@ bool Blockchain::getBackwardBlocksSize(size_t from_height, std::vector<size_t>& 
       << from_height << ", blockchain height = " << chainHeight;
     return false;
   }
-  size_t start_offset = (from_height + 1) - std::min((from_height + 1), count);
-  DbBlockMeta meta{};
-  for (size_t i = start_offset; i != from_height + 1; i++) {
-    m_db.getBlockMeta(static_cast<uint32_t>(i), meta);
-    sz.push_back(meta.blockCumulativeSize);
-  }
+  uint32_t start_offset = static_cast<uint32_t>(
+    (from_height + 1) - std::min((from_height + 1), count));
+
+  // Read the range in a single cursor scan instead of one txn per block.
+  std::vector<DbBlockMeta> metas;
+  m_db.getBlockMetaRange(start_offset, from_height, metas);
+  for (const auto& m : metas) sz.push_back(m.blockCumulativeSize);
   return true;
 }
 
@@ -676,15 +702,17 @@ bool Blockchain::check_block_timestamp_main(const Block& b) {
   }
 
   uint32_t chainHeight = m_db.getChainHeight();
+  uint32_t window = static_cast<uint32_t>(m_currency.timestampCheckWindow(b.majorVersion));
+  uint32_t fromH  = (chainHeight > window) ? chainHeight - window : 0;
+
+  // Read the timestamp window in a single cursor scan (one read txn).
+  std::vector<DbBlockMeta> metas;
+  m_db.getBlockMetaRange(fromH, chainHeight - 1, metas);
+
   std::vector<uint64_t> timestamps;
-  size_t offset = chainHeight <= m_currency.timestampCheckWindow(b.majorVersion)
-                    ? 0
-                    : chainHeight - m_currency.timestampCheckWindow(b.majorVersion);
-  DbBlockMeta meta{};
-  for (uint32_t h = static_cast<uint32_t>(offset); h < chainHeight; ++h) {
-    m_db.getBlockMeta(h, meta);
-    timestamps.push_back(meta.timestamp);
-  }
+  timestamps.reserve(metas.size());
+  for (const auto& m : metas) timestamps.push_back(m.timestamp);
+
   return check_block_timestamp(std::move(timestamps), b);
 }
 
@@ -2707,47 +2735,63 @@ bool Blockchain::migrateFromSwappedVector(const std::string& config_folder) {
   }
 
   uint32_t totalBlocks = static_cast<uint32_t>(oldBlocks.size());
-  logger(INFO, BRIGHT_WHITE) << "Migrating " << totalBlocks << " blocks from legacy storage to LMDB...";
 
-  for (uint32_t b = 0; b < totalBlocks; ++b) {
-    if (b % 1000 == 0) {
-      logger(INFO, BRIGHT_WHITE) << "Migration: height " << b << " of " << totalBlocks;
-    }
+  // Resume support: skip blocks already committed to LMDB.
+  uint32_t startBlock = m_db.getChainHeight();
+  if (startBlock >= totalBlocks) {
+    logger(INFO, BRIGHT_WHITE) << "Migration already complete (" << totalBlocks << " blocks in LMDB).";
+    return true;
+  }
+  if (startBlock > 0) {
+    logger(INFO, BRIGHT_WHITE) << "Resuming migration from block " << startBlock
+      << " of " << totalBlocks << " (" << (totalBlocks - startBlock) << " remaining).";
+  } else {
+    logger(INFO, BRIGHT_WHITE) << "Migrating " << totalBlocks << " blocks from legacy storage to LMDB...";
+  }
 
-    BlockEntry block = oldBlocks[b];
-    Crypto::Hash blockHash = get_block_hash(block.bl);
+  // Write BATCH_SIZE blocks per LMDB transaction.
+  // Batching reduces commit overhead from O(totalBlocks) to O(totalBlocks/BATCH_SIZE)
+  // and keeps B-tree pages hot in the mmap across multiple block writes within a batch,
+  // which dramatically reduces B-tree fragmentation and page-split overhead.
+  // On MDB_MAP_FULL the current batch is aborted, the map is doubled, and the same
+  // batch is retried from its starting block (which is re-read from SwappedVector).
+  static const uint32_t BATCH_SIZE = 1000;
 
-    // Retry loop: on MDB_MAP_FULL abort, double the map, and redo this block.
-    for (;;) {
-      // Reset global output indexes so a retry starts clean.
-      for (auto& te : block.transactions) {
-        te.m_global_output_indexes.clear();
-      }
+  for (uint32_t batchStart = startBlock; batchStart < totalBlocks; ) {
+    uint32_t batchEnd = std::min(batchStart + BATCH_SIZE, totalBlocks);
 
+    for (;;) {  // map-full retry loop for this batch
       m_db.beginWriteTxn();
-
       bool ok = true;
       try {
-        for (uint16_t t = 0; t < static_cast<uint16_t>(block.transactions.size()); ++t) {
-          Crypto::Hash txHash;
-          if (t == 0) {
-            txHash = getObjectHash(block.bl.baseTransaction);
-          } else {
-            txHash = block.bl.transactionHashes[t - 1];
+        for (uint32_t b = batchStart; b < batchEnd && ok; ++b) {
+          if (b % 10000 == 0) {
+            logger(INFO, BRIGHT_WHITE) << "Migration: height " << b << " of " << totalBlocks;
           }
-          TransactionIndex txIdx = {b, t};
-          if (!pushTransaction(block, txHash, txIdx)) {
-            logger(ERROR, BRIGHT_RED) << "Migration: pushTransaction failed at block " << b
-              << " tx " << t;
-            ok = false;
-            break;
+
+          // Fresh read from SwappedVector gives empty m_global_output_indexes,
+          // which pushTransaction will fill in correctly.
+          BlockEntry block = oldBlocks[b];
+          Crypto::Hash blockHash = get_block_hash(block.bl);
+
+          for (uint16_t t = 0; t < static_cast<uint16_t>(block.transactions.size()); ++t) {
+            Crypto::Hash txHash = (t == 0)
+              ? getObjectHash(block.bl.baseTransaction)
+              : block.bl.transactionHashes[t - 1];
+            if (!pushTransaction(block, txHash, {b, t})) {
+              logger(ERROR, BRIGHT_RED) << "Migration: pushTransaction failed at block " << b
+                << " tx " << t;
+              ok = false;
+              break;
+            }
           }
+          if (ok) pushBlock(block, blockHash);
         }
 
         if (ok) {
-          pushBlock(block, blockHash);
           m_db.commitTxn();
-          break;  // success — next block
+          batchStart = batchEnd;  // advance to next batch
+          break;
         } else {
           m_db.abortTxn();
           return false;
@@ -2755,10 +2799,10 @@ bool Blockchain::migrateFromSwappedVector(const std::string& config_folder) {
 
       } catch (const LMDBMapFullException&) {
         m_db.abortTxn();
-        logger(INFO, BRIGHT_YELLOW) << "Migration: LMDB map full at block " << b
-          << ", resizing map and retrying...";
+        logger(INFO, BRIGHT_YELLOW) << "Migration: LMDB map full at block " << batchStart
+          << ", resizing map and retrying batch...";
         m_db.resizeMap();
-        // loop back and retry this block
+        // batchStart unchanged — retry same batch from the beginning
       }
     }
   }

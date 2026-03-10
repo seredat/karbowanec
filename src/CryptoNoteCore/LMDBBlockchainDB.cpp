@@ -269,6 +269,35 @@ bool LMDBBlockchainDB::getBlockMeta(uint32_t height, DbBlockMeta& meta) const {
   return true;
 }
 
+bool LMDBBlockchainDB::getBlockMetaRange(uint32_t fromHeight, uint32_t toHeight,
+                                          std::vector<DbBlockMeta>& out) const {
+  if (fromHeight > toHeight) return true;
+  MDB_txn* txn   = activeTxn();
+  bool   ownTxn  = !m_writeTxn;
+  MDB_cursor* cur = nullptr;
+  int rc = mdb_cursor_open(txn, m_dbiBlockMeta, &cur);
+  if (rc) { if (ownTxn) endReadTxn(txn); return false; }
+
+  out.reserve(out.size() + (toHeight - fromHeight + 1));
+
+  uint8_t kbuf[4]; encBE32(kbuf, fromHeight);
+  MDB_val k = {4, kbuf}, v{};
+  rc = mdb_cursor_get(cur, &k, &v, MDB_SET);
+  while (rc == 0) {
+    uint32_t h = decBE32(static_cast<const uint8_t*>(k.mv_data));
+    if (h > toHeight) break;
+    if (v.mv_size >= sizeof(DbBlockMeta)) {
+      DbBlockMeta m{};
+      std::memcpy(&m, v.mv_data, sizeof(DbBlockMeta));
+      out.push_back(m);
+    }
+    rc = mdb_cursor_get(cur, &k, &v, MDB_NEXT);
+  }
+  mdb_cursor_close(cur);
+  if (ownTxn) endReadTxn(txn);
+  return true;
+}
+
 bool LMDBBlockchainDB::removeLastBlockMeta() {
   assert(m_writeTxn);
   MDB_cursor* cur = nullptr;
