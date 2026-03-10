@@ -1979,90 +1979,112 @@ bool Blockchain::pushBlock(const Block& blockData, const std::vector<Transaction
     return false;
   }
 
-  // Begin LMDB write transaction — all writes below are atomic
-  m_db.beginWriteTxn();
+  // Pre-compute values that are stable across map-full retries.
+  // These read from already-committed blocks so they work outside the write txn.
+  const Crypto::Hash minerTransactionHash = getObjectHash(blockData.baseTransaction);
+  const size_t coinbase_blob_size = getObjectBinarySize(blockData.baseTransaction);
 
-  BlockEntry block;
-  block.bl = blockData;
-  block.height = newHeight;
-  block.transactions.resize(1);
-  block.transactions[0].tx = blockData.baseTransaction;
-
-  Crypto::Hash minerTransactionHash = getObjectHash(blockData.baseTransaction);
-  TransactionIndex transactionIndex = {newHeight, 0};
-  if (!pushTransaction(block, minerTransactionHash, transactionIndex)) {
-    m_db.abortTxn();
-    bvc.m_verification_failed = true;
-    return false;
-  }
-
-  size_t coinbase_blob_size = getObjectBinarySize(blockData.baseTransaction);
-  size_t cumulative_block_size = coinbase_blob_size;
-  uint64_t fee_summary = 0;
-
-  for (size_t i = 0; i < transactions.size(); ++i) {
-    const Crypto::Hash& tx_id = blockData.transactionHashes[i];
-    block.transactions.resize(block.transactions.size() + 1);
-    block.transactions.back().tx = transactions[i];
-
-    size_t blob_size = toBinaryArray(block.transactions.back().tx).size();
-    uint64_t fee = getInputAmount(block.transactions.back().tx) -
-                   getOutputAmount(block.transactions.back().tx);
-
-    if (!checkTransactionInputs(block.transactions.back().tx)) {
-      logger(INFO, BRIGHT_WHITE) << "Block " << blockHash
-        << " has at least one transaction with wrong inputs: " << tx_id;
-      bvc.m_verification_failed = true;
-      m_db.abortTxn();
-      return false;
-    }
-
-    ++transactionIndex.transaction;
-    if (!pushTransaction(block, tx_id, transactionIndex)) {
-      m_db.abortTxn();
-      bvc.m_verification_failed = true;
-      return false;
-    }
-
-    cumulative_block_size += blob_size;
-    fee_summary += fee;
-  }
-
-  if (!checkCumulativeBlockSize(blockHash, cumulative_block_size, newHeight)) {
-    bvc.m_verification_failed = true;
-    m_db.abortTxn();
-    return false;
-  }
-
-  int64_t emissionChange = 0;
-  uint64_t reward = 0;
   uint64_t already_generated_coins = 0;
+  difficulty_type prevCumulativeDifficulty = 0;
   if (newHeight > 0) {
     DbBlockMeta prevMeta{};
     m_db.getBlockMeta(newHeight - 1, prevMeta);
-    already_generated_coins = prevMeta.alreadyGeneratedCoins;
+    already_generated_coins   = prevMeta.alreadyGeneratedCoins;
+    prevCumulativeDifficulty  = prevMeta.cumulativeDifficulty;
   }
 
-  if (!validate_miner_transaction(blockData, newHeight, cumulative_block_size,
-                                   already_generated_coins, fee_summary, reward, emissionChange)) {
-    logger(INFO, BRIGHT_WHITE) << "Block " << blockHash << " has invalid miner transaction";
-    bvc.m_verification_failed = true;
-    m_db.abortTxn();
-    return false;
+  // Outputs that must survive past the write-txn block for the log below.
+  BlockEntry block;
+  block.bl     = blockData;
+  block.height = newHeight;
+  size_t   cumulative_block_size = coinbase_blob_size;
+  uint64_t fee_summary           = 0;
+  int64_t  emissionChange        = 0;
+  uint64_t reward                = 0;
+
+  // Write-txn section with automatic map-full resize-and-retry.
+  // On MDB_MAP_FULL the whole write is atomic-aborted, the map is doubled,
+  // and everything is retried from scratch.
+  for (;;) {
+    // Reset all state that the write txn populates so a retry starts clean.
+    block.transactions.clear();
+    block.transactions.resize(1);
+    block.transactions[0].tx = blockData.baseTransaction;
+    TransactionIndex transactionIndex = {newHeight, 0};
+    cumulative_block_size = coinbase_blob_size;
+    fee_summary           = 0;
+    emissionChange        = 0;
+    reward                = 0;
+
+    m_db.beginWriteTxn();
+
+    try {
+      if (!pushTransaction(block, minerTransactionHash, transactionIndex)) {
+        m_db.abortTxn();
+        bvc.m_verification_failed = true;
+        return false;
+      }
+
+      for (size_t i = 0; i < transactions.size(); ++i) {
+        const Crypto::Hash& tx_id = blockData.transactionHashes[i];
+        block.transactions.resize(block.transactions.size() + 1);
+        block.transactions.back().tx = transactions[i];
+
+        size_t blob_size = toBinaryArray(block.transactions.back().tx).size();
+        uint64_t fee = getInputAmount(block.transactions.back().tx) -
+                       getOutputAmount(block.transactions.back().tx);
+
+        if (!checkTransactionInputs(block.transactions.back().tx)) {
+          logger(INFO, BRIGHT_WHITE) << "Block " << blockHash
+            << " has at least one transaction with wrong inputs: " << tx_id;
+          bvc.m_verification_failed = true;
+          m_db.abortTxn();
+          return false;
+        }
+
+        ++transactionIndex.transaction;
+        if (!pushTransaction(block, tx_id, transactionIndex)) {
+          m_db.abortTxn();
+          bvc.m_verification_failed = true;
+          return false;
+        }
+
+        cumulative_block_size += blob_size;
+        fee_summary += fee;
+      }
+
+      if (!checkCumulativeBlockSize(blockHash, cumulative_block_size, newHeight)) {
+        bvc.m_verification_failed = true;
+        m_db.abortTxn();
+        return false;
+      }
+
+      if (!validate_miner_transaction(blockData, newHeight, cumulative_block_size,
+                                       already_generated_coins, fee_summary, reward, emissionChange)) {
+        logger(INFO, BRIGHT_WHITE) << "Block " << blockHash << " has invalid miner transaction";
+        bvc.m_verification_failed = true;
+        m_db.abortTxn();
+        return false;
+      }
+
+      block.block_cumulative_size  = cumulative_block_size;
+      block.already_generated_coins = already_generated_coins + emissionChange;
+      block.cumulative_difficulty   = currentDifficulty + prevCumulativeDifficulty;
+
+      pushBlock(block, blockHash);  // writes block-level LMDB data
+
+      m_db.commitTxn();
+      break;  // success — exit retry loop
+
+    } catch (const LMDBMapFullException&) {
+      // abortTxn() is safe even if commitTxn() already nulled m_writeTxn.
+      m_db.abortTxn();
+      logger(WARNING, BRIGHT_YELLOW) << "LMDB map full at height " << newHeight
+        << ", resizing and retrying...";
+      m_db.resizeMap();
+      // loop back and retry the entire write
+    }
   }
-
-  block.block_cumulative_size = cumulative_block_size;
-  block.already_generated_coins = already_generated_coins + emissionChange;
-  block.cumulative_difficulty = currentDifficulty;
-  if (newHeight > 0) {
-    DbBlockMeta prevMeta{};
-    m_db.getBlockMeta(newHeight - 1, prevMeta);
-    block.cumulative_difficulty += prevMeta.cumulativeDifficulty;
-  }
-
-  pushBlock(block, blockHash);  // writes block-level LMDB data
-
-  m_db.commitTxn();
 
   auto block_processing_time = std::chrono::duration_cast<std::chrono::milliseconds>(
     std::chrono::steady_clock::now() - blockProcessingStart).count();
@@ -2695,31 +2717,49 @@ bool Blockchain::migrateFromSwappedVector(const std::string& config_folder) {
     BlockEntry block = oldBlocks[b];
     Crypto::Hash blockHash = get_block_hash(block.bl);
 
-    m_db.beginWriteTxn();
-
-    bool ok = true;
-    for (uint16_t t = 0; t < static_cast<uint16_t>(block.transactions.size()); ++t) {
-      Crypto::Hash txHash;
-      if (t == 0) {
-        txHash = getObjectHash(block.bl.baseTransaction);
-      } else {
-        txHash = block.bl.transactionHashes[t - 1];
+    // Retry loop: on MDB_MAP_FULL abort, double the map, and redo this block.
+    for (;;) {
+      // Reset global output indexes so a retry starts clean.
+      for (auto& te : block.transactions) {
+        te.m_global_output_indexes.clear();
       }
-      TransactionIndex txIdx = {b, t};
-      if (!pushTransaction(block, txHash, txIdx)) {
-        logger(ERROR, BRIGHT_RED) << "Migration: pushTransaction failed at block " << b
-          << " tx " << t;
-        ok = false;
-        break;
-      }
-    }
 
-    if (ok) {
-      pushBlock(block, blockHash);
-      m_db.commitTxn();
-    } else {
-      m_db.abortTxn();
-      return false;
+      m_db.beginWriteTxn();
+
+      bool ok = true;
+      try {
+        for (uint16_t t = 0; t < static_cast<uint16_t>(block.transactions.size()); ++t) {
+          Crypto::Hash txHash;
+          if (t == 0) {
+            txHash = getObjectHash(block.bl.baseTransaction);
+          } else {
+            txHash = block.bl.transactionHashes[t - 1];
+          }
+          TransactionIndex txIdx = {b, t};
+          if (!pushTransaction(block, txHash, txIdx)) {
+            logger(ERROR, BRIGHT_RED) << "Migration: pushTransaction failed at block " << b
+              << " tx " << t;
+            ok = false;
+            break;
+          }
+        }
+
+        if (ok) {
+          pushBlock(block, blockHash);
+          m_db.commitTxn();
+          break;  // success — next block
+        } else {
+          m_db.abortTxn();
+          return false;
+        }
+
+      } catch (const LMDBMapFullException&) {
+        m_db.abortTxn();
+        logger(INFO, BRIGHT_YELLOW) << "Migration: LMDB map full at block " << b
+          << ", resizing map and retrying...";
+        m_db.resizeMap();
+        // loop back and retry this block
+      }
     }
   }
 

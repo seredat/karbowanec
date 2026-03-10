@@ -182,7 +182,7 @@ namespace CryptoNote {
       }
 
       size_t voteCounter = 0;
-      for (size_t i = height + 1 - m_currency.upgradeVotingWindow(); i <= height; ++i) {
+      for (uint32_t i = height + 1 - m_currency.upgradeVotingWindow(); i <= height; ++i) {
         const auto& b = m_blockchain[i].bl;
         voteCounter += (b.majorVersion == m_targetVersion - 1) && (b.minorVersion == BLOCK_MINOR_VERSION_1) ? 1 : 0;
       }
