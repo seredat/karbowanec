@@ -225,6 +225,21 @@ void LMDBBlockchainDB::resizeMap() {
   checkRc(rc, "resizeMap");
 }
 
+void LMDBBlockchainDB::growMapIfNeeded(double threshold) {
+  assert(!m_writeTxn && "growMapIfNeeded called with active write txn");
+  MDB_envinfo info{};
+  mdb_env_info(m_env, &info);
+  MDB_stat stat{};
+  mdb_env_stat(m_env, &stat);
+  size_t totalPages = info.me_mapsize / stat.ms_psize;
+  size_t usedPages  = info.me_last_pgno + 1;
+  if (totalPages > 0 &&
+      static_cast<double>(usedPages) / static_cast<double>(totalPages) >= threshold) {
+    int rc = mdb_env_set_mapsize(m_env, info.me_mapsize * 2);
+    checkRc(rc, "growMapIfNeeded");
+  }
+}
+
 void LMDBBlockchainDB::setFastSyncMode(bool enable) {
   // MDB_NOSYNC: skip ALL per-commit syncs (data pages AND meta page).
   // Combined with MDB_WRITEMAP | MDB_MAPASYNC, commits become pure in-memory

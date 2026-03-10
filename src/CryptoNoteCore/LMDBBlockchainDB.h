@@ -147,9 +147,20 @@ public:
   // ── Resize when map is full ───────────────────────────────────────────────
   // Call this when no write txn is active, then re-begin the txn.
   void resizeMap();
+  // Proactively doubles the map if fill ratio >= threshold (default 80%).
+  // Call before beginWriteTxn() to prevent mid-batch MDB_MAP_FULL.
+  void growMapIfNeeded(double threshold = 0.8);
 
-  // ── Fast-sync mode ─────────────────────────────────────────────────────────
-  void LMDBBlockchainDB::setFastSyncMode(bool enable);
+  // ── IBD helpers ───────────────────────────────────────────────────────────
+  // True while a write txn is active.  Used by Blockchain to detect an open
+  // IBD batch so it can reuse rather than re-open the transaction.
+  bool hasActiveTxn() const noexcept { return m_writeTxn != nullptr; }
+
+  // Enable/disable MDB_NOMETASYNC (skips the per-commit meta-page fdatasync).
+  // Safe to use during IBD; call with enable=false when returning to normal
+  // operation — that call also forces a full mdb_env_sync to flush all
+  // pending writes.
+  void setFastSyncMode(bool enable);
 
 private:
   MDB_env* m_env      = nullptr;

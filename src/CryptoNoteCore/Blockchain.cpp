@@ -354,6 +354,7 @@ bool Blockchain::isSyncing() const {
 
 void Blockchain::beginBatchIfNeeded() {
   if (m_batchCount == 0) {
+    m_db.growMapIfNeeded();      // preemptively resize if >=80% full
     m_db.setFastSyncMode(true);  // enable MDB_NOSYNC for zero-cost commits
     m_db.beginWriteTxn();
   }
