@@ -62,6 +62,10 @@ namespace CryptoNote {
     bool addObserver(IBlockchainStorageObserver* observer);
     bool removeObserver(IBlockchainStorageObserver* observer);
 
+    // Commit any pending batch write txn immediately.  Called at clean shutdown
+    // and before operations that need fully-committed state.
+    bool flushBatch();
+
     // ITransactionValidator
     virtual bool checkTransactionInputs(const CryptoNote::Transaction& tx, BlockInfo& maxUsedBlock) override;
     virtual bool checkTransactionInputs(const CryptoNote::Transaction& tx, BlockInfo& maxUsedBlock, BlockInfo& lastFailed) override;
@@ -303,6 +307,12 @@ namespace CryptoNote {
     bool m_allowDeepReorg;
     bool m_no_blobs;
 
+    // ── Batch-commit state (Monero-style) ──────────────────────────────────
+    // Blocks written into the currently-open batch write txn (0 = no open txn).
+    uint32_t m_batchCount = 0;
+    // Commit the batch write txn every this many blocks during initial sync.
+    static constexpr uint32_t BATCH_SIZE = 1000;
+
     IntrusiveLinkedList<MessageQueue<BlockchainMessage>> m_messageQueueList;
     Logging::LoggerRef logger;
 
@@ -343,6 +353,16 @@ namespace CryptoNote {
     std::vector<Crypto::Hash> doBuildSparseChain(const Crypto::Hash& startBlockId) const;
     bool getBlockCumulativeSize(const Block& block, size_t& cumulativeSize);
     bool update_next_cumulative_size_limit();
+
+    // ── Batch-commit helpers ────────────────────────────────────────────────
+    // True when the chain tip is more than 1 hour behind wall-clock time,
+    // meaning we are doing initial block download and should batch commits.
+    bool isSyncing() const;
+    // Open a new LMDB write txn (+ enable MDB_NOSYNC) iff no batch is open.
+    void beginBatchIfNeeded();
+    // Increment batch counter; commit if batch is full or we've caught up.
+    void commitBatchOrBlock(bool forceSingle = false);
+
     bool check_tx_input(const KeyInput& txin, const Crypto::Hash& tx_prefix_hash,
                          const std::vector<Crypto::Signature>& sig,
                          uint32_t* pmax_related_block_height = nullptr);

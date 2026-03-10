@@ -225,6 +225,21 @@ void LMDBBlockchainDB::resizeMap() {
   checkRc(rc, "resizeMap");
 }
 
+void LMDBBlockchainDB::setFastSyncMode(bool enable) {
+  // MDB_NOSYNC: skip ALL per-commit syncs (data pages AND meta page).
+  // Combined with MDB_WRITEMAP | MDB_MAPASYNC, commits become pure in-memory
+  // B-tree operations with zero kernel sync calls — same as Monero does
+  // during initial sync.  On crash the current open batch is lost, but for
+  // IBD that just means re-downloading a batch worth of blocks.
+  int rc = mdb_env_set_flags(m_env, MDB_NOSYNC, enable ? 1 : 0);
+  checkRc(rc, "setFastSyncMode/set_flags");
+  if (!enable) {
+    // Returning to normal mode: force a full flush so all dirty pages hit disk.
+    rc = mdb_env_sync(m_env, 1);
+    checkRc(rc, "setFastSyncMode/env_sync");
+  }
+}
+
 // ─── getChainHeight ───────────────────────────────────────────────────────
 
 uint32_t LMDBBlockchainDB::getChainHeight() const {

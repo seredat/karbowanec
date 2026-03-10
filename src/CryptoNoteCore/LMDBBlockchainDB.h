@@ -148,6 +148,9 @@ public:
   // Call this when no write txn is active, then re-begin the txn.
   void resizeMap();
 
+  // ── Fast-sync mode ─────────────────────────────────────────────────────────
+  void LMDBBlockchainDB::setFastSyncMode(bool enable);
+
 private:
   MDB_env* m_env      = nullptr;
   MDB_txn* m_writeTxn = nullptr;
