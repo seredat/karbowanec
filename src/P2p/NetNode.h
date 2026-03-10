@@ -2,7 +2,7 @@
 // Copyright (c) 2014-2018, The Monero project
 // Copyright (c) 2014-2018, The Forknote developers
 // Copyright (c) 2018-2022, Conceal Network & Conceal Devs
-// Copyright (c) 2016-2022, The Karbo developers
+// Copyright (c) 2016-2026, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -223,7 +223,5 @@ namespace CryptoNote
     boost::uuids::uuid m_network_id = CRYPTONOTE_NETWORK;
     std::map<uint32_t, time_t> m_blocked_hosts;
     std::map<uint32_t, uint64_t> m_host_fails_score;
-
-    mutable std::mutex mutex;
   };
 }

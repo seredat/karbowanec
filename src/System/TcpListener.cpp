@@ -35,6 +35,20 @@ namespace System {
     return *this;
   }
 
+  void TcpListener::close() {
+    if (acceptor && acceptor->is_open()) {
+      boost::system::error_code ignored_ec;
+
+      // Cancel any pending async operations
+      acceptor->cancel(ignored_ec);
+
+      // Close the acceptor socket
+      acceptor->close(ignored_ec);
+
+      // We ignore errors during close
+    }
+  }
+
   TcpConnection TcpListener::accept() {
     assert(dispatcher != nullptr);
     assert(acceptor);
