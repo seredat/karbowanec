@@ -478,8 +478,3 @@ bool DaemonCommandsHandler::unban(const std::vector<std::string>& args)
   }
   return m_srv.unban_host(ip);
 }
-//--------------------------------------------------------------------------------
-bool DaemonCommandsHandler::save(const std::vector<std::string>& args) {
-  return m_core.saveBlockchain();
-}
-
