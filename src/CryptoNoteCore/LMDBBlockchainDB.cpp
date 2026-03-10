@@ -21,8 +21,6 @@
 #include <cstring>
 #include <stdexcept>
 
-#include "Common/FileSystemShim.h"
-
 namespace CryptoNote {
 
 // ─── Big-endian helpers ────────────────────────────────────────────────────

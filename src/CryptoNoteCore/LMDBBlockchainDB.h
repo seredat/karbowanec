@@ -18,13 +18,14 @@
 #pragma once
 
 #include <cstdint>
+#include <cstring>
 #include <string>
 #include <vector>
 #include <stdexcept>
 
 #include "crypto/hash.h"
 #include "crypto/crypto.h"
-#include "lmdb.h"
+#include "liblmdb/lmdb.h"
 
 namespace CryptoNote {
 
@@ -179,10 +180,16 @@ private:
 // Provides the Blocks-container interface that BasicUpgradeDetector<BC> needs.
 class LMDBBlockView {
 public:
-  // Proxy types matching what UpgradeDetector reads from the chain
+  // Proxy for the 'bl' member that BasicUpgradeDetector accesses.
+  // Carries majorVersion, minorVersion, and the pre-computed block hash
+  // (read from DbBlockMeta.hash) so the free-function overload of
+  // get_block_hash() below can satisfy calls like:
+  //   get_block_hash(m_blockchain.back().bl)
+  // without deserialising the full block from LMDB.
   struct BLProxy {
-    uint8_t majorVersion = 0;
-    uint8_t minorVersion = 0;
+    uint8_t      majorVersion = 0;
+    uint8_t      minorVersion = 0;
+    Crypto::Hash blockHash{};  // copied from DbBlockMeta::hash
   };
   struct BlockProxy {
     BLProxy bl;
@@ -190,11 +197,20 @@ public:
   using value_type = BlockProxy;
 
   // ── Random-access iterator ──────────────────────────────────────────────
+  // Because operator*() returns BlockProxy by value (a proxy object, not a
+  // stored reference), operator->() cannot return BlockProxy* directly.
+  // The standard solution is an "arrow proxy" that owns the value and returns
+  // a pointer to it, so that it->field works correctly.
+  struct ArrowProxy {
+    BlockProxy val;
+    const BlockProxy* operator->() const { return &val; }
+  };
+
   struct Iterator {
     using iterator_category = std::random_access_iterator_tag;
     using value_type        = BlockProxy;
     using difference_type   = ptrdiff_t;
-    using pointer           = BlockProxy*;
+    using pointer           = ArrowProxy;
     using reference         = BlockProxy;
 
     const LMDBBlockchainDB* db = nullptr;
@@ -203,12 +219,17 @@ public:
     BlockProxy operator*() const {
       DbBlockMeta m{};
       db->getBlockMeta(pos, m);
-      return BlockProxy{{m.majorVersion, m.minorVersion}};
+      BLProxy bl{m.majorVersion, m.minorVersion, {}};
+      std::memcpy(bl.blockHash.data, m.hash, sizeof(m.hash));
+      return BlockProxy{bl};
     }
-    Iterator& operator++()            { ++pos; return *this; }
-    Iterator  operator++(int)         { auto t = *this; ++pos; return t; }
-    Iterator& operator--()            { --pos; return *this; }
-    Iterator  operator--(int)         { auto t = *this; --pos; return t; }
+    ArrowProxy operator->() const { return ArrowProxy{**this}; }
+    Iterator& operator++()               { ++pos; return *this; }
+    Iterator  operator++(int)            { auto t = *this; ++pos; return t; }
+    Iterator& operator--()               { --pos; return *this; }
+    Iterator  operator--(int)            { auto t = *this; --pos; return t; }
+    Iterator& operator+=(ptrdiff_t n)    { pos = static_cast<uint32_t>(pos + n); return *this; }
+    Iterator& operator-=(ptrdiff_t n)    { pos = static_cast<uint32_t>(pos - n); return *this; }
     Iterator  operator+(ptrdiff_t n) const { return {db, static_cast<uint32_t>(pos + n)}; }
     Iterator  operator-(ptrdiff_t n) const { return {db, static_cast<uint32_t>(pos - n)}; }
     ptrdiff_t operator-(const Iterator& o) const { return static_cast<ptrdiff_t>(pos) - o.pos; }
@@ -221,6 +242,9 @@ public:
     bool operator>=(const Iterator& o) const { return pos >= o.pos; }
   };
 
+  // Non-member form: n + it  (required for full random-access conformance)
+  friend Iterator operator+(ptrdiff_t n, const Iterator& it) { return it + n; }
+
   explicit LMDBBlockView(LMDBBlockchainDB& db) : m_db(db) {}
 
   uint32_t size()  const { return m_db.getChainHeight(); }
@@ -229,7 +253,9 @@ public:
   BlockProxy operator[](uint32_t height) const {
     DbBlockMeta m{};
     m_db.getBlockMeta(height, m);
-    return BlockProxy{{m.majorVersion, m.minorVersion}};
+    BLProxy bl{m.majorVersion, m.minorVersion, {}};
+    std::memcpy(bl.blockHash.data, m.hash, sizeof(m.hash));
+    return BlockProxy{bl};
   }
 
   BlockProxy back() const {
@@ -243,5 +269,14 @@ public:
 private:
   LMDBBlockchainDB& m_db;
 };
+
+// ─── ADL overload for BasicUpgradeDetector ─────────────────────────────────
+// BasicUpgradeDetector calls get_block_hash(m_blockchain.back().bl) where
+// bl is LMDBBlockView::BLProxy.  Providing this overload in the same namespace
+// lets ADL resolve the call without touching UpgradeDetector.h or
+// deserialising the full Block.
+inline Crypto::Hash get_block_hash(const LMDBBlockView::BLProxy& b) {
+  return b.blockHash;
+}
 
 } // namespace CryptoNote
