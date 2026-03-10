@@ -41,7 +41,7 @@ namespace CryptoNote {
     ~miner();
 
     bool init(const MinerConfig& config);
-    bool set_block_template(const Block& bl, const difficulty_type& diffic);
+    bool set_block_template(const Block& bl, const Difficulty& diffic);
     bool on_block_chain_update();
     bool start(const AccountKeys& acc, size_t threads_count);
     uint64_t get_speed();
@@ -51,7 +51,7 @@ namespace CryptoNote {
     bool on_idle();
     void on_synchronized();
     //synchronous analog (for fast calls)
-    bool find_nonce_for_given_block(Crypto::cn_context &context, Block& bl, const difficulty_type& diffic);
+    bool find_nonce_for_given_block(Crypto::cn_context &context, Block& bl, const Difficulty& diffic);
     void pause();
     void resume();
     void do_print_hashrate(bool do_hr);
@@ -77,7 +77,7 @@ namespace CryptoNote {
     Block m_template;
     std::atomic<uint32_t> m_template_no;
     std::atomic<uint32_t> m_starter_nonce;
-    difficulty_type m_diffic;
+    Difficulty m_diffic;
 
     std::atomic<uint32_t> m_threads_total;
     std::atomic<int32_t> m_pausers_count;
