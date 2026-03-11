@@ -140,6 +140,9 @@ namespace CryptoNote {
      void set_checkpoints(Checkpoints&& chk_pts);
      virtual bool isInCheckpointZone(uint32_t height) const override;
 
+     // Flush any pending batch write txn (e.g. at shutdown).
+     bool flushBatch() { return m_blockchain.flushBatch(); }
+
      std::vector<Transaction> getPoolTransactions() override;
      bool getPoolTransaction(const Crypto::Hash& tx_hash, Transaction& transaction) override;
      virtual size_t getPoolTransactionsCount() override;
@@ -170,8 +173,6 @@ namespace CryptoNote {
                                  std::vector<Crypto::Hash>& deletedTxsIds) override;
 
      virtual void rollbackBlockchain(const uint32_t height) override;
-
-     virtual bool saveBlockchain() override;
 
      uint64_t getNextBlockDifficulty() override;
      uint64_t getTotalGeneratedAmount() override;

@@ -150,5 +150,10 @@ namespace System {
     uint32_t addr_value = v4.to_uint(); // to_uint exists in some boost versions; if not, use to_ulong() or to_bytes() accordingly
     return { Ipv4Address(addr_value), endpoint.port() };
   }
+  
+  boost::asio::ip::tcp::socket& TcpConnection::getSocket() {
+    if (!socketPtr) throw std::runtime_error("Socket not initialized");
+    return *socketPtr;
+  }
 
 } // namespace System
