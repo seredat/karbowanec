@@ -18,6 +18,9 @@ jobs:
       ANDROID_ABI: arm64-v8a
       ANDROID_API: 28
       BUILD_DIR: build/arm64-v8a
+      # NDK version must match the Boost prebuilt (dec1 ndk_26b_boost_1.83.0 was built with NDK 26b)
+      NDK_VERSION: "26.3.11579264"
+      BOOST_VERSION_TAG: "ndk_26b_boost_1.83.0"
 
     steps:
       - name: Checkout repository
@@ -28,7 +31,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build wget unzip git build-essential python3 libssl-dev zip
+          sudo apt-get install -y cmake ninja-build wget unzip git build-essential python3 zip
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
@@ -39,32 +42,62 @@ jobs:
           sdkmanager "platform-tools" \
                      "build-tools;34.0.0" \
                      "platforms;android-${ANDROID_API}" \
-                     "ndk;28.2.13676358"
+                     "ndk;${NDK_VERSION}"
 
       - name: Set NDK path
         run: |
-          NDK_PATH=$(ls -d $ANDROID_HOME/ndk/* | sort -r | head -n 1)
+          NDK_PATH=$ANDROID_HOME/ndk/${NDK_VERSION}
           echo "NDK_PATH=$NDK_PATH" >> $GITHUB_ENV
-          echo "Using NDK at $NDK_PATH"
+          echo "Using NDK at: $NDK_PATH"
 
+      # FIX: added id: so fetch steps can check cache-hit
       - name: Cache Boost and OpenSSL
+        id: cache-prebuilts
         uses: actions/cache@v4
         with:
           path: |
             ~/opt/android/boost
             ~/opt/android/openssl
-          key: android-prebuilts-arm64-boost178-openssl111k
+          key: android-prebuilts-arm64-boost183-openssl111k-ndk26b-v2
 
+      # FIX: only run on cache miss
       - name: Fetch Boost
+        if: steps.cache-prebuilts.outputs.cache-hit != 'true'
         run: |
           mkdir -p ${HOME}/opt/android
-          wget -nv https://github.com/dec1/Boost-for-Android/releases/download/ndk_26b_boost_1.83.0/ndk_26b_boost_1.83.0.zip
-          unzip -q ndk_26b_boost_1.83.0.zip -d ${HOME}/opt/android/boost/
+          wget -nv https://github.com/dec1/Boost-for-Android/releases/download/${BOOST_VERSION_TAG}/${BOOST_VERSION_TAG}.zip
+          unzip -q ${BOOST_VERSION_TAG}.zip -d ${HOME}/opt/android/boost/
 
+      # FIX: only run on cache miss
       - name: Fetch OpenSSL prebuilt
+        if: steps.cache-prebuilts.outputs.cache-hit != 'true'
         run: |
           git clone --depth 1 https://github.com/PurpleI2P/OpenSSL-for-Android-Prebuilt.git ${HOME}/opt/android/openssl
+
+      # Probe actual Boost layout so path detection below is transparent in logs
+      - name: Probe Boost directory structure
+        run: |
+          BOOST_BASE=${HOME}/opt/android/boost/${BOOST_VERSION_TAG}
+          echo "=== Boost root ===" && ls "$BOOST_BASE" || echo "(missing)"
+          echo "=== include/ ===" && ls "$BOOST_BASE/include/" | head -5 || echo "(missing)"
+          echo "=== libs/ ===" && ls "$BOOST_BASE/libs/" || echo "(missing)"
+          echo "=== libs/arm64-v8a/ ===" && ls "$BOOST_BASE/libs/arm64-v8a/" | head -10 || echo "(missing)"
+
+      # FIX: auto-detect whether libs are flat or in a 'static' subdirectory
+      - name: Set prebuilt env paths
+        run: |
+          BOOST_BASE=${HOME}/opt/android/boost/${BOOST_VERSION_TAG}
+          if [ -d "$BOOST_BASE/libs/${ANDROID_ABI}/static" ]; then
+            BOOST_LIB_DIR="$BOOST_BASE/libs/${ANDROID_ABI}/static"
+          else
+            BOOST_LIB_DIR="$BOOST_BASE/libs/${ANDROID_ABI}"
+          fi
+          echo "BOOST_ROOT=$BOOST_BASE"             >> $GITHUB_ENV
+          echo "BOOST_INCLUDE_DIR=$BOOST_BASE/include" >> $GITHUB_ENV
+          echo "BOOST_LIB_DIR=$BOOST_LIB_DIR"       >> $GITHUB_ENV
           echo "OPENSSL_ROOT=${HOME}/opt/android/openssl/openssl-1.1.1k-clang" >> $GITHUB_ENV
+          echo "Boost lib dir: $BOOST_LIB_DIR"
+          ls "$BOOST_LIB_DIR" | grep -E 'boost_(system|filesystem|thread|program_options|regex)' || echo "WARNING: expected boost libs not found at $BOOST_LIB_DIR"
 
       - name: Configure CMake
         run: |
@@ -72,16 +105,13 @@ jobs:
           rm -rf $BUILD_DIR && mkdir -p $BUILD_DIR
           cd $BUILD_DIR
 
-          export CC=clang
-          export CXX=clang++
-          export CFLAGS='-stdlib=libc++'
-
           cmake ../.. \
             -DCMAKE_TOOLCHAIN_FILE=$NDK_PATH/build/cmake/android.toolchain.cmake \
             -DANDROID_ABI=$ANDROID_ABI \
             -DANDROID_PLATFORM=android-$ANDROID_API \
             -DANDROID_NATIVE_API_LEVEL=$ANDROID_API \
             -DANDROID_TOOLCHAIN=clang \
+            -DANDROID_STL=c++_static \
             -DSTATIC=ON \
             -DANDROID=true \
             -DOPENSSL_ROOT_DIR=$OPENSSL_ROOT \
@@ -89,11 +119,13 @@ jobs:
             -DOPENSSL_CRYPTO_LIBRARY=$OPENSSL_ROOT/$ANDROID_ABI/lib/libcrypto.a \
             -DOPENSSL_INCLUDE_DIR=$OPENSSL_ROOT/include \
             -DBoost_DEBUG=ON \
-            -DBOOST_IGNORE_SYSTEM_PATHS_DEFAULT=ON -DBoost_NO_SYSTEM_PATHS=ON -DBoost_USE_STATIC_RUNTIME=ON \
-            -DBOOST_ROOT=${HOME}/opt/android/boost/ndk_26b_boost_1.83.0 \
-            -DBoost_INCLUDE_DIR=${HOME}/opt/android/boost/ndk_26b_boost_1.83.0/include \
-            -DBoost_LIBRARY_DIR=${HOME}/opt/android/boost/ndk_26b_boost_1.83.0/libs/arm64-v8a/static \
-            -DBoost_LIBRARY_DIRS=${HOME}/opt/android/boost/ndk_26b_boost_1.83.0/libs/arm64-v8a/static \
+            -DBoost_NO_SYSTEM_PATHS=ON \
+            -DBoost_USE_STATIC_LIBS=ON \
+            -DBoost_USE_STATIC_RUNTIME=ON \
+            -DBOOST_ROOT=$BOOST_ROOT \
+            -DBoost_INCLUDE_DIR=$BOOST_INCLUDE_DIR \
+            -DBoost_LIBRARY_DIR=$BOOST_LIB_DIR \
+            -DBoost_LIBRARY_DIRS=$BOOST_LIB_DIR \
             -DCMAKE_FIND_PACKAGE_PREFER_CONFIG=OFF \
             -DCMAKE_POLICY_DEFAULT_CMP0074=NEW \
             -DCMAKE_POLICY_DEFAULT_CMP0144=OLD \
@@ -112,15 +144,17 @@ jobs:
         run: |
           cd $BUILD_DIR/src
           mkdir -p karbo-$ANDROID_ABI
+          # FIX: use NDK's llvm-strip instead of host strip
+          STRIP=$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip
           for bin in karbowanecd simplewallet greenwallet optimizer walletd vanitygen; do
             if [ -f "$bin" ]; then
-              strip "$bin" || true
+              $STRIP "$bin" || true
               cp "$bin" karbo-$ANDROID_ABI/
             fi
           done
           cd karbo-$ANDROID_ABI
           zip -r ../karbo-$ANDROID_ABI.zip .
-          echo "artifact_path=$BUILD_DIR/src/karbo-$ANDROID_ABI.zip" >> $GITHUB_OUTPUT
+          echo "artifact_path=$BUILD_DIR/src/karbo-$ANDROID_ABI.zip"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
