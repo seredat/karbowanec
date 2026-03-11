@@ -60,9 +60,8 @@ jobs:
             ~/opt/android/openssl
           key: android-prebuilts-arm64-boost183-openssl111k-ndk26b-v2
 
-      # FIX: only run on cache miss
-      - name: Fetch Boost
-        if: steps.cache-prebuilts.outputs.cache-hit != 'true'
+      - name: Fetch Boost 1.78 prebuilt
+        #if: steps.cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p ${HOME}/opt/android
           wget -nv https://github.com/dec1/Boost-for-Android/releases/download/${BOOST_VERSION_TAG}/${BOOST_VERSION_TAG}.zip
@@ -70,7 +69,7 @@ jobs:
 
       # FIX: only run on cache miss
       - name: Fetch OpenSSL prebuilt
-        if: steps.cache-prebuilts.outputs.cache-hit != 'true'
+        #if: steps.cache.outputs.cache-hit != 'true'
         run: |
           git clone --depth 1 https://github.com/PurpleI2P/OpenSSL-for-Android-Prebuilt.git ${HOME}/opt/android/openssl
 
