@@ -63,7 +63,7 @@ PeerlistManager::Peerlist::Peerlist(peers_indexed& peers, size_t maxSize) :
 }
 
 void PeerlistManager::serialize(ISerializer& s) {
-  const uint8_t currentVersion = 2;
+  const uint8_t currentVersion = 3;
   uint8_t version = currentVersion;
 
   s(version, "version");
@@ -76,7 +76,6 @@ void PeerlistManager::serialize(ISerializer& s) {
   std::lock_guard<std::recursive_mutex> lock(mutex_);
   s(m_peers_white, "whitelist");
   s(m_peers_gray, "graylist");
-  s(m_peers_anchor, "anchorlist");
 }
 
 size_t PeerlistManager::Peerlist::count() const {

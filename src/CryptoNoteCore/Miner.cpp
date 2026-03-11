@@ -439,7 +439,7 @@ namespace CryptoNote
 
       b.nonce = nonce;
 
-      // step 1: sing the block
+      // step 1: sign the block
       if (b.majorVersion >= CryptoNote::BLOCK_MAJOR_VERSION_5) {
         BinaryArray ba;
         if (!get_block_hashing_blob(b, ba)) {

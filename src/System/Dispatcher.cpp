@@ -247,7 +247,7 @@ namespace System {
         if (firstResumingContext == nullptr) {
           lastResumingContext = nullptr;
         }
-        // Clear flags on dequeue (matches originals; satisfies Event.cpp assertions)
+        // Clear flags on dequeue
         context->inExecutionQueue = false;
         context->interruptProcedure = nullptr;
         break;
@@ -275,21 +275,48 @@ namespace System {
         break;
       }
 
-      // 3) Nothing ready -> arm wake timer for earliest deadline and BLOCK
-      arm_wake_timer_if_needed(wakeTimer, wakeArmed, wakeExpiryMs, timers);
+      // 3) Nothing ready - ensure wakeTimer is armed
+      if (timers.empty()) {
+        // Arm single long-lived dummy timer only once while there are no real timers.
+        if (!wakeArmed) {
+          using namespace std::chrono;
+          auto nowForExpiry = steady_clock::now();
+          // set a long duration (effectively "never" under normal conditions)
+          wakeTimer.expires_after(hours(1));
 
+          // capture 'this' pointer safely; handler will clear armed state on completion
+          wakeTimer.async_wait([this](const boost::system::error_code& ec) {
+            // When the dummy timer completes (either fired or was cancelled),
+            // mark wakeArmed false so future loops may re-arm real timers as needed.
+            // We don't need to re-arm here - dispatch() will re-evaluate state.
+            this->wakeArmed = false;
+            this->wakeExpiryMs = 0;
+            (void)ec; // silence unused param in builds without logging
+            });
+
+          wakeArmed = true;
+          // approximate expiry ms for diagnostics; exact value not critical
+          wakeExpiryMs = now_ms() + static_cast<uint64_t>(60 * 60 * 1000); // +1 hour
+        }
+      }
+      else {
+        // There are real timers -> arm wake timer to earliest deadline (existing helper)
+        arm_wake_timer_if_needed(wakeTimer, wakeArmed, wakeExpiryMs, timers);
+      }
+
+      // 4) Block until a handler runs or wakeTimer fires
       try {
-        // Block until either a handler runs (TCP etc.) or the wake timer fires
         ensureIoContextReady();
-        ioContext.run_one();
+        ioContext.run_one(); // will now block even if no real work is ready
       }
       catch (...) {
-        // keep loop alive
+        // Swallow, keep loop alive
       }
-      // Loop back; we'll re-check queues/timers again
+
+      // Loop back; ready queues and timers will be re-checked
     }
 
-    // Switch to the selected context if different
+    // 5) Switch to the selected context if different
     if (context != currentContext) {
       auto* prevYield = currentContext->yield;
       currentContext = context;
