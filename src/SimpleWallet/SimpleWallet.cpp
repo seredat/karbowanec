@@ -2,7 +2,7 @@
 // Copyright (c) 2014-2016, XDN developers
 // Copyright (c) 2014-2017, The Monero Project
 // Copyright (c) 2014-2017, The Forknote developers
-// Copyright (c) 2016-2022, The Karbo developers
+// Copyright (c) 2016-2026, The Karbo developers
 //
 // All rights reserved.
 //
@@ -671,11 +671,6 @@ simple_wallet::simple_wallet(System::Dispatcher& dispatcher, const CryptoNote::C
   m_consoleHandler.setHandler("verify_message", std::bind(&simple_wallet::verify_message, this, std::placeholders::_1), "Verify a signature of the message");
   m_consoleHandler.setHandler("help", std::bind(&simple_wallet::help, this, std::placeholders::_1), "Show this help");
   m_consoleHandler.setHandler("exit", std::bind(&simple_wallet::exit, this, std::placeholders::_1), "Close wallet");
-
-  std::stringstream userAgent;
-  userAgent << "NodeRpcProxy/" << PROJECT_VERSION_LONG;
-  m_requestHeaders = { {"User-Agent", userAgent.str()}, { "Connection", "keep-alive" } };
-
 }
 //----------------------------------------------------------------------------------------------------
 
@@ -1765,6 +1760,26 @@ bool simple_wallet::change_password(const std::vector<std::string>& args) {
   return true;
 }
 
+std::unique_ptr<CryptoNote::HttpClient> simple_wallet::createDaemonHttpClient() {
+  if (m_daemon_ssl) {
+    return std::make_unique<CryptoNote::HttpClient>(
+      m_dispatcher,
+      m_daemon_host,
+      m_daemon_port,
+      m_daemon_cert,
+      "",
+     !m_daemon_no_verify
+    );
+  }
+  else {
+    return std::make_unique<CryptoNote::HttpClient>(
+      m_dispatcher,
+      m_daemon_host,
+      m_daemon_port
+    );
+  }
+}
+
 bool simple_wallet::start_mining(const std::vector<std::string>& args) {
   COMMAND_RPC_START_MINING::request req;
 
@@ -1788,7 +1803,7 @@ bool simple_wallet::start_mining(const std::vector<std::string>& args) {
 
   if (!ok) {
     fail_msg_writer() << "invalid arguments. Please use start_mining [<number_of_threads>], " <<
-      "<number_of_threads> should be from 1 to " << max_mining_threads_count;
+      "where <number_of_threads> should be from 1 to " << max_mining_threads_count;
     return true;
   }
 
@@ -1798,32 +1813,24 @@ bool simple_wallet::start_mining(const std::vector<std::string>& args) {
   std::string err;
 
   try {
-    httplib::Client cli(m_daemon_address);
-    if (m_daemon_ssl && m_daemon_no_verify) {
-      cli.enable_server_certificate_verification(!m_daemon_no_verify);
-    }
-    const auto rsp = cli.Post(rpc_url.c_str(), m_requestHeaders, storeToJson(req), "application/json");
-    if (rsp) {
-      if (rsp->status == 200) {
-        if (!loadFromJson(res, rsp->body)) {
-          err = "Failed to parse JSON response";
-        }
-      }
-      err = interpret_rpc_response(res.status);
-    }
-    else {
-      err = "No response...";
-    }
+    auto httpClient = createDaemonHttpClient();
 
-    if (err.empty()) {
+    JsonRpc::invokeJsonCommand(*httpClient, rpc_url, req, res);
+
+    std::string err = interpret_rpc_response(res.status);
+    if (err.empty())
       success_msg_writer() << "Mining started in daemon";
-    }
-    else {
-      fail_msg_writer() << "Mining has not started due to an error: " << err;
-    }
-  } catch (const std::exception& e) {
+    else
+      fail_msg_writer() << "Mining has not started: " << err;
+
+  }
+  catch (const ConnectException&) {
+    printConnectionError();
+  }
+  catch (const std::exception& e) {
     fail_msg_writer() << "Failed to invoke RPC method: " << e.what();
   }
+
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -1836,32 +1843,23 @@ bool simple_wallet::stop_mining(const std::vector<std::string>& args)
   std::string err;
 
   try {
-    httplib::Client cli(m_daemon_address);
-    if (m_daemon_ssl && m_daemon_no_verify) {
-      cli.enable_server_certificate_verification(!m_daemon_no_verify);
-    }
-    const auto rsp = cli.Post(rpc_url.c_str(), m_requestHeaders, storeToJson(req), "application/json");
-    if (rsp) {
-      if (rsp->status == 200) {
-        if (!loadFromJson(res, rsp->body)) {
-          err = "Failed to parse JSON response";
-        }
-      }
-      err = interpret_rpc_response(res.status);
-    }
-    else {
-      err = "No response...";
-    }
+    auto httpClient = createDaemonHttpClient();
 
-    if (err.empty()) {
+    JsonRpc::invokeJsonCommand(*httpClient, rpc_url, req, res);
+
+    std::string err = interpret_rpc_response(res.status);
+    if (err.empty())
       success_msg_writer() << "Mining stopped in daemon";
-    }
-    else {
+    else
       fail_msg_writer() << "Mining has not stopped: " << err;
-    }
-  } catch (const std::exception& e) {
+  }
+  catch (const ConnectException&) {
+    printConnectionError();
+  }
+  catch (const std::exception& e) {
     fail_msg_writer() << "Failed to invoke RPC method: " << e.what();
   }
+
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -2430,7 +2428,9 @@ bool simple_wallet::print_address(const std::vector<std::string> &args/* = std::
 }
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::save_address_to_file(const std::vector<std::string> &args/* = std::vector<std::string>()*/) {
-  std::string walletAddressFile = prepareWalletAddressFilename(m_wallet_file_arg.empty() ? m_generate_new : m_wallet_file_arg);
+  std::string walletAddressFile = prepareWalletAddressFilename(m_wallet_file_arg.empty() ?
+                                                               m_generate_new :
+                                                               Common::RemoveExtension(m_wallet_file_arg));
   boost::system::error_code ignore;
   if (boost::filesystem::exists(walletAddressFile, ignore)) {
     fail_msg_writer() << "Address file already exists: " + walletAddressFile;
@@ -2686,34 +2686,23 @@ int main(int argc, char* argv[]) {
       return 1;
     }
 
-    Tools::wallet_rpc_server wrpc(logManager, *wallet, *node, currency, walletFileName);
+    Tools::wallet_rpc_server wrpc(dispatcher, logManager, *wallet, *node, currency, walletFileName);
 
     if (!wrpc.init(vm)) {
-      logger(ERROR, BRIGHT_RED) << "Failed to initialize wallet rpc server";
+      logger(ERROR, BRIGHT_RED) << "Failed to initialize wallet RPC server";
       return 1;
     }
 
     Tools::SignalHandler::install([&m_stopComplete, &dispatcher, &wrpc, &wallet] {
-      wrpc.stop();
-
       dispatcher.remoteSpawn([&] {
+        wrpc.stop();
         m_stopComplete.set();
       });
-
     });
 
-    bool enable_ssl;
-    std::string bind_address;
-    std::string bind_address_ssl;
-    std::string ssl_info;
-    wrpc.getServerConf(bind_address, bind_address_ssl, enable_ssl);
-    if (enable_ssl) ssl_info += std::string(", SSL on address ") + bind_address_ssl;
-    logger(INFO) << "Starting wallet rpc server on address " << bind_address << ssl_info;
     wrpc.run();
 
     m_stopComplete.wait();
-
-    logger(INFO) << "Stopped wallet rpc server";
 
     try {
       logger(INFO) << "Storing wallet...";

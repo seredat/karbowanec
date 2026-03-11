@@ -102,15 +102,6 @@ void findMyOutputs(
       checkOutputKey(derivation, out.key, keyIndex, idx, spendKeys, outputs);
       ++keyIndex;
 
-    } else if (outType == TransactionTypes::OutputType::Multisignature) {
-
-      uint64_t amount;
-      MultisignatureOutput out;
-      tx.getOutput(idx, out, amount);
-      for (const auto& key : out.keys) {
-        checkOutputKey(derivation, key, idx, idx, spendKeys, outputs);
-        ++keyIndex;
-      }
     }
   }
 }
@@ -458,8 +449,7 @@ std::error_code createTransfers(
     auto outType = tx.getOutputType(size_t(idx));
 
     if (
-      outType != TransactionTypes::OutputType::Key &&
-      outType != TransactionTypes::OutputType::Multisignature) {
+      outType != TransactionTypes::OutputType::Key) {
       continue;
     }
 
@@ -502,28 +492,6 @@ std::error_code createTransfers(
       info.amount = amount;
       info.outputKey = out.key;
 
-    } else if (outType == TransactionTypes::OutputType::Multisignature) {
-      uint64_t amount;
-      MultisignatureOutput out;
-      tx.getOutput(idx, out, amount);
-
-      for (const auto& key : out.keys) {
-        std::unordered_set<Crypto::Hash>::iterator it = transactions_hash_seen.find(txHash);
-        if (it == transactions_hash_seen.end()) {
-          std::unordered_set<Crypto::PublicKey>::iterator key_it = public_keys_seen.find(key);
-          if (key_it != public_keys_seen.end()) {
-            throw std::runtime_error("duplicate multisignature output key is found");
-            return std::error_code();
-          }
-          if (std::find(temp_keys.begin(), temp_keys.end(), key) != temp_keys.end()) {
-            throw std::runtime_error("the same multisignature output key is present more than once");
-            return std::error_code();
-          }
-          temp_keys.push_back(key);
-        }
-      }
-      info.amount = amount;
-      info.requiredSignatures = out.requiredSignatureCount;
     }
     transfers.push_back(info);
   }

@@ -111,7 +111,6 @@ namespace CryptoNote {
     bool getRandomOutsByAmount(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_response& res);
     bool getBackwardBlocksSize(size_t from_height, std::vector<size_t>& sz, size_t count);
     bool getTransactionOutputGlobalIndexes(const Crypto::Hash& tx_id, std::vector<uint32_t>& indexs);
-    bool get_out_by_msig_gindex(uint64_t amount, uint64_t gindex, MultisignatureOutput& out);
     bool checkTransactionInputs(const Transaction& tx, uint32_t& pmax_used_block_height, Crypto::Hash& max_used_block_id, BlockInfo* tail = 0);
     uint64_t getCurrentCumulativeBlocksizeLimit();
     uint64_t blockDifficulty(size_t i);
@@ -120,7 +119,6 @@ namespace CryptoNote {
     bool getBlockContainingTransaction(const Crypto::Hash& txId, Crypto::Hash& blockId, uint32_t& blockHeight);
     bool getAlreadyGeneratedCoins(const Crypto::Hash& hash, uint64_t& generatedCoins);
     bool getBlockSize(const Crypto::Hash& hash, size_t& size);
-    bool getMultisigOutputReference(const MultisignatureInput& txInMultisig, std::pair<Crypto::Hash, size_t>& outputReference);
     bool getGeneratedTransactionsNumber(uint32_t height, uint64_t& generatedTransactions);
     bool getOrphanBlockIdsByHeight(uint32_t height, std::vector<Crypto::Hash>& blockHashes);
     bool getBlockIdsByTimestamp(uint64_t timestampBegin, uint64_t timestampEnd, uint32_t blocksNumberLimit, std::vector<Crypto::Hash>& hashes, uint32_t& blocksNumberWithinTimestamps);
@@ -217,18 +215,6 @@ namespace CryptoNote {
 
   private:
 
-    struct MultisignatureOutputUsage {
-      TransactionIndex transactionIndex;
-      uint16_t outputIndex;
-      bool isUsed;
-
-      void serialize(ISerializer& s) {
-        s(transactionIndex, "txindex");
-        s(outputIndex, "outindex");
-        s(isUsed, "used");
-      }
-    };
-
     struct TransactionEntry {
       Transaction tx;
       std::vector<uint32_t> m_global_output_indexes;
@@ -260,7 +246,6 @@ namespace CryptoNote {
     typedef parallel_flat_hash_map<Crypto::KeyImage, uint32_t> key_images_container;
     typedef parallel_flat_hash_map<Crypto::Hash, BlockEntry> blocks_ext_by_hash;
     typedef parallel_flat_hash_map<uint64_t, std::vector<std::pair<TransactionIndex, uint16_t>>> outputs_container; //Crypto::Hash - tx hash, size_t - index of out in transaction
-    typedef parallel_flat_hash_map<uint64_t, std::vector<MultisignatureOutputUsage>> MultisignatureOutputsContainer;
 
     typedef std::vector<BinaryArray> hashing_blobs_container;
 
@@ -288,7 +273,6 @@ namespace CryptoNote {
     Blocks m_blocks;
     CryptoNote::BlockIndex m_blockIndex;
     TransactionMap m_transactionMap;
-    MultisignatureOutputsContainer m_multisignatureOutputs;
 
     hashing_blobs_container m_blobs;
 
@@ -342,7 +326,6 @@ namespace CryptoNote {
     bool pushTransaction(BlockEntry& block, const Crypto::Hash& transactionHash, TransactionIndex transactionIndex);
     void popTransaction(const Transaction& transaction, const Crypto::Hash& transactionHash);
     void popTransactions(const BlockEntry& block, const Crypto::Hash& minerTransactionHash);
-    bool validateInput(const MultisignatureInput& input, const Crypto::Hash& transactionHash, const Crypto::Hash& transactionPrefixHash, const std::vector<Crypto::Signature>& transactionSignatures);
     bool checkCheckpoints(uint32_t& lastValidCheckpointHeight);
     void removeLastBlock();
     bool checkUpgradeHeight(const UpgradeDetector& upgradeDetector);

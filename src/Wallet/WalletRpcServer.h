@@ -1,7 +1,7 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2014-2016, XDN developers
 // Copyright (c) 2014-2016, The Monero Project
-// Copyright (c) 2016-2023, Karbo developers
+// Copyright (c) 2016-2026, Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -26,11 +26,14 @@
 #include <boost/program_options/variables_map.hpp>
 
 #include "Common/CommandLine.h"
-#include "HTTP/httplib.h"
+#include "HTTP/HttpServer.h"
+#include "HTTP/HttpRequest.h"
+#include "HTTP/HttpResponse.h"
 #include "Rpc/JsonRpc.h"
 #include "Logging/LoggerRef.h"
 #include "WalletRpcServerCommandsDefinitions.h"
 #include "WalletLegacy/WalletLegacy.h"
+#include "System/Dispatcher.h"
 
 namespace Tools
 {
@@ -38,6 +41,7 @@ class wallet_rpc_server
 {
 public:
   wallet_rpc_server(
+    System::Dispatcher& dispatcher,
     Logging::ILogger& log,
     CryptoNote::IWalletLegacy &w, 
     CryptoNote::INode &n, 
@@ -63,7 +67,7 @@ public:
   void stop();
 
 private:
-  void processRequest(const httplib::Request& request, httplib::Response& response);
+  void processRequest(const CryptoNote::HttpRequest& request, CryptoNote::HttpResponse& response);
 
   //json_rpc
   bool on_get_balance(const wallet_rpc::COMMAND_RPC_GET_BALANCE::request& req, wallet_rpc::COMMAND_RPC_GET_BALANCE::response& res);
@@ -90,15 +94,14 @@ private:
   bool on_reset(const wallet_rpc::COMMAND_RPC_RESET::request& req, wallet_rpc::COMMAND_RPC_RESET::response& res);
 
   bool handle_command_line(const boost::program_options::variables_map& vm);
-  void listen(const std::string address, const uint16_t port);
-  void listen_ssl(const std::string address, const uint16_t port);
-  bool authenticate(const httplib::Request& request) const;
+  bool authenticate(const CryptoNote::HttpRequest& request) const;
 
   CryptoNote::Currency& m_currency;
   CryptoNote::IWalletLegacy& m_wallet;
   CryptoNote::INode& m_node;
-  httplib::Server* http;
-  httplib::SSLServer* https;
+  std::unique_ptr<CryptoNote::HttpServer> m_httpServer;
+  std::unique_ptr<CryptoNote::HttpServer> m_httpsServer;
+  System::Dispatcher& m_dispatcher;
   Logging::LoggerRef logger;
   std::list<std::thread> m_workers;
 

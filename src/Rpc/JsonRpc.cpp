@@ -1,23 +1,13 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
-// Copyright (c) 2016-2020, The Karbo developers
+// Copyright (c) 2016-2026, The Karbo developers
 //
 // This file is part of Karbo.
-//
-// Karbo is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Lesser General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// Karbo is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Lesser General Public License for more details.
-//
-// You should have received a copy of the GNU Lesser General Public License
-// along with Karbo.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "JsonRpc.h"
-#include "HTTP/httplib.h"
+#include <HTTP/HttpClient.h>
+#include <HTTP/HttpRequest.h>
+#include <HTTP/HttpResponse.h>
+#include <Common/base64.hpp>
 #include "CryptoNoteCore/TransactionPool.h"
 
 namespace CryptoNote {
@@ -40,25 +30,35 @@ JsonRpcError::JsonRpcError(int c) : code(c) {
 JsonRpcError::JsonRpcError(int c, const std::string& msg) : code(c), message(msg) {
 }
 
-void invokeJsonRpcCommand(httplib::Client& httpClient, JsonRpcRequest& jsReq, JsonRpcResponse& jsRes, const std::string& user, const std::string& password) {
+void invokeJsonRpcCommand(HttpClient& httpClient, JsonRpcRequest& jsReq, JsonRpcResponse& jsRes,
+  const std::string& user, const std::string& password) {
+  HttpRequest httpReq;
+  HttpResponse httpRes;
+
+  httpReq.setMethod("POST");
+  httpReq.setUrl("/json_rpc");
+  httpReq.addHeader("Content-Type", "application/json");
+  httpReq.addHeader("User-Agent", "NodeRpcProxy");
+
   if (!user.empty() || !password.empty()) {
-    httpClient.set_basic_auth(user.c_str(), password.c_str());
+    httpReq.addHeader("Authorization", "Basic " + base64::encode(Common::asBinaryArray(user + ":" + password)));
   }
 
-  auto rsp = httpClient.Post("/json_rpc", jsReq.getBody(), "application/json");
+  httpReq.setBody(jsReq.getBody());
 
-  if (!rsp || rsp->status != 200) {
-    throw std::runtime_error("JSON-RPC call failed");
+  httpClient.request(httpReq, httpRes);
+
+  if (httpRes.getStatus() != HttpResponse::STATUS_200) {
+    throw std::runtime_error("JSON-RPC call failed, HTTP status = " + std::to_string(httpRes.getStatus()));
   }
 
-  jsRes.parse(rsp->body);
+  jsRes.parse(httpRes.getBody());
 
   JsonRpcError err;
   if (jsRes.getError(err)) {
     throw err;
   }
 }
-
 
 }
 }

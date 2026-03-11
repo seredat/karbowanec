@@ -589,6 +589,22 @@ if(ANDROID AND CMAKE_C_COMPILER_ID STREQUAL "Clang")
   endif()
 endif()
 
+if (MSVC)
+  add_compile_options(
+    /O2        # Max optimization
+    /Ob2       # Inline aggressively
+    /Oi        # Intrinsics
+    /Ot        # Favor speed
+    /GL        # Link-time code generation
+  )
+
+  add_link_options(
+    /LTCG      # Link-time optimization
+  )
+
+  add_compile_definitions(NDEBUG)
+endif()
+
 include("${CMAKE_CURRENT_SOURCE_DIR}/src/version.cmake")
 
 function (treat_warnings_as_errors dirs)
