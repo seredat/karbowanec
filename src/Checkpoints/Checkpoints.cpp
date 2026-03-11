@@ -211,6 +211,7 @@ bool Checkpoints::load_checkpoints_from_dns()
   }
 
   return true;
-}
 #endif
+}
+
 }
