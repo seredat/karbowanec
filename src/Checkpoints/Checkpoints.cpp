@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2018, The TurtleCoin developers
-// Copyright (c) 2016-2021, The Karbo developers
+// Copyright (c) 2016-2026, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -148,10 +148,14 @@ std::vector<uint32_t> Checkpoints::getCheckpointHeights() const {
 
   return checkpointHeights;
 }
-#ifndef __ANDROID__
+
 //---------------------------------------------------------------------------
 bool Checkpoints::load_checkpoints_from_dns()
 {
+#if defined(__ANDROID__)
+	return false;
+#else
+	
   std::string domain(CryptoNote::DNS_CHECKPOINTS_HOST);
   std::vector<std::string>records;
   bool res = true;
