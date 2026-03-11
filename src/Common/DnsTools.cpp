@@ -47,8 +47,15 @@
 
 namespace Common {
 
-#ifndef __ANDROID__
-
+#if defined(__ANDROID__)
+  // Android API 28 does not expose res_query in the public NDK headers.
+  // DNS TXT checkpoint lookups are disabled; the daemon falls back to
+  // hard-coded checkpoints embedded at compile time.
+  bool fetch_dns_txt(const std::string& /*url*/,
+                     std::vector<std::string>& /*records*/) {
+    return false;
+  }
+#else
   bool fetch_dns_txt(const std::string domain, std::vector<std::string>&records) {
     using namespace std;
 
