@@ -647,10 +647,12 @@ bool Blockchain::getBlockLongHash(Crypto::cn_context& context, const Block& b, C
     return false;
 
   Crypto::Hash hash_1, hash_2;
+  // currentHeight - 1 - unlockWindow is always <= getCurrentBlockchainHeight() - 1
+  // Avoid the redundant lock acquisition on every hash iteration by computing maxHeight 
+  // directly from the block template instead of getCurrentBlockchainHeight().
   const uint32_t currentHeight = boost::get<BaseInput>(b.baseTransaction.inputs[0]).blockIndex;
-  const uint32_t maxHeight = std::min<uint32_t>(
-    getCurrentBlockchainHeight() - 1,
-    currentHeight - 1 - static_cast<uint32_t>(m_currency.minedMoneyUnlockWindow()));
+  const uint32_t unlockWindow = static_cast<uint32_t>(m_currency.minedMoneyUnlockWindow());
+  const uint32_t maxHeight = currentHeight - 1 - unlockWindow;
 
 #define ITER 128
   for (uint32_t i = 0; i < ITER; i++) {
