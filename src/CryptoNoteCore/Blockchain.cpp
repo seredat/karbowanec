@@ -2027,15 +2027,22 @@ bool Blockchain::pushBlock(const Block& blockData, const std::vector<Transaction
     return false;
   }
 
+  // getChainHeight() uses activeTxn() so it correctly accounts for any blocks
+// already written into an open batch write txn from previous calls.
+  uint32_t newHeight = m_db.getChainHeight();
+
   auto longhashTimeStart = std::chrono::steady_clock::now();
   Crypto::Hash proof_of_work = NULL_HASH;
-  if (m_checkpoints.is_in_checkpoint_zone(getCurrentBlockchainHeight())) {
-    if (!m_checkpoints.check_block(getCurrentBlockchainHeight(), blockHash)) {
+  
+  const bool inCheckpoint = m_checkpoints.is_in_checkpoint_zone(newHeight);
+  if (inCheckpoint) {
+    if (!m_checkpoints.check_block(newHeight, blockHash)) {
       logger(ERROR, BRIGHT_RED) << "CHECKPOINT VALIDATION FAILED";
       bvc.m_verification_failed = true;
       return false;
     }
-  } else {
+  }
+  else {
     if (!checkProofOfWork(m_cn_context, blockData, currentDifficulty, proof_of_work)) {
       logger(INFO, BRIGHT_WHITE) << "Block " << blockHash
         << ", has too weak proof of work: " << proof_of_work
@@ -2044,12 +2051,9 @@ bool Blockchain::pushBlock(const Block& blockData, const std::vector<Transaction
       return false;
     }
   }
+
   auto longhash_calculating_time = std::chrono::duration_cast<std::chrono::milliseconds>(
     std::chrono::steady_clock::now() - longhashTimeStart).count();
-
-  // getChainHeight() uses activeTxn() so it correctly accounts for any blocks
-  // already written into an open batch write txn from previous calls.
-  uint32_t newHeight = m_db.getChainHeight();
 
   if (!prevalidate_miner_transaction(blockData, newHeight)) {
     logger(INFO, BRIGHT_WHITE) << "Block " << blockHash << " failed to pass prevalidation";
@@ -2098,11 +2102,6 @@ bool Blockchain::pushBlock(const Block& blockData, const std::vector<Transaction
   block.transactions[0].tx = blockData.baseTransaction;
   TransactionIndex transactionIndex = {newHeight, 0};
 
-  // Under a confirmed checkpoint the block hash has already been verified by
-  // the network.  Skip the expensive per-input validation (key-image domain
-  // check, output-key LMDB scans) — pushTransaction still records everything.
-  const bool inCheckpoint = m_checkpoints.is_in_checkpoint_zone(newHeight);
-
   try {
     beginBatchIfNeeded();
 
@@ -2122,6 +2121,9 @@ bool Blockchain::pushBlock(const Block& blockData, const std::vector<Transaction
       uint64_t fee = getInputAmount(block.transactions.back().tx) -
                      getOutputAmount(block.transactions.back().tx);
 
+      // Under a confirmed checkpoint the block hash has already been verified by
+      // the network. Skip the expensive per-input validation (key-image domain
+      // check, output-key LMDB scans) — pushTransaction still records everything.
       if (!inCheckpoint && !checkTransactionInputs(block.transactions.back().tx)) {
         logger(INFO, BRIGHT_WHITE) << "Block " << blockHash
           << " has at least one transaction with wrong inputs: " << tx_id;
