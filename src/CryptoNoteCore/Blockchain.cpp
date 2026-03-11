@@ -234,7 +234,7 @@ bool Blockchain::init(const std::string& config_folder, bool load_existing) {
       m_blobs.reserve(chainHeight);
       for (uint32_t h = 0; h < chainHeight; ++h) {
         if (h % 50000 == 0 && h > 0) {
-          logger(INFO, BRIGHT_WHITE) << "Loading blobs: height " << h << " of " << chainHeight;
+          logger(DEBUGGING, BRIGHT_WHITE) << "Loading blobs: height " << h << " of " << chainHeight;
         }
         std::vector<uint8_t> blobData;
         if (!m_db.getHashingBlob(h, blobData)) {
@@ -1817,12 +1817,19 @@ bool Blockchain::check_tx_input(const KeyInput& txin, const Crypto::Hash& tx_pre
   std::lock_guard<decltype(m_blockchain_lock)> lk(m_blockchain_lock);
 
   struct outputs_visitor {
+    // Key values are OWNED here so that pointers into m_results_collector remain
+    // valid after each loop iteration in scanOutputKeysForIndexes destroys the
+    // temporary TransactionEntry.  reserve() prevents reallocation (which would
+    // invalidate already-stored back-pointers).
+    std::vector<Crypto::PublicKey> m_key_storage;
     std::vector<const Crypto::PublicKey*>& m_results_collector;
     Blockchain& m_bch;
     LoggerRef logger;
     outputs_visitor(std::vector<const Crypto::PublicKey*>& results_collector,
-                    Blockchain& bch, ILogger& logger)
-      : m_results_collector(results_collector), m_bch(bch), logger(logger, "outputs_visitor") {}
+                    Blockchain& bch, ILogger& logger, size_t ringSize)
+      : m_results_collector(results_collector), m_bch(bch), logger(logger, "outputs_visitor") {
+        m_key_storage.reserve(ringSize);
+    }
 
     bool handle_output(const Transaction& tx, const TransactionOutput& out,
                        size_t transactionOutputIndex) {
@@ -1835,7 +1842,8 @@ bool Blockchain::check_tx_input(const KeyInput& txin, const Crypto::Hash& tx_pre
         logger(INFO, BRIGHT_WHITE) << "Output have wrong type id, which=" << out.target.which();
         return false;
       }
-      m_results_collector.push_back(&boost::get<KeyOutput>(out.target).key);
+      m_key_storage.push_back(boost::get<KeyOutput>(out.target).key);  // copy key value
+      m_results_collector.push_back(&m_key_storage.back());             // stable pointer
       return true;
     }
   };
@@ -1847,7 +1855,7 @@ bool Blockchain::check_tx_input(const KeyInput& txin, const Crypto::Hash& tx_pre
   }
 
   std::vector<const Crypto::PublicKey*> output_keys;
-  outputs_visitor vi(output_keys, *this, logger.getLogger());
+  outputs_visitor vi(output_keys, *this, logger.getLogger(), txin.outputIndexes.size());
   if (!scanOutputKeysForIndexes(txin, vi, pmax_related_block_height)) {
     logger(INFO, BRIGHT_WHITE) << "Failed to get output keys for tx with amount = "
       << m_currency.formatAmount(txin.amount)
