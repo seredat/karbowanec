@@ -50,7 +50,6 @@ jobs:
           echo "NDK_PATH=$NDK_PATH" >> $GITHUB_ENV
           echo "Using NDK at: $NDK_PATH"
 
-      # FIX: added id: so fetch steps can check cache-hit
       - name: Cache Boost and OpenSSL
         id: cache-prebuilts
         uses: actions/cache@v4
@@ -60,7 +59,6 @@ jobs:
             ~/opt/android/openssl
           key: android-prebuilts-arm64-boost183-openssl111k-ndk26b-v2
 
-      # FIX: only run on cache miss
       - name: Fetch Boost
         if: steps.cache-prebuilts.outputs.cache-hit != 'true'
         run: |
@@ -68,7 +66,6 @@ jobs:
           wget -nv https://github.com/dec1/Boost-for-Android/releases/download/${BOOST_VERSION_TAG}/${BOOST_VERSION_TAG}.zip
           unzip -q ${BOOST_VERSION_TAG}.zip -d ${HOME}/opt/android/boost/
 
-      # FIX: only run on cache miss
       - name: Fetch OpenSSL prebuilt
         if: steps.cache-prebuilts.outputs.cache-hit != 'true'
         run: |
@@ -83,7 +80,6 @@ jobs:
           echo "=== libs/ ===" && ls "$BOOST_BASE/libs/" || echo "(missing)"
           echo "=== libs/arm64-v8a/ ===" && ls "$BOOST_BASE/libs/arm64-v8a/" | head -10 || echo "(missing)"
 
-      # FIX: auto-detect whether libs are flat or in a 'static' subdirectory
       - name: Set prebuilt env paths
         run: |
           BOOST_BASE=${HOME}/opt/android/boost/${BOOST_VERSION_TAG}
