@@ -17,7 +17,6 @@
 
 #pragma once
 
-#include <set>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -188,10 +187,7 @@ namespace CryptoNote {
       indexed_by<main_index_t, fee_index_t>
     > tx_container_t;
 
-    typedef std::pair<uint64_t, uint64_t> GlobalOutput;
-    typedef std::set<GlobalOutput> GlobalOutputsContainer;
     typedef std::unordered_map<Crypto::KeyImage, std::unordered_set<Crypto::Hash> > key_images_container;
-
 
     // double spending checking
     bool addTransactionInputs(const Crypto::Hash& id, const Transaction& tx, bool keptByBlock);
@@ -210,7 +206,6 @@ namespace CryptoNote {
     OnceInTimeInterval m_txCheckInterval;
     mutable std::recursive_mutex m_transactions_lock;
     key_images_container m_spent_key_images;
-    GlobalOutputsContainer m_spentOutputs;
 
     std::string m_config_folder;
     CryptoNote::ITransactionValidator& m_validator;

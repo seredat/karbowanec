@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <ctime>
+#include <set>
 #include <vector>
 #include <unordered_set>
 #include <unordered_map>
@@ -464,8 +465,6 @@ namespace CryptoNote {
 
       m_transactions.clear();
       m_spent_key_images.clear();
-      m_spentOutputs.clear();
-
       m_paymentIdIndex.clear();
       m_timestampIndex.clear();
     } else {
@@ -496,7 +495,7 @@ namespace CryptoNote {
     return true;
   }
 
-#define CURRENT_MEMPOOL_ARCHIVE_VER 1
+#define CURRENT_MEMPOOL_ARCHIVE_VER 2
 
   void serialize(CryptoNote::tx_memory_pool::TransactionDetails& td, ISerializer& s) {
     s(td.id, "id");
@@ -532,7 +531,6 @@ namespace CryptoNote {
     }
 
     KV_MEMBER(m_spent_key_images);
-    KV_MEMBER(m_spentOutputs);
     KV_MEMBER(m_recentlyDeletedTransactions);
   }
 

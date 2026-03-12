@@ -572,7 +572,7 @@ bool Blockchain::getBackwardBlocksSize(size_t from_height, std::vector<size_t>& 
 
   // Read the range in a single cursor scan instead of one txn per block.
   std::vector<DbBlockMeta> metas;
-  m_db.getBlockMetaRange(start_offset, from_height, metas);
+  m_db.getBlockMetaRange(start_offset, static_cast<uint32_t>(from_height), metas);
   for (const auto& m : metas) sz.push_back(m.blockCumulativeSize);
   return true;
 }
