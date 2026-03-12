@@ -72,7 +72,6 @@ DaemonCommandsHandler::DaemonCommandsHandler(CryptoNote::Core& core, CryptoNote:
   m_consoleHandler.setHandler("ban", std::bind(&DaemonCommandsHandler::ban, this, std::placeholders::_1), "Ban a given <IP> for [<seconds>] or permanently if no duration provided, ban <IP> [<seconds>]");
   m_consoleHandler.setHandler("unban", std::bind(&DaemonCommandsHandler::unban, this, std::placeholders::_1), "Unban a given <IP>, unban <IP>");
   m_consoleHandler.setHandler("status", std::bind(&DaemonCommandsHandler::status, this, std::placeholders::_1), "Show daemon status");
-  m_consoleHandler.setHandler("save", std::bind(&DaemonCommandsHandler::save, this, std::placeholders::_1), "Store blockchain");
 }
 
 //--------------------------------------------------------------------------------
@@ -478,8 +477,3 @@ bool DaemonCommandsHandler::unban(const std::vector<std::string>& args)
   }
   return m_srv.unban_host(ip);
 }
-//--------------------------------------------------------------------------------
-bool DaemonCommandsHandler::save(const std::vector<std::string>& args) {
-  return m_core.saveBlockchain();
-}
-

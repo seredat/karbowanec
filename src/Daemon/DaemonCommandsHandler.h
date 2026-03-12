@@ -87,5 +87,4 @@ private:
   bool ban(const std::vector<std::string>& args);
   bool unban(const std::vector<std::string>& args);
   bool status(const std::vector<std::string>& args);
-  bool save(const std::vector<std::string>& args);
 };

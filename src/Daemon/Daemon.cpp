@@ -37,7 +37,6 @@
 #include "CryptoNoteCore/MinerConfig.h"
 #include "CryptoNoteProtocol/CryptoNoteProtocolHandler.h"
 #include "CryptoNoteProtocol/ICryptoNoteProtocolQuery.h"
-#include "HTTP/httplib.h"
 #include "Logging/LoggerManager.h"
 #include "Rpc/RpcServer.h"
 #include "Rpc/RpcServerConfig.h"
