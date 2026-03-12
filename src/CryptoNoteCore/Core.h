@@ -46,7 +46,7 @@ namespace CryptoNote {
 
   class Core : public ICore, public IMinerHandler, public IBlockchainStorageObserver, public ITxPoolObserver {
    public:
-     Core(const Currency& currency, i_cryptonote_protocol* pprotocol, Logging::ILogger& logger, System::Dispatcher& dispatcher, bool blockchainIndexesEnabled, bool allowDeepReorg = false, bool noBlobs = false);
+     Core(const Currency& currency, i_cryptonote_protocol* pprotocol, Logging::ILogger& logger, System::Dispatcher& dispatcher, bool allowDeepReorg = false, bool noBlobs = false);
      ~Core();
 
      bool on_idle() override;

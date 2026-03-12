@@ -86,7 +86,6 @@ namespace CryptoNote {
 			m_blocksCacheFileName = "testnet_" + m_blocksCacheFileName;
 			m_blockIndexesFileName = "testnet_" + m_blockIndexesFileName;
 			m_txPoolFileName = "testnet_" + m_txPoolFileName;
-			m_blockchainIndicesFileName = "testnet_" + m_blockchainIndicesFileName;
 		}
 
 		return true;
@@ -883,7 +882,6 @@ namespace CryptoNote {
 		blocksCacheFileName(parameters::CRYPTONOTE_BLOCKSCACHE_FILENAME);
 		blockIndexesFileName(parameters::CRYPTONOTE_BLOCKINDEXES_FILENAME);
 		txPoolFileName(parameters::CRYPTONOTE_POOLDATA_FILENAME);
-		blockchainIndicesFileName(parameters::CRYPTONOTE_BLOCKCHAIN_INDICES_FILENAME);
 
 		testnet(false);
 	}

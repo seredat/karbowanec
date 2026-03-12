@@ -94,20 +94,19 @@ namespace CryptoNote {
   //---------------------------------------------------------------------------------
   tx_memory_pool::tx_memory_pool(
     const CryptoNote::Currency& currency,
-    CryptoNote::ITransactionValidator& validator, 
+    CryptoNote::ITransactionValidator& validator,
     CryptoNote::ICore& core,
     CryptoNote::ITimeProvider& timeProvider,
-    Logging::ILogger& log,
-    bool blockchainIndexesEnabled) :
+    Logging::ILogger& log) :
     m_currency(currency),
     m_validator(validator),
     m_core(core),
-    m_timeProvider(timeProvider), 
+    m_timeProvider(timeProvider),
     m_txCheckInterval(60, timeProvider),
     m_fee_index(boost::get<1>(m_transactions)),
     logger(log, "txpool"),
-    m_paymentIdIndex(blockchainIndexesEnabled),
-    m_timestampIndex(blockchainIndexesEnabled) {
+    m_paymentIdIndex(true),
+    m_timestampIndex(true) {
   }
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::add_tx(const Transaction &tx, /*const Crypto::Hash& tx_prefix_hash,*/ const Crypto::Hash &id, size_t blobSize, tx_verification_context& tvc, bool keptByBlock) {

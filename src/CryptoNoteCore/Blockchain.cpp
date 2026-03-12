@@ -68,8 +68,7 @@ namespace CryptoNote {
 // ─── Constructor ─────────────────────────────────────────────────────────────
 
 Blockchain::Blockchain(const Currency& currency, tx_memory_pool& tx_pool,
-                       ILogger& logger, bool blockchainIndexesEnabled,
-                       bool allowDeepReorg, bool noBlobs)
+                       ILogger& logger, bool allowDeepReorg, bool noBlobs)
   : logger(logger, "Blockchain"),
     m_currency(currency),
     m_tx_pool(tx_pool),
@@ -80,7 +79,6 @@ Blockchain::Blockchain(const Currency& currency, tx_memory_pool& tx_pool,
     m_upgradeDetectorV5(currency, m_blockView, BLOCK_MAJOR_VERSION_5, logger),
     m_upgradeDetectorV6(currency, m_blockView, BLOCK_MAJOR_VERSION_6, logger),
     m_checkpoints(logger, allowDeepReorg),
-    m_blockchainIndexesEnabled(blockchainIndexesEnabled),
     m_allowDeepReorg(allowDeepReorg),
     m_no_blobs(noBlobs)
 {
@@ -2247,9 +2245,7 @@ bool Blockchain::pushBlock(BlockEntry& block, const Crypto::Hash& blockHash) {
     m_blobs.push_back(hashBlob);
   }
 
-  if (m_blockchainIndexesEnabled) {
-    m_db.putTimestamp(block.bl.timestamp, blockHash);
-  }
+  m_db.putTimestamp(block.bl.timestamp, blockHash);
 
   uint64_t prevGenTx = 0;
   if (height > 0) {
@@ -2340,8 +2336,8 @@ bool Blockchain::pushTransaction(BlockEntry& block, const Crypto::Hash& transact
   // Record tx index
   m_db.putTxIndex(transactionHash, block.height, transactionIndex.transaction);
 
-  // Record payment ID if enabled
-  if (m_blockchainIndexesEnabled) {
+  // Record payment ID
+  {
     Crypto::Hash paymentId;
     if (getPaymentIdFromTxExtra(tx.extra, paymentId)) {
       m_db.putPaymentId(paymentId, transactionHash);
@@ -2391,8 +2387,8 @@ void Blockchain::popTransaction(const Transaction& transaction,
     }
   }
 
-  // Remove payment ID if enabled
-  if (m_blockchainIndexesEnabled) {
+  // Remove payment ID
+  {
     Crypto::Hash paymentId;
     if (getPaymentIdFromTxExtra(transaction.extra, paymentId)) {
       m_db.removePaymentId(paymentId, transactionHash);
@@ -2476,9 +2472,7 @@ void Blockchain::removeLastBlock() {
   m_db.removeHashingBlob(height);
   m_db.removeGeneratedTxCount(height);
 
-  if (m_blockchainIndexesEnabled) {
-    m_db.removeTimestamp(meta.timestamp, blockHash);
-  }
+  m_db.removeTimestamp(meta.timestamp, blockHash);
 
   m_db.removeLastBlockMeta();
   m_db.commitTxn();
@@ -2608,7 +2602,6 @@ bool Blockchain::getBlockIdsByTimestamp(uint64_t timestampBegin, uint64_t timest
                                          uint32_t blocksNumberLimit,
                                          std::vector<Crypto::Hash>& hashes,
                                          uint32_t& blocksNumberWithinTimestamps) {
-  if (!m_blockchainIndexesEnabled) return false;
   std::lock_guard<decltype(m_blockchain_lock)> lk(m_blockchain_lock);
   return m_db.getBlockHashesByTimestampRange(timestampBegin, timestampEnd,
                                               blocksNumberLimit, hashes, blocksNumberWithinTimestamps);
@@ -2616,7 +2609,6 @@ bool Blockchain::getBlockIdsByTimestamp(uint64_t timestampBegin, uint64_t timest
 
 bool Blockchain::getTransactionIdsByPaymentId(const Crypto::Hash& paymentId,
                                                std::vector<Crypto::Hash>& transactionHashes) {
-  if (!m_blockchainIndexesEnabled) return false;
   std::lock_guard<decltype(m_blockchain_lock)> lk(m_blockchain_lock);
   return m_db.getPaymentIdTxHashes(paymentId, transactionHashes);
 }
