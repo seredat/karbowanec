@@ -1,7 +1,7 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2018, The BBSCoin Developers
 // Copyright (c) 2018-2019, The TurtleCoin Developers
-// Copyright (c) 2017-2018, Karbo developers
+// Copyright (c) 2017-2016, Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -51,6 +51,7 @@
 #include "CryptoNoteCore/CryptoNoteBasicImpl.h"
 #include "CryptoNoteCore/CryptoNoteFormatUtils.h"
 #include "CryptoNoteCore/CryptoNoteSerialization.h"
+#include "Wallet/TransactionBuilder.h"
 #include "CryptoNoteCore/CryptoNoteTools.h"
 #include "CryptoNoteCore/TransactionApi.h"
 #include "CryptoNoteCore/TransactionExtra.h"
@@ -2293,56 +2294,34 @@ bool WalletGreen::eraseForeignTransfers(size_t transactionId, size_t firstTransf
 std::unique_ptr<CryptoNote::ITransaction> WalletGreen::makeTransaction(const std::vector<ReceiverAmounts>& decomposedOutputs,
   std::vector<InputInfo>& keysInfo, const std::string& extra, uint64_t unlockTimestamp, Crypto::SecretKey& txSecretKey) {
 
-  std::unique_ptr<ITransaction> tx = createTransaction();
+  std::vector<TxBuildInput> inputs;
+  for (auto& input: keysInfo) {
+    TxBuildInput bi;
+    bi.keyInfo = input.keyInfo;
+    bi.senderKeys = makeAccountKeys(*input.walletRecord);
+    inputs.push_back(std::move(bi));
+  }
 
-  typedef std::pair<const AccountPublicAddress*, uint64_t> AmountToAddress;
-  std::vector<AmountToAddress> amountsToAddresses;
+  std::vector<TxBuildOutput> outputs;
   for (const auto& output: decomposedOutputs) {
     for (auto amount: output.amounts) {
-      amountsToAddresses.emplace_back(AmountToAddress{&output.receiver, amount});
+      outputs.push_back(TxBuildOutput{output.receiver, amount});
     }
   }
 
-  std::shuffle(amountsToAddresses.begin(), amountsToAddresses.end(), Random::generator());
-  std::sort(amountsToAddresses.begin(), amountsToAddresses.end(), [] (const AmountToAddress& left, const AmountToAddress& right) {
-    return left.second < right.second;
-  });
+  auto tx = buildTransaction(inputs, outputs, m_viewSecretKey, extra, unlockTimestamp, 0, txSecretKey);
 
-  tx->setUnlockTime(unlockTimestamp);
-
-  // Add inputs first so we can compute the inputs hash for deterministic key generation.
-  for (auto& input: keysInfo) {
-    tx->addInput(makeAccountKeys(*input.walletRecord), input.keyInfo, input.ephKeys);
+  // copy ephKeys back so callers still have them if needed
+  for (size_t i = 0; i < keysInfo.size(); ++i) {
+    keysInfo[i].ephKeys = inputs[i].ephKeys;
   }
-
-  // Generate deterministic transaction keys from inputs hash and wallet view secret key.
-  // This matches the approach used in constructTransaction (CryptoNoteFormatUtils) and
-  // allows the sending proof (tx secret key) to be recomputed even if not stored in cache.
-  tx->generateDeterministicTransactionKeys(m_viewSecretKey);
-
-  // Add outputs after deterministic keys are set, so output key derivation uses the
-  // deterministic transaction secret key.
-  for (const auto& amountToAddress: amountsToAddresses) {
-    tx->addOutput(amountToAddress.second, *amountToAddress.first);
-  }
-
-  tx->appendExtra(Common::asBinaryArray(extra));
-
-  size_t i = 0;
-  for(auto& input: keysInfo) {
-    tx->signInputKey(i++, input.keyInfo, input.ephKeys);
-  }
-
-  SecretKey txkey;
-  tx->getTransactionSecretKey(txkey);
-  txSecretKey = txkey;
 
   m_logger(DEBUGGING) << "Transaction created, hash " << tx->getTransactionHash() <<
     ", inputs " << m_currency.formatAmount(tx->getInputTotalAmount()) <<
     ", outputs " << m_currency.formatAmount(tx->getOutputTotalAmount()) <<
     ", fee " << m_currency.formatAmount(tx->getInputTotalAmount() - tx->getOutputTotalAmount()) <<
-    ", key " << Common::podToHex(txkey);
-    return tx;
+    ", key " << Common::podToHex(txSecretKey);
+  return tx;
 }
 
 void WalletGreen::sendTransaction(const CryptoNote::Transaction& cryptoNoteTransaction) {

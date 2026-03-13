@@ -1,4 +1,5 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2016-2026, Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -22,7 +23,7 @@
 #include "Account.h"
 #include "CryptoNoteCore/CryptoNoteTools.h"
 #include "CryptoNoteConfig.h"
-#include "CryptoNoteFormatUtils.h"
+#include "Common/BinaryArray.hpp"
 
 #include <boost/optional.hpp>
 #include <numeric>
@@ -245,8 +246,16 @@ namespace CryptoNote {
   void TransactionImpl::generateDeterministicTransactionKeys(const SecretKey& viewSecretKey) {
     checkIfSigning();
 
+    // Derive deterministic keypair: secretKey = hash_to_scalar(viewSecretKey || hash(inputs))
+    // Inputs must be added before calling this method; outputs must be added after.
+    Crypto::Hash inputsHash = getObjectHash(transaction.inputs);
+    BinaryArray ba;
+    Common::append(ba, std::begin(viewSecretKey.data), std::end(viewSecretKey.data));
+    Common::append(ba, std::begin(inputsHash.data), std::end(inputsHash.data));
+
     KeyPair keys;
-    if (!CryptoNote::generateDeterministicTransactionKeys(getObjectHash(transaction.inputs), viewSecretKey, keys)) {
+    hash_to_scalar(ba.data(), ba.size(), keys.secretKey);
+    if (!secret_key_to_public_key(keys.secretKey, keys.publicKey)) {
       throw std::runtime_error("Failed to generate deterministic transaction keys");
     }
 

@@ -36,7 +36,7 @@ TransactionBuilder& TransactionBuilder::setTxKeys(const CryptoNote::KeyPair& txK
   return *this;
 }
 
-TransactionBuilder& TransactionBuilder::setInput(const std::vector<CryptoNote::TransactionSourceEntry>& sources, const CryptoNote::AccountKeys& senderKeys) {
+TransactionBuilder& TransactionBuilder::setInput(const std::vector<CryptoNote::TxBuildInput>& sources, const CryptoNote::AccountKeys& senderKeys) {
   m_sources = sources;
   m_senderKeys = senderKeys;
   return *this;
@@ -47,12 +47,12 @@ TransactionBuilder& TransactionBuilder::addMultisignatureInput(const Multisignat
   return *this;
 }
 
-TransactionBuilder& TransactionBuilder::setOutput(const std::vector<CryptoNote::TransactionDestinationEntry>& destinations) {
+TransactionBuilder& TransactionBuilder::setOutput(const std::vector<CryptoNote::TxBuildOutput>& destinations) {
   m_destinations = destinations;
   return *this;
 }
 
-TransactionBuilder& TransactionBuilder::addOutput(const CryptoNote::TransactionDestinationEntry& dest) {
+TransactionBuilder& TransactionBuilder::addOutput(const CryptoNote::TxBuildOutput& dest) {
   m_destinations.push_back(dest);
   return *this;
 }
@@ -92,20 +92,20 @@ Transaction TransactionBuilder::build() const {
 }
 
 void TransactionBuilder::fillInputs(Transaction& tx, std::vector<CryptoNote::KeyPair>& contexts) const {
-  for (const TransactionSourceEntry& src_entr : m_sources) {
+  for (const TxBuildInput& src_entr : m_sources) {
     contexts.push_back(KeyPair());
     KeyPair& in_ephemeral = contexts.back();
     Crypto::KeyImage img;
-    generate_key_image_helper(m_senderKeys, src_entr.realTransactionPublicKey, src_entr.realOutputIndexInTransaction, in_ephemeral, img);
+    generate_key_image_helper(m_senderKeys, src_entr.keyInfo.realOutput.transactionPublicKey, src_entr.keyInfo.realOutput.outputInTransaction, in_ephemeral, img);
 
     // put key image into tx input
     KeyInput input_to_key;
-    input_to_key.amount = src_entr.amount;
+    input_to_key.amount = src_entr.keyInfo.amount;
     input_to_key.keyImage = img;
 
     // fill outputs array and use relative offsets
-    for (const TransactionSourceEntry::OutputEntry& out_entry : src_entr.outputs) {
-      input_to_key.outputIndexes.push_back(out_entry.first);
+    for (const TransactionTypes::GlobalOutput& out_entry : src_entr.keyInfo.outputs) {
+      input_to_key.outputIndexes.push_back(out_entry.outputIndex);
     }
 
     input_to_key.outputIndexes = absolute_output_offsets_to_relative(input_to_key.outputIndexes);
@@ -123,8 +123,8 @@ void TransactionBuilder::fillOutputs(Transaction& tx) const {
   for(const auto& dst_entr : m_destinations) {
     Crypto::KeyDerivation derivation;
     Crypto::PublicKey out_eph_public_key;
-    Crypto::generate_key_derivation(dst_entr.addr.viewPublicKey, m_txKey.secretKey, derivation);
-    Crypto::derive_public_key(derivation, output_index, dst_entr.addr.spendPublicKey, out_eph_public_key);
+    Crypto::generate_key_derivation(dst_entr.destination.viewPublicKey, m_txKey.secretKey, derivation);
+    Crypto::derive_public_key(derivation, output_index, dst_entr.destination.spendPublicKey, out_eph_public_key);
 
     TransactionOutput out;
     out.amount = dst_entr.amount;
@@ -166,14 +166,14 @@ void TransactionBuilder::signSources(const Crypto::Hash& prefixHash, const std::
   for (const auto& src_entr : m_sources) {
     std::vector<const Crypto::PublicKey*> keys_ptrs;
 
-    for (const auto& o : src_entr.outputs) {
-      keys_ptrs.push_back(&o.second);
+    for (const auto& o : src_entr.keyInfo.outputs) {
+      keys_ptrs.push_back(&o.targetKey);
     }
 
     tx.signatures.push_back(std::vector<Crypto::Signature>());
     std::vector<Crypto::Signature>& sigs = tx.signatures.back();
-    sigs.resize(src_entr.outputs.size());
-    generate_ring_signature(prefixHash, boost::get<KeyInput>(tx.inputs[i]).keyImage, keys_ptrs, contexts[i].secretKey, src_entr.realOutput, sigs.data());
+    sigs.resize(src_entr.keyInfo.outputs.size());
+    generate_ring_signature(prefixHash, boost::get<KeyInput>(tx.inputs[i]).keyImage, keys_ptrs, contexts[i].secretKey, src_entr.keyInfo.realOutput.transactionIndex, sigs.data());
     i++;
   }
 

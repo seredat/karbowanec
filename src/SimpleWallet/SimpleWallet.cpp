@@ -288,11 +288,12 @@ struct TransferCommand {
           }
         } else {
           WalletLegacyTransfer destination;
-          CryptoNote::TransactionDestinationEntry de;
+          CryptoNote::AccountPublicAddress deAddr;
+          uint64_t deAmount = 0;
 #ifndef __ANDROID__
           std::string aliasUrl;
 #endif
-          if (!m_currency.parseAccountAddressString(arg, de.addr)) {
+          if (!m_currency.parseAccountAddressString(arg, deAddr)) {
             Crypto::Hash paymentId;
             if (CryptoNote::parsePaymentId(arg, paymentId)) {
               logger(ERROR, BRIGHT_RED) << "Invalid payment ID usage. Please, use -p <payment_id>. See help for details.";
@@ -309,8 +310,8 @@ struct TransferCommand {
           }
 
           auto value = ar.next();
-          bool ok = m_currency.parseAmount(value, de.amount);
-          if (!ok || 0 == de.amount) {
+          bool ok = m_currency.parseAmount(value, deAmount);
+          if (!ok || 0 == deAmount) {
 #if defined(WIN32)
 #undef max
 #undef min
@@ -324,18 +325,18 @@ struct TransferCommand {
           if (aliasUrl.empty()) {
 #endif
             destination.address = arg;
-            destination.amount = de.amount;
+            destination.amount = deAmount;
             dsts.push_back(destination);
 #ifndef __ANDROID__
           } else {
-            aliases[aliasUrl].emplace_back(WalletLegacyTransfer{ "", static_cast<int64_t>(de.amount) });
+            aliases[aliasUrl].emplace_back(WalletLegacyTransfer{ "", static_cast<int64_t>(deAmount) });
           }
 #endif
           std::string remote_node_fee_address = m_node.feeAddress();
           if (!remote_node_fee_address.empty()) {
             destination.address = m_node.feeAddress();
             int64_t remote_node_fee_amount = (int64_t)m_node.feeAmount();
-            destination.amount = std::min<int64_t>((remote_node_fee_amount == 0 ? static_cast<int64_t>(de.amount * 0.0025) : remote_node_fee_amount),
+            destination.amount = std::min<int64_t>((remote_node_fee_amount == 0 ? static_cast<int64_t>(deAmount * 0.0025) : remote_node_fee_amount),
               (int64_t)CryptoNote::parameters::MAXIMUM_FEE);
             dsts.push_back(destination);
           }

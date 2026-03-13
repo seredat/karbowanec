@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
-// Copyright (c) 2018, Karbo developers
+// Copyright (c) 2018-2026, Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include <boost/utility/value_init.hpp>
-
 #include <CryptoNote.h>
 #include "CryptoNoteBasic.h"
 #include "CryptoNoteSerialization.h"
@@ -34,33 +32,6 @@ class ILogger;
 namespace CryptoNote {
 
 bool parseAndValidateTransactionFromBinaryArray(const BinaryArray& transactionBinaryArray, Transaction& transaction, Crypto::Hash& transactionHash, Crypto::Hash& transactionPrefixHash);
-
-struct TransactionSourceEntry {
-  typedef std::pair<uint32_t, Crypto::PublicKey> OutputEntry;
-
-  std::vector<OutputEntry> outputs;           //index + key
-  size_t realOutput;                          //index in outputs vector of real output_entry
-  Crypto::PublicKey realTransactionPublicKey; //incoming real tx public key
-  size_t realOutputIndexInTransaction;        //index in transaction outputs vector
-  uint64_t amount;                            //money
-};
-
-struct TransactionDestinationEntry {
-  uint64_t amount;                    //money
-  AccountPublicAddress addr;          //destination address
-
-  TransactionDestinationEntry() : amount(0), addr(boost::value_initialized<AccountPublicAddress>()) {}
-  TransactionDestinationEntry(uint64_t amount, const AccountPublicAddress &addr) : amount(amount), addr(addr) {}
-};
-
-bool generateDeterministicTransactionKeys(const Crypto::Hash& inputsHash, const Crypto::SecretKey& viewSecretKey, KeyPair& generatedKeys);
-bool generateDeterministicTransactionKeys(const Transaction& tx, const Crypto::SecretKey& viewSecretKey, KeyPair& generatedKeys);
-
-bool constructTransaction(
-  const AccountKeys& senderAccountKeys,
-  const std::vector<TransactionSourceEntry>& sources,
-  const std::vector<TransactionDestinationEntry>& destinations,
-  std::vector<uint8_t> extra, Transaction& transaction, uint64_t unlock_time, Crypto::SecretKey &tx_key, Logging::ILogger& log);
 
 bool getTransactionProof(const Crypto::Hash& transactionHash, const CryptoNote::AccountPublicAddress& destinationAddress, const Crypto::SecretKey& transactionKey, std::string& transactionProof, Logging::ILogger& log);
 bool getReserveProof(const std::vector<TransactionOutputInformation>& selectedTransfers, const CryptoNote::AccountKeys& accountKeys, const uint64_t& amount, const std::string& message, std::string& reserveProof, Logging::ILogger& log);

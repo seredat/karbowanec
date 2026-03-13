@@ -1,4 +1,5 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2016-2026, Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -124,10 +125,8 @@ public:
   // transaction info
   virtual void setTransactionSecretKey(const Crypto::SecretKey& key) = 0;
 
-  // Generate deterministic transaction keys from inputs hash and wallet view secret key.
+  // Generate deterministic transaction keys from wallet view secret key and inputs hash.
   // Must be called after all inputs are added and before any outputs are added.
-  // Mirrors generateDeterministicTransactionKeys from CryptoNoteFormatUtils, allowing
-  // the sending proof (tx secret key) to be recomputed even if not stored in wallet cache.
   virtual void generateDeterministicTransactionKeys(const Crypto::SecretKey& viewSecretKey) = 0;
 
   // signing

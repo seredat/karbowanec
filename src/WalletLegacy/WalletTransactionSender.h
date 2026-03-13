@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
-// Copyright (c) 2016-2020, Karbo developers
+// Copyright (c) 2016-2026, Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -22,6 +22,7 @@
 #include "CryptoNoteCore/Currency.h"
 
 #include "INode.h"
+#include "Wallet/TransactionBuilder.h"
 #include "WalletLegacy/WalletSendTransactionContext.h"
 #include "WalletLegacy/WalletUserTransactionsCache.h"
 #include "WalletLegacy/WalletUnconfirmedTransactions.h"
@@ -53,11 +54,11 @@ private:
   std::shared_ptr<WalletRequest> makeGetRandomOutsRequest(std::shared_ptr<SendTransactionContext> context);
   std::shared_ptr<WalletRequest> doSendTransaction(std::shared_ptr<SendTransactionContext> context, std::deque<std::shared_ptr<WalletLegacyEvent>>& events);
   void prepareInputs(const std::list<TransactionOutputInformation>& selectedTransfers, std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount>& outs,
-      std::vector<TransactionSourceEntry>& sources, uint64_t mixIn);
-  void splitDestinations(TransferId firstTransferId, size_t transfersCount, const TransactionDestinationEntry& changeDts,
-    const TxDustPolicy& dustPolicy, std::vector<TransactionDestinationEntry>& splittedDests);
-  void digitSplitStrategy(TransferId firstTransferId, size_t transfersCount, const TransactionDestinationEntry& change_dst, uint64_t dust_threshold,
-    std::vector<TransactionDestinationEntry>& splitted_dsts, uint64_t& dust);
+      std::vector<TxBuildInput>& inputs, uint64_t mixIn);
+  void splitDestinations(TransferId firstTransferId, size_t transfersCount, const TxBuildOutput& changeDts,
+    const TxDustPolicy& dustPolicy, std::vector<TxBuildOutput>& splittedDests);
+  void digitSplitStrategy(TransferId firstTransferId, size_t transfersCount, const TxBuildOutput& change_dst, uint64_t dust_threshold,
+    std::vector<TxBuildOutput>& splitted_dsts, uint64_t& dust);
   void sendTransactionRandomOutsByAmount(std::shared_ptr<SendTransactionContext> context, std::deque<std::shared_ptr<WalletLegacyEvent>>& events,
       boost::optional<std::shared_ptr<WalletRequest> >& nextRequest, std::error_code ec);
   void relayTransactionCallback(std::shared_ptr<SendTransactionContext> context, std::deque<std::shared_ptr<WalletLegacyEvent>>& events,
