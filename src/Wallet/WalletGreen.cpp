@@ -2308,16 +2308,25 @@ std::unique_ptr<CryptoNote::ITransaction> WalletGreen::makeTransaction(const std
     return left.second < right.second;
   });
 
+  tx->setUnlockTime(unlockTimestamp);
+
+  // Add inputs first so we can compute the inputs hash for deterministic key generation.
+  for (auto& input: keysInfo) {
+    tx->addInput(makeAccountKeys(*input.walletRecord), input.keyInfo, input.ephKeys);
+  }
+
+  // Generate deterministic transaction keys from inputs hash and wallet view secret key.
+  // This matches the approach used in constructTransaction (CryptoNoteFormatUtils) and
+  // allows the sending proof (tx secret key) to be recomputed even if not stored in cache.
+  tx->generateDeterministicTransactionKeys(m_viewSecretKey);
+
+  // Add outputs after deterministic keys are set, so output key derivation uses the
+  // deterministic transaction secret key.
   for (const auto& amountToAddress: amountsToAddresses) {
     tx->addOutput(amountToAddress.second, *amountToAddress.first);
   }
 
-  tx->setUnlockTime(unlockTimestamp);
   tx->appendExtra(Common::asBinaryArray(extra));
-
-  for (auto& input: keysInfo) {
-    tx->addInput(makeAccountKeys(*input.walletRecord), input.keyInfo, input.ephKeys);
-  }
 
   size_t i = 0;
   for(auto& input: keysInfo) {
@@ -2327,7 +2336,7 @@ std::unique_ptr<CryptoNote::ITransaction> WalletGreen::makeTransaction(const std
   SecretKey txkey;
   tx->getTransactionSecretKey(txkey);
   txSecretKey = txkey;
-  
+
   m_logger(DEBUGGING) << "Transaction created, hash " << tx->getTransactionHash() <<
     ", inputs " << m_currency.formatAmount(tx->getInputTotalAmount()) <<
     ", outputs " << m_currency.formatAmount(tx->getOutputTotalAmount()) <<

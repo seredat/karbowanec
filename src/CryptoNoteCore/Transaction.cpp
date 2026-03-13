@@ -22,6 +22,7 @@
 #include "Account.h"
 #include "CryptoNoteCore/CryptoNoteTools.h"
 #include "CryptoNoteConfig.h"
+#include "CryptoNoteFormatUtils.h"
 
 #include <boost/optional.hpp>
 #include <numeric>
@@ -110,6 +111,7 @@ namespace CryptoNote {
     // secret key
     virtual bool getTransactionSecretKey(SecretKey& key) const override;
     virtual void setTransactionSecretKey(const SecretKey& key) override;
+    virtual void generateDeterministicTransactionKeys(const SecretKey& viewSecretKey) override;
 
   private:
 
@@ -238,6 +240,22 @@ namespace CryptoNote {
     }
 
     secretKey = key;
+  }
+
+  void TransactionImpl::generateDeterministicTransactionKeys(const SecretKey& viewSecretKey) {
+    checkIfSigning();
+
+    KeyPair keys;
+    if (!CryptoNote::generateDeterministicTransactionKeys(getObjectHash(transaction.inputs), viewSecretKey, keys)) {
+      throw std::runtime_error("Failed to generate deterministic transaction keys");
+    }
+
+    secretKey = keys.secretKey;
+
+    TransactionExtraPublicKey pk = { keys.publicKey };
+    extra.set(pk);
+    transaction.extra = extra.serialize();
+    invalidateHash();
   }
 
   size_t TransactionImpl::addInput(const KeyInput& input) {

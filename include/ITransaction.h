@@ -124,6 +124,12 @@ public:
   // transaction info
   virtual void setTransactionSecretKey(const Crypto::SecretKey& key) = 0;
 
+  // Generate deterministic transaction keys from inputs hash and wallet view secret key.
+  // Must be called after all inputs are added and before any outputs are added.
+  // Mirrors generateDeterministicTransactionKeys from CryptoNoteFormatUtils, allowing
+  // the sending proof (tx secret key) to be recomputed even if not stored in wallet cache.
+  virtual void generateDeterministicTransactionKeys(const Crypto::SecretKey& viewSecretKey) = 0;
+
   // signing
   virtual void signInputKey(size_t input, const TransactionTypes::InputKeyInfo& info, const KeyPair& ephKeys) = 0;
 };
