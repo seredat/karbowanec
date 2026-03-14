@@ -227,8 +227,13 @@ bool Blockchain::init(const std::string& config_folder, bool load_existing) {
 
     logger(INFO, BRIGHT_WHITE) << "Loading blockchain...";
 
-    // Preload hashing blobs into RAM
+    // Always clear first: if migration just ran it will have already populated
+    // m_blobs as a side effect of calling the inner pushBlock(), and we must
+    // not double-load them - duplicate entries corrupt the index used by
+    // getBlockLongHash() for v5+ PoW, causing validation failures on new blocks
+    // after ~minedMoneyUnlockWindow live blocks are received post-migration.
     if (!m_no_blobs) {
+      m_blobs.clear();
       m_blobs.reserve(chainHeight);
       for (uint32_t h = 0; h < chainHeight; ++h) {
         if (h % 50000 == 0 && h > 0) {
@@ -2123,7 +2128,7 @@ bool Blockchain::pushBlock(const Block& blockData, const std::vector<Transaction
 
       // Under a confirmed checkpoint the block hash has already been verified by
       // the network. Skip the expensive per-input validation (key-image domain
-      // check, output-key LMDB scans) — pushTransaction still records everything.
+      // check, output-key LMDB scans) - pushTransaction still records everything.
       if (!inCheckpoint && !checkTransactionInputs(block.transactions.back().tx)) {
         logger(INFO, BRIGHT_WHITE) << "Block " << blockHash
           << " has at least one transaction with wrong inputs: " << tx_id;
@@ -2211,7 +2216,7 @@ bool Blockchain::pushBlock(const Block& blockData, const std::vector<Transaction
   return true;
 }
 
-// Inner pushBlock — writes block-level data within the active write txn.
+// Inner pushBlock - writes block-level data within the active write txn.
 bool Blockchain::pushBlock(BlockEntry& block, const Crypto::Hash& blockHash) {
   uint32_t height = block.height;
 
@@ -2863,7 +2868,7 @@ bool Blockchain::migrateFromSwappedVector(const std::string& config_folder) {
         logger(INFO, BRIGHT_YELLOW) << "Migration: LMDB map full at block " << batchStart
           << ", resizing map and retrying batch...";
         m_db.resizeMap();
-        // batchStart unchanged — retry same batch from the beginning
+        // batchStart unchanged - retry same batch from the beginning
       }
     }
   }
