@@ -24,6 +24,7 @@
 #include <cstdio>
 #include <cmath>
 #include <cstring>
+#include <filesystem>
 #include <boost/foreach.hpp>
 #include "Common/Math.h"
 #include "Common/int-util.h"
@@ -2786,94 +2787,132 @@ void Blockchain::print_blockchain_outs(const std::string& file) {
 // ─── Migration from legacy SwappedVector ─────────────────────────────────────
 
 bool Blockchain::migrateFromSwappedVector(const std::string& config_folder) {
-  SwappedVector<BlockEntry> oldBlocks;
   std::string blocksFile  = appendPath(config_folder, m_currency.blocksFileName());
   std::string indexFile   = appendPath(config_folder, m_currency.blockIndexesFileName());
 
-  if (!oldBlocks.open(blocksFile, indexFile, 1024)) {
-    logger(WARNING, BRIGHT_YELLOW) << "Migration: failed to open old block files";
-    return false;
-  }
+  uint32_t totalBlocks = 0;
+  uint32_t startBlock = 0;
 
-  if (oldBlocks.empty()) {
-    logger(INFO) << "Migration: old block files are empty, nothing to migrate";
-    return true;
-  }
+  {
+    SwappedVector<BlockEntry> oldBlocks;
 
-  uint32_t totalBlocks = static_cast<uint32_t>(oldBlocks.size());
+    if (!oldBlocks.open(blocksFile, indexFile, 1024)) {
+      logger(WARNING, BRIGHT_YELLOW) << "Migration: failed to open old block files";
+      return false;
+    }
 
-  // Resume support: skip blocks already committed to LMDB.
-  uint32_t startBlock = m_db.getChainHeight();
-  if (startBlock >= totalBlocks) {
-    logger(INFO, BRIGHT_WHITE) << "Migration already complete (" << totalBlocks << " blocks in LMDB).";
-    return true;
-  }
-  if (startBlock > 0) {
-    logger(INFO, BRIGHT_WHITE) << "Resuming migration from block " << startBlock
-      << " of " << totalBlocks << " (" << (totalBlocks - startBlock) << " remaining).";
-  } else {
-    logger(INFO, BRIGHT_WHITE) << "Migrating " << totalBlocks << " blocks from legacy storage to LMDB...";
-  }
+    if (oldBlocks.empty()) {
+      logger(INFO) << "Migration: old block files are empty, nothing to migrate";
+      return true;
+    }
 
-  // Write BATCH_SIZE blocks per LMDB transaction.
-  // Batching reduces commit overhead from O(totalBlocks) to O(totalBlocks/BATCH_SIZE)
-  // and keeps B-tree pages hot in the mmap across multiple block writes within a batch,
-  // which dramatically reduces B-tree fragmentation and page-split overhead.
-  // On MDB_MAP_FULL the current batch is aborted, the map is doubled, and the same
-  // batch is retried from its starting block (which is re-read from SwappedVector).
-  static const uint32_t BATCH_SIZE = 1000;
+    totalBlocks = static_cast<uint32_t>(oldBlocks.size());
+    // Resume support: skip blocks already committed to LMDB.
+    startBlock = m_db.getChainHeight();
 
-  for (uint32_t batchStart = startBlock; batchStart < totalBlocks; ) {
-    uint32_t batchEnd = std::min(batchStart + BATCH_SIZE, totalBlocks);
+    if (startBlock < totalBlocks) {
+      if (startBlock > 0) {
+        logger(INFO, BRIGHT_WHITE) << "Resuming migration from block " << startBlock
+          << " of " << totalBlocks << " (" << (totalBlocks - startBlock) << " remaining).";
+      }
+      else {
+        logger(INFO, BRIGHT_WHITE) << "Migrating " << totalBlocks << " blocks from legacy storage to LMDB...";
+      }
 
-    for (;;) {  // map-full retry loop for this batch
-      m_db.beginWriteTxn();
-      bool ok = true;
-      try {
-        for (uint32_t b = batchStart; b < batchEnd && ok; ++b) {
-          if (b % 10000 == 0) {
-            logger(INFO, BRIGHT_WHITE) << "Migration: height " << b << " of " << totalBlocks;
-          }
+      // Write BATCH_SIZE blocks per LMDB transaction.
+      // Batching reduces commit overhead from O(totalBlocks) to O(totalBlocks/BATCH_SIZE)
+      // and keeps B-tree pages hot in the mmap across multiple block writes within a batch,
+      // which dramatically reduces B-tree fragmentation and page-split overhead.
+      // On MDB_MAP_FULL the current batch is aborted, the map is doubled, and the same
+      // batch is retried from its starting block (which is re-read from SwappedVector).
+      static const uint32_t BATCH_SIZE = 1000;
 
-          // Fresh read from SwappedVector gives empty m_global_output_indexes,
-          // which pushTransaction will fill in correctly.
-          BlockEntry block = oldBlocks[b];
-          Crypto::Hash blockHash = get_block_hash(block.bl);
+      for (uint32_t batchStart = startBlock; batchStart < totalBlocks; ) {
+        uint32_t batchEnd = std::min(batchStart + BATCH_SIZE, totalBlocks);
 
-          for (uint16_t t = 0; t < static_cast<uint16_t>(block.transactions.size()); ++t) {
-            Crypto::Hash txHash = (t == 0)
-              ? getObjectHash(block.bl.baseTransaction)
-              : block.bl.transactionHashes[t - 1];
-            if (!pushTransaction(block, txHash, {b, t})) {
-              logger(ERROR, BRIGHT_RED) << "Migration: pushTransaction failed at block " << b
-                << " tx " << t;
-              ok = false;
+        for (;;) {  // map-full retry loop for this batch
+          m_db.beginWriteTxn();
+          bool ok = true;
+          try {
+            for (uint32_t b = batchStart; b < batchEnd && ok; ++b) {
+              if (b % 10000 == 0) {
+                logger(INFO, BRIGHT_WHITE) << "Migration: height " << b << " of " << totalBlocks;
+              }
+
+              // Fresh read from SwappedVector gives empty m_global_output_indexes,
+              // which pushTransaction will fill in correctly.
+              BlockEntry block = oldBlocks[b];
+              Crypto::Hash blockHash = get_block_hash(block.bl);
+
+              for (uint16_t t = 0; t < static_cast<uint16_t>(block.transactions.size()); ++t) {
+                Crypto::Hash txHash = (t == 0)
+                  ? getObjectHash(block.bl.baseTransaction)
+                  : block.bl.transactionHashes[t - 1];
+                if (!pushTransaction(block, txHash, { b, t })) {
+                  logger(ERROR, BRIGHT_RED) << "Migration: pushTransaction failed at block " << b
+                    << " tx " << t;
+                  ok = false;
+                  break;
+                }
+              }
+              if (ok) pushBlock(block, blockHash);
+            }
+
+            if (ok) {
+              m_db.commitTxn();
+              batchStart = batchEnd;  // advance to next batch
               break;
             }
+            else {
+              m_db.abortTxn();
+              return false;
+            }
+
           }
-          if (ok) pushBlock(block, blockHash);
+          catch (const LMDBMapFullException&) {
+            m_db.abortTxn();
+            logger(DEBUGGING, BRIGHT_YELLOW) << "Migration: LMDB map full at block " << batchStart
+              << ", resizing map and retrying batch...";
+            m_db.resizeMap();
+            // batchStart unchanged - retry same batch from the beginning
+          }
         }
-
-        if (ok) {
-          m_db.commitTxn();
-          batchStart = batchEnd;  // advance to next batch
-          break;
-        } else {
-          m_db.abortTxn();
-          return false;
-        }
-
-      } catch (const LMDBMapFullException&) {
-        m_db.abortTxn();
-        logger(INFO, BRIGHT_YELLOW) << "Migration: LMDB map full at block " << batchStart
-          << ", resizing map and retrying batch...";
-        m_db.resizeMap();
-        // batchStart unchanged - retry same batch from the beginning
       }
+
+      logger(INFO, BRIGHT_WHITE) << "Migration complete! " << totalBlocks << " blocks migrated to LMDB.";
+    } else {
+      logger(INFO, BRIGHT_WHITE) << "Migration already complete (" << totalBlocks << " blocks in LMDB).";
+    }
+  } // oldBlocks goes out of scope and is closed here
+
+  // Remove old SwappedVector files now that they are closed and no longer needed.
+  try {
+    if (std::filesystem::exists(blocksFile)) {
+      std::filesystem::remove(blocksFile);
+      logger(INFO) << "Migration: removed old blocks file: " << blocksFile;
+    }
+
+    if (std::filesystem::exists(indexFile)) {
+      std::filesystem::remove(indexFile);
+      logger(INFO) << "Migration: removed old index file: " << indexFile;
+    }
+
+    std::string cacheFile = appendPath(config_folder, m_currency.blocksCacheFileName());
+    if (std::filesystem::exists(cacheFile)) {
+      std::filesystem::remove(cacheFile);
+      logger(INFO) << "Migration: removed old cache file: " << cacheFile;
+    }
+
+    std::string indicesFileName = appendPath(config_folder, m_currency.blockchainIndicesFileName());
+    if (std::filesystem::exists(indicesFileName)) {
+      std::filesystem::remove(indicesFileName);
+      logger(INFO) << "Migration: removed old indices file: " << indicesFileName;
     }
   }
+  catch (const std::exception& e) {
+    logger(WARNING, BRIGHT_YELLOW) << "Migration: failed to remove old files: " << e.what();
+  }
 
-  logger(INFO, BRIGHT_WHITE) << "Migration complete! " << totalBlocks << " blocks migrated to LMDB.";
   return true;
 }
 
