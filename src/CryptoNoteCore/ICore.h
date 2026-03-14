@@ -138,7 +138,6 @@ public:
   virtual bool removeMessageQueue(MessageQueue<BlockchainMessage>& messageQueue) = 0;
 
   virtual void rollbackBlockchain(const uint32_t height) = 0;
-  virtual bool saveBlockchain() = 0;
 
   virtual bool getBlockLongHash(Crypto::cn_context &context, const Block& b, Crypto::Hash& res) = 0;
 

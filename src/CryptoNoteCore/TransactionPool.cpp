@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <ctime>
+#include <set>
 #include <vector>
 #include <unordered_set>
 #include <unordered_map>
@@ -94,20 +95,19 @@ namespace CryptoNote {
   //---------------------------------------------------------------------------------
   tx_memory_pool::tx_memory_pool(
     const CryptoNote::Currency& currency,
-    CryptoNote::ITransactionValidator& validator, 
+    CryptoNote::ITransactionValidator& validator,
     CryptoNote::ICore& core,
     CryptoNote::ITimeProvider& timeProvider,
-    Logging::ILogger& log,
-    bool blockchainIndexesEnabled) :
+    Logging::ILogger& log) :
     m_currency(currency),
     m_validator(validator),
     m_core(core),
-    m_timeProvider(timeProvider), 
+    m_timeProvider(timeProvider),
     m_txCheckInterval(60, timeProvider),
     m_fee_index(boost::get<1>(m_transactions)),
     logger(log, "txpool"),
-    m_paymentIdIndex(blockchainIndexesEnabled),
-    m_timestampIndex(blockchainIndexesEnabled) {
+    m_paymentIdIndex(true),
+    m_timestampIndex(true) {
   }
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::add_tx(const Transaction &tx, /*const Crypto::Hash& tx_prefix_hash,*/ const Crypto::Hash &id, size_t blobSize, tx_verification_context& tvc, bool keptByBlock) {
@@ -465,8 +465,6 @@ namespace CryptoNote {
 
       m_transactions.clear();
       m_spent_key_images.clear();
-      m_spentOutputs.clear();
-
       m_paymentIdIndex.clear();
       m_timestampIndex.clear();
     } else {
@@ -497,7 +495,7 @@ namespace CryptoNote {
     return true;
   }
 
-#define CURRENT_MEMPOOL_ARCHIVE_VER 1
+#define CURRENT_MEMPOOL_ARCHIVE_VER 2
 
   void serialize(CryptoNote::tx_memory_pool::TransactionDetails& td, ISerializer& s) {
     s(td.id, "id");
@@ -533,7 +531,6 @@ namespace CryptoNote {
     }
 
     KV_MEMBER(m_spent_key_images);
-    KV_MEMBER(m_spentOutputs);
     KV_MEMBER(m_recentlyDeletedTransactions);
   }
 
