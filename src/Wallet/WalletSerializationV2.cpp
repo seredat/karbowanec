@@ -125,7 +125,6 @@ WalletSerializerV2::WalletSerializerV2(
   ITransfersObserver& transfersObserver,
   Crypto::PublicKey& viewPublicKey,
   Crypto::SecretKey& viewSecretKey,
-  Crypto::SecretKey& auditSecretKey,
   uint64_t& actualBalance,
   uint64_t& pendingBalance,
   WalletsContainer& walletsContainer,
@@ -138,7 +137,6 @@ WalletSerializerV2::WalletSerializerV2(
   uint32_t transactionSoftLockTime
 ) :
   m_transfersObserver(transfersObserver),
-  m_auditSecretKey(auditSecretKey),
   m_actualBalance(actualBalance),
   m_pendingBalance(pendingBalance),
   m_walletsContainer(walletsContainer),
@@ -173,14 +171,6 @@ void WalletSerializerV2::load(Common::IInputStream& source, uint8_t version) {
   }
 
   s(m_extra, "extra");
-
-  // Version 8+: load auditSecretKey = sc_reduce32(keccak("view_seed"||spendSecretKey)).
-  // Version 7 stored a "viewSeed" field = keccak(spendSecretKey) (raw, unreduced) — a different
-  // value from auditSecretKey; skip it and let WalletGreen re-derive correctly from the spend key.
-  // Version 6 has no such field at all.
-  if (version >= 8) {
-    s(m_auditSecretKey, "auditSecretKey");
-  }
 }
 
 void WalletSerializerV2::save(Common::IOutputStream& destination, WalletSaveLevel saveLevel) {
@@ -203,10 +193,6 @@ void WalletSerializerV2::save(Common::IOutputStream& destination, WalletSaveLeve
   }
 
   s(m_extra, "extra");
-  // Version 8+: persist auditSecretKey so audit wallets survive round-trips.
-  // For full wallets, auditSecretKey is re-derived from the spend key on load;
-  // storing it here is required for view-only audit wallets (no spend key available).
-  s(m_auditSecretKey, "auditSecretKey");
 }
 
 std::unordered_set<Crypto::PublicKey>& WalletSerializerV2::addedKeys() {

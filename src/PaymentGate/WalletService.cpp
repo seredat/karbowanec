@@ -941,23 +941,6 @@ std::error_code WalletService::getViewKey(std::string& viewSecretKey) {
   return std::error_code();
 }
 
-std::error_code WalletService::getAuditKey(std::string& auditSecretKey) {
-  try {
-    System::EventLock lk(readyEvent);
-    CryptoNote::KeyPair auditPair = wallet.getAuditKey();
-    if (auditPair.secretKey == CryptoNote::NULL_SECRET_KEY) {
-      logger(Logging::WARNING, Logging::BRIGHT_YELLOW) << "This wallet has no audit key "
-        "(view-only or non-deterministic wallet)";
-      return make_error_code(CryptoNote::error::WalletServiceErrorCode::KEYS_NOT_DETERMINISTIC);
-    }
-    auditSecretKey = Common::podToHex(auditPair.secretKey);
-  } catch (std::system_error& x) {
-    logger(Logging::WARNING, Logging::BRIGHT_YELLOW) << "Error while getting audit key: " << x.what();
-    return x.code();
-  }
-
-  return std::error_code();
-}
 
 std::error_code WalletService::getMnemonicSeed(const std::string& address, std::string& mnemonicSeed) {
   try {

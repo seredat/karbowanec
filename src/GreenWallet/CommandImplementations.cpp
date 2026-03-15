@@ -65,18 +65,15 @@ std::string getGUIPrivateKey(CryptoNote::WalletGreen &wallet)
     auto viewKey = wallet.getViewKey();
     auto spendKey = wallet.getAddressSpendKey(0);
 
-    // Serialize in legacy 128-byte format (without auditSecretKey) for backward compatibility
-    // with older wallet software. auditSecretKey is auto-derived from spendSecretKey on import.
-    // Layout: spendPublicKey(32) | viewPublicKey(32) | spendSecretKey(32) | viewSecretKey(32)
-    struct LegacyKeyData {
-        CryptoNote::AccountPublicAddress address;
-        Crypto::SecretKey spendSecretKey;
-        Crypto::SecretKey viewSecretKey;
+    CryptoNote::AccountPublicAddress addr
+    {
+        spendKey.publicKey,
+        viewKey.publicKey,
     };
 
-    LegacyKeyData legacyKey
+    CryptoNote::AccountKeys keys
     {
-        { spendKey.publicKey, viewKey.publicKey },
+        addr,
         spendKey.secretKey,
         viewKey.secretKey,
     };
@@ -84,7 +81,7 @@ std::string getGUIPrivateKey(CryptoNote::WalletGreen &wallet)
     return Tools::Base58::encode_addr
     (
         CryptoNote::parameters::CRYPTONOTE_PUBLIC_ADDRESS_BASE58_PREFIX,
-        std::string(reinterpret_cast<char*>(&legacyKey), sizeof(legacyKey))
+        std::string(reinterpret_cast<char*>(&keys), sizeof(keys))
     );
 }
 
@@ -94,40 +91,22 @@ void printPrivateKeys(CryptoNote::WalletGreen &wallet, bool viewWallet)
 
     if (viewWallet)
     {
-        // For a view-only wallet (created with initializeWithAuditKey or createViewWallet),
-        // show the view key. If opened from an audit key (auditSecretKey-based), also
-        // show the audit key which enables full auditing (incoming + outgoing).
-        auto auditKeyPair = wallet.getAuditKey();
         std::cout << SuccessMsg("Private view key:")
                   << std::endl
                   << SuccessMsg(Common::podToHex(privateViewKey))
                   << std::endl;
-
-        if (auditKeyPair.secretKey != CryptoNote::NULL_SECRET_KEY)
-        {
-            // Reconstruct audit key string for re-export.
-            // New audit format: spendPub | viewPub | viewSecretKey | auditSecretKey (256 hex).
-            try {
-                auto spendPub  = wallet.getAddressSpendKey(0).publicKey;
-                auto viewPub   = wallet.getViewKey().publicKey;
-                std::cout << std::endl
-                          << SuccessMsg("Audit key (tracks incoming AND outgoing):")
-                          << std::endl
-                          << SuccessMsg(Common::podToHex(spendPub)
-                               + Common::podToHex(viewPub)
-                               + Common::podToHex(privateViewKey)
-                               + Common::podToHex(auditKeyPair.secretKey))
-                          << std::endl;
-            } catch (...) {}
-        }
         return;
     }
 
-    auto privateSpendKey = wallet.getAddressSpendKey(0).secretKey;
+	auto privateSpendKey = wallet.getAddressSpendKey(0).secretKey;
 
-    // Use auditKey (if available) to confirm deterministic derivation.
-    auto auditKeyPair = wallet.getAuditKey();
-    const bool deterministicPrivateKeys = (auditKeyPair.secretKey != CryptoNote::NULL_SECRET_KEY);
+    Crypto::SecretKey derivedPrivateViewKey;
+
+    CryptoNote::AccountBase::generateViewFromSpend(privateSpendKey,
+                                                   derivedPrivateViewKey);
+
+    const bool deterministicPrivateKeys
+             = derivedPrivateViewKey == privateViewKey;
 
     std::cout << SuccessMsg("Private spend key:")
               << std::endl
@@ -151,19 +130,6 @@ void printPrivateKeys(CryptoNote::WalletGreen &wallet, bool viewWallet)
                   << SuccessMsg("Mnemonic seed:")
                   << std::endl
                   << SuccessMsg(mnemonicSeed)
-                  << std::endl;
-
-        // Show audit key — new format: spendPub | viewPub | viewSecretKey | auditSecretKey (256 hex).
-        // Import with "audit_key" command in simplewallet or equivalent.
-        auto spendPub = wallet.getAddressSpendKey(0).publicKey;
-        auto viewPub  = wallet.getViewKey().publicKey;
-        std::cout << std::endl
-                  << SuccessMsg("Audit key (share with trusted auditor — tracks ALL transactions):")
-                  << std::endl
-                  << SuccessMsg(Common::podToHex(spendPub)
-                       + Common::podToHex(viewPub)
-                       + Common::podToHex(privateViewKey)
-                       + Common::podToHex(auditKeyPair.secretKey))
                   << std::endl;
     }
 

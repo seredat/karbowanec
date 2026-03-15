@@ -105,4 +105,11 @@ void get_tx_tree_hash(const std::vector<Crypto::Hash>& tx_hashes, Crypto::Hash& 
 Crypto::Hash get_tx_tree_hash(const std::vector<Crypto::Hash>& tx_hashes);
 Crypto::Hash get_tx_tree_hash(const Block& b);
 bool is_valid_decomposed_amount(uint64_t amount);
+
+// Deterministic transaction key generation: r = Hs(viewSecretKey || inputsHash), R = r*G.
+// Same formula used by sender and detector — single authoritative implementation.
+bool generateDeterministicTransactionKeys(const Crypto::Hash& inputsHash,
+    const Crypto::SecretKey& secretKey, CryptoNote::KeyPair& keys);
+bool generateDeterministicTransactionKeys(const Transaction& tx,
+    const Crypto::SecretKey& secretKey, CryptoNote::KeyPair& keys);
 }

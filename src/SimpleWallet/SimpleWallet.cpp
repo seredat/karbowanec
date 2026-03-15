@@ -640,8 +640,7 @@ simple_wallet::simple_wallet(System::Dispatcher& dispatcher, const CryptoNote::C
   m_consoleHandler.setHandler("stop_mining", std::bind(&simple_wallet::stop_mining, this, std::placeholders::_1), "Stop mining in daemon");
   m_consoleHandler.setHandler("show_keys", std::bind(&simple_wallet::show_keys, this, std::placeholders::_1), "Show the secret keys and mnemonic phrase (for deterministic wallet)");
   m_consoleHandler.setHandler("export_keys", std::bind(&simple_wallet::export_keys_to_file, this, std::placeholders::_1), "Save current wallet private keys to file");
-  m_consoleHandler.setHandler("audit_key", std::bind(&simple_wallet::show_audit_key, this, std::placeholders::_1), "Show the full audit key (256 hex chars) containing viewSecretKey + auditSecretKey — import into an audit wallet that tracks both incoming AND outgoing transactions");
-  m_consoleHandler.setHandler("tracking_key", std::bind(&simple_wallet::show_tracking_key, this, std::placeholders::_1), "Show the legacy tracking key (256 hex chars, viewSecretKey only) — import into a view-only wallet that tracks incoming transactions only");
+  m_consoleHandler.setHandler("tracking_key", std::bind(&simple_wallet::show_tracking_key, this, std::placeholders::_1), "Show the tracking key (192 hex chars) - import into a view-only wallet for audit");
   m_consoleHandler.setHandler("balance", std::bind(&simple_wallet::show_balance, this, std::placeholders::_1), "Show current wallet balance");
   m_consoleHandler.setHandler("incoming_transfers", std::bind(&simple_wallet::show_incoming_transfers, this, std::placeholders::_1), "Show incoming transfers");
   m_consoleHandler.setHandler("outgoing_transfers", std::bind(&simple_wallet::show_outgoing_transfers, this, std::placeholders::_1), "Show outgoing transfers");
@@ -870,8 +869,7 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     std::cout << "G - generate new wallet\n";
     std::cout << "I - import wallet from keys\n";
     std::cout << "R - restore backup/paperwallet\n";
-    std::cout << "A - import audit wallet (viewSecretKey + auditSecretKey, tracks incoming AND outgoing)\n";
-    std::cout << "T - import tracking wallet (viewSecretKey only, incoming transactions only)\n";
+    std::cout << "T - import tracking (audit) wallet\n";
     std::cout << "E - exit\n";
 
     char c;
@@ -880,7 +878,7 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
       std::string answer;
       std::getline(std::cin, answer);
       c = answer[0];
-      if (!(c == 'O' || c == 'G' || c == 'E' || c == 'I' || c == 'R' || c == 'A' || c == 'T' || c == 'o' || c == 'g' || c == 'e' || c == 'i' || c == 'r' || c == 'a' || c == 't'))
+      if (!(c == 'O' || c == 'G' || c == 'E' || c == 'I' || c == 'R' || c == 'T' || c == 'o' || c == 'g' || c == 'e' || c == 'i' || c == 'r' || c == 't'))
         std::cout << "Unknown command: " << c << std::endl;
       else
         break;
@@ -945,8 +943,6 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
       m_restore_new = userInput;
     else if (c == 'g' || c == 'G')
       m_generate_new = userInput;
-    else if (c == 'a' || c == 'A')
-      m_audit_new = userInput;
     else if (c == 't' || c == 'T')
       m_track_new = userInput;
     else
@@ -976,7 +972,7 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
   }
 
   std::string walletFileName;
-  if (!m_generate_new.empty() || !m_import_new.empty() || !m_restore_new.empty() || !m_audit_new.empty() || !m_track_new.empty())
+  if (!m_generate_new.empty() || !m_import_new.empty() || !m_restore_new.empty() || !m_track_new.empty())
   {
     std::string ignoredString;
     if (!m_generate_new.empty())
@@ -985,8 +981,6 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
       WalletHelper::prepareFileNames(m_import_new, ignoredString, walletFileName);
     else if (!m_restore_new.empty())
       WalletHelper::prepareFileNames(m_restore_new, ignoredString, walletFileName);
-    else if (!m_audit_new.empty())
-      WalletHelper::prepareFileNames(m_audit_new, ignoredString, walletFileName);
     else if (!m_track_new.empty())
       WalletHelper::prepareFileNames(m_track_new, ignoredString, walletFileName);
 
@@ -1019,25 +1013,21 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
   {
     pwd_container.password(command_line::get_arg(vm, arg_password));
   }
-  else if (!pwd_container.read_password(!m_generate_new.empty() || !m_import_new.empty() || !m_restore_new.empty() || !m_audit_new.empty() || !m_track_new.empty()))
+  else if (!pwd_container.read_password(!m_generate_new.empty() || !m_import_new.empty() || !m_restore_new.empty() || !m_track_new.empty()))
   {
     fail_msg_writer() << "failed to read wallet password";
     return false;
   }
 
-  // Collect the audit/tracking key string BEFORE starting the node so that the background
+  // Collect the tracking key string BEFORE starting the node so that the background
   // "Wallet connected to daemon." log message cannot fire while we are waiting for console
   // input and corrupt the prompt.
   std::string tracking_key_string;
-  if (!m_audit_new.empty() || !m_track_new.empty())
+  if (!m_track_new.empty())
   {
-    const bool isAudit = !m_audit_new.empty();
     do
     {
-      if (isAudit)
-        std::cout << "Audit Key (256 hex chars — viewSecretKey + auditSecretKey): ";
-      else
-        std::cout << "Tracking Key (256 hex chars — viewSecretKey only): ";
+      std::cout << "Tracking Key (192 hex chars - spendPublicKey + viewPublicKey + viewSecretKey): ";
       std::getline(std::cin, tracking_key_string);
       boost::algorithm::trim(tracking_key_string);
     } while (tracking_key_string.empty());
@@ -1300,16 +1290,10 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
       logger(WARNING, BRIGHT_RED) << "Couldn't write wallet address file: " + walletAddressFile;
     }
   }
-  else if (!m_audit_new.empty() || !m_track_new.empty())
+  else if (!m_track_new.empty())
   {
-    // Both audit and tracking imports use the same 256-hex key string (collected before node init).
-    // New audit key format: spendPub(64) | viewPub(64) | viewSecretKey(64) | auditSecretKey(64)
-    // Legacy tracking key format: spendPub(64) | viewPub(64) | null32(64) | viewSecretKey(64)
-    // Detection: if field2 (bytes 64-95) is non-null → new audit format; if null → legacy format.
-
-    const bool isAuditImport = !m_audit_new.empty();
-    const std::string& walletName = isAuditImport ? m_audit_new : m_track_new;
-    std::string walletAddressFile = prepareWalletAddressFilename(walletName);
+    // Tracking key format: spendPublicKey(64) | viewPublicKey(64) | viewSecretKey(64) = 192 hex chars.
+    std::string walletAddressFile = prepareWalletAddressFilename(m_track_new);
     boost::system::error_code ignore;
     if (boost::filesystem::exists(walletAddressFile, ignore))
     {
@@ -1317,9 +1301,9 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
       return false;
     }
 
-    if (tracking_key_string.length() != 256)
+    if (tracking_key_string.length() != 192)
     {
-      logger(ERROR, BRIGHT_RED) << "Wrong key length (expected 256 hex characters).";
+      logger(ERROR, BRIGHT_RED) << "Wrong key length (expected 192 hex characters).";
       return false;
     }
 
@@ -1327,59 +1311,18 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
 
     std::string public_spend_key_string = tracking_key_string.substr(0, 64);
     std::string public_view_key_string  = tracking_key_string.substr(64, 64);
-    std::string field2_string           = tracking_key_string.substr(128, 64);  // viewSecretKey (audit) or null (legacy)
-    std::string field3_string           = tracking_key_string.substr(192, 64);  // auditSecretKey (audit) or viewSecretKey (legacy)
+    std::string view_secret_key_string  = tracking_key_string.substr(128, 64);
 
-    Crypto::Hash public_spend_key_hash, public_view_key_hash, field2_hash, field3_hash;
+    Crypto::Hash public_spend_key_hash, public_view_key_hash, view_secret_key_hash;
     size_t size;
     if (!Common::fromHex(public_spend_key_string, &public_spend_key_hash, sizeof(public_spend_key_hash), size) || size != sizeof(public_spend_key_hash)) return false;
     if (!Common::fromHex(public_view_key_string,  &public_view_key_hash,  sizeof(public_view_key_hash),  size) || size != sizeof(public_view_key_hash))  return false;
-    if (!Common::fromHex(field2_string,           &field2_hash,           sizeof(field2_hash),           size) || size != sizeof(field2_hash))            return false;
-    if (!Common::fromHex(field3_string,           &field3_hash,           sizeof(field3_hash),           size) || size != sizeof(field3_hash))            return false;
+    if (!Common::fromHex(view_secret_key_string,  &view_secret_key_hash,  sizeof(view_secret_key_hash),  size) || size != sizeof(view_secret_key_hash))  return false;
 
-    Crypto::PublicKey public_spend_key = *(struct Crypto::PublicKey*)&public_spend_key_hash;
-    Crypto::PublicKey public_view_key  = *(struct Crypto::PublicKey*)&public_view_key_hash;
-    Crypto::SecretKey field2_key = *(struct Crypto::SecretKey*)&field2_hash;  // viewSecretKey or null
-    Crypto::SecretKey field3_key = *(struct Crypto::SecretKey*)&field3_hash;  // auditSecretKey or viewSecretKey
-
-    keys.address.spendPublicKey = public_spend_key;
-    keys.address.viewPublicKey  = public_view_key;
-    keys.spendSecretKey         = boost::value_initialized<Crypto::SecretKey>(); // tracking wallets have no spend key
-
-    const Crypto::SecretKey nullKey = boost::value_initialized<Crypto::SecretKey>();
-    bool field2IsNull = (field2_key == nullKey);
-
-    if (!field2IsNull)
-    {
-      // New audit key format: field2 = viewSecretKey, field3 = auditSecretKey.
-      // Validate field2: its public key must equal viewPublicKey.
-      Crypto::PublicKey testViewPub;
-      if (!Crypto::secret_key_to_public_key(field2_key, testViewPub) || testViewPub != public_view_key) {
-        logger(ERROR, BRIGHT_RED) << "Invalid audit key: field2 (viewSecretKey) does not match the wallet's viewPublicKey. "
-                                  << "Check that you copied the full audit key correctly.";
-        return false;
-      }
-      keys.viewSecretKey   = field2_key;
-      keys.auditSecretKey  = field3_key;
-      logger(INFO) << "Audit key format detected (viewSecretKey + auditSecretKey). Tracks incoming AND outgoing transactions.";
-    }
-    else
-    {
-      // Legacy tracking key format: field2 = null, field3 = viewSecretKey.
-      // Validate field3: sc_reduce32(field3)*G must equal viewPublicKey.
-      Crypto::PublicKey testViewPub;
-      Crypto::SecretKey testViewSec;
-      Crypto::SecretKey field3Copy = field3_key;
-      Crypto::generate_deterministic_keys(testViewPub, testViewSec, field3Copy);
-      if (testViewPub != public_view_key) {
-        logger(ERROR, BRIGHT_RED) << "Invalid tracking key: field3 (viewSecretKey) does not correspond to the wallet's viewPublicKey. "
-                                  << "Check that you copied the full tracking key correctly.";
-        return false;
-      }
-      keys.viewSecretKey  = field3_key;
-      keys.auditSecretKey = nullKey;
-      logger(INFO) << "Legacy tracking key format detected (viewSecretKey only). Incoming transactions only.";
-    }
+    keys.address.spendPublicKey = *(struct Crypto::PublicKey*)&public_spend_key_hash;
+    keys.address.viewPublicKey  = *(struct Crypto::PublicKey*)&public_view_key_hash;
+    keys.viewSecretKey          = *(struct Crypto::SecretKey*)&view_secret_key_hash;
+    keys.spendSecretKey         = boost::value_initialized<Crypto::SecretKey>();
 
     if (!new_tracking_wallet(keys, walletFileName, pwd_container.password()))
     {
@@ -1723,34 +1666,15 @@ bool simple_wallet::new_tracking_wallet(AccountKeys &tracking_key, const std::st
         return false;
     }
 
-    {
-      AccountKeys importedKeys;
-      m_wallet->getAccountKeys(importedKeys);
-      const bool isAuditable = !(importedKeys.auditSecretKey == boost::value_initialized<Crypto::SecretKey>());
-
-      if (isAuditable) {
-        success_msg_writer() <<
-            "**********************************************************************\n" <<
-            "Your AUDIT wallet has been imported. It does not allow spending.\n" <<
-            "It tracks both INCOMING and OUTGOING transactions using the audit key.\n" <<
-            "Use \"help\" command to see the list of available commands.\n" <<
-            "Always use \"exit\" command when closing simplewallet to save\n" <<
-            "current session's state. Otherwise, you will possibly need to synchronize\n" <<
-            "your wallet again. Your wallet key is NOT under risk anyway.\n" <<
-            "**********************************************************************";
-      } else {
-        success_msg_writer() <<
-            "**********************************************************************\n" <<
-            "Your tracking wallet has been imported. It does not allow spending.\n" <<
-            "It allows to view incoming transactions but not outgoing ones.\n" <<
-            "If there were spendings total balance will be inaccurate.\n" <<
-            "Use \"help\" command to see the list of available commands.\n" <<
-            "Always use \"exit\" command when closing simplewallet to save\n" <<
-            "current session's state. Otherwise, you will possibly need to synchronize\n" <<
-            "your wallet again. Your wallet key is NOT under risk anyway.\n" <<
-            "**********************************************************************";
-      }
-    }
+    success_msg_writer() <<
+        "**********************************************************************\n" <<
+        "Your tracking wallet has been imported. It does not allow spending.\n" <<
+        "It allows to audit incoming and outgoing transactions.\n" <<
+        "Use \"help\" command to see the list of available commands.\n" <<
+        "Always use \"exit\" command when closing simplewallet to save\n" <<
+        "current session's state. Otherwise, you will possibly need to synchronize\n" <<
+        "your wallet again. Your wallet key is NOT under risk anyway.\n" <<
+        "**********************************************************************";
     return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -2007,9 +1931,6 @@ std::string simple_wallet::get_formatted_wallet_keys() {
   priv_keys += "Public address:\t\t" + m_wallet->getAddress() + "\n";
   priv_keys += "Private spend key:\t" + Common::podToHex(keys.spendSecretKey) + "\n";
   priv_keys += "Private view key:\t" + Common::podToHex(keys.viewSecretKey) + "\n";
-  if (!(keys.auditSecretKey == boost::value_initialized<Crypto::SecretKey>())) {
-    priv_keys += "Private audit key:\t" + Common::podToHex(keys.auditSecretKey) + "\n";
-  }
   priv_keys += "Private keys:\t\t" + Tools::Base58::encode_addr(parameters::CRYPTONOTE_PUBLIC_ADDRESS_BASE58_PREFIX,
     std::string(reinterpret_cast<char*>(&keys), sizeof(keys))) + "\n";
 
@@ -2052,45 +1973,14 @@ bool simple_wallet::show_tracking_key(const std::vector<std::string>& args/* = s
   AccountKeys keys;
   m_wallet->getAccountKeys(keys);
 
-  // Legacy tracking key format (view-only, incoming transactions only):
-  // spendPublicKey(32) | viewPublicKey(32) | null32(32) | viewSecretKey(32) = 256 hex chars.
-  // The null32 field signals legacy format to importers.
-  const Crypto::SecretKey nullKey = boost::value_initialized<Crypto::SecretKey>();
-
+  // Tracking key format (view-only, audit wallet):
+  // spendPublicKey(32) | viewPublicKey(32) | viewSecretKey(32) = 192 hex chars.
   success_msg_writer(true) << "Tracking key: "
     << Common::podToHex(keys.address.spendPublicKey)
     << Common::podToHex(keys.address.viewPublicKey)
-    << Common::podToHex(nullKey)
     << Common::podToHex(keys.viewSecretKey);
-  success_msg_writer() << "This is a LEGACY tracking key (incoming transactions only).\n"
-                       << "The recipient can view incoming transactions but not outgoing ones.\n"
-                       << "For full audit capability (incoming + outgoing), use the \"audit_key\" command.";
-
-  return true;
-}
-//----------------------------------------------------------------------------------------------------
-bool simple_wallet::show_audit_key(const std::vector<std::string>& args/* = std::vector<std::string>()*/) {
-  AccountKeys keys;
-  m_wallet->getAccountKeys(keys);
-
-  if (keys.auditSecretKey == boost::value_initialized<Crypto::SecretKey>()) {
-    fail_msg_writer() << "This wallet has no audit key. Only deterministic wallets (created from a spend\n"
-                      << "key or mnemonic) have an auditSecretKey. View-only and non-deterministic wallets do not.\n"
-                      << "Use the \"tracking_key\" command to export a legacy view-only tracking key instead.";
-    return true;
-  }
-
-  // New audit key format: spendPublicKey(32) | viewPublicKey(32) | viewSecretKey(32) | auditSecretKey(32)
-  // = 256 hex chars total. The non-null viewSecretKey field signals the new audit format to importers.
-  // Auditors need BOTH viewSecretKey (to scan incoming outputs) and auditSecretKey (to rederive tx keys).
-  success_msg_writer(true) << "Audit key: "
-    << Common::podToHex(keys.address.spendPublicKey)
-    << Common::podToHex(keys.address.viewPublicKey)
-    << Common::podToHex(keys.viewSecretKey)
-    << Common::podToHex(keys.auditSecretKey);
-  success_msg_writer() << "WARNING: Share this key ONLY with a TRUSTED auditor.\n"
-                       << "It reveals ALL incoming AND outgoing transactions and allows\n"
-                       << "reconstruction of transaction secret keys for payment proofs.";
+  success_msg_writer() << "This tracking key allows viewing and auditing transactions.\n"
+                       << "Share this key ONLY with a TRUSTED party.";
 
   return true;
 }

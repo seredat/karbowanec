@@ -21,6 +21,7 @@
 #include "TransactionUtils.h"
 
 #include "Account.h"
+#include "CryptoNoteCore/CryptoNoteFormatUtils.h"
 #include "CryptoNoteCore/CryptoNoteTools.h"
 #include "CryptoNoteConfig.h"
 #include "Common/BinaryArray.hpp"
@@ -112,7 +113,7 @@ namespace CryptoNote {
     // secret key
     virtual bool getTransactionSecretKey(SecretKey& key) const override;
     virtual void setTransactionSecretKey(const SecretKey& key) override;
-    virtual void generateDeterministicTransactionKeys(const SecretKey& auditSecretKey) override;
+    virtual void generateDeterministicTransactionKeys(const SecretKey& viewSecretKey) override;
 
   private:
 
@@ -243,25 +244,15 @@ namespace CryptoNote {
     secretKey = key;
   }
 
-  void TransactionImpl::generateDeterministicTransactionKeys(const SecretKey& auditSecretKey) {
+  void TransactionImpl::generateDeterministicTransactionKeys(const SecretKey& viewSecretKey) {
     checkIfSigning();
 
-    if (auditSecretKey == NULL_SECRET_KEY) {
-      throw std::runtime_error("generateDeterministicTransactionKeys: auditSecretKey is null — "
-          "view-only wallets cannot generate deterministic transaction keys");
+    if (viewSecretKey == NULL_SECRET_KEY) {
+      throw std::runtime_error("generateDeterministicTransactionKeys: viewSecretKey is null");
     }
 
-    // Derive deterministic keypair: secretKey = Hs(auditSecretKey || inputsHash)
-    // auditSecretKey = sc_reduce32(keccak("view_seed"||spendSecretKey)) — already domain-separated.
-    // No extra prefix needed. Inputs must be added before calling; outputs must be added after.
-    Crypto::Hash inputsHash = getObjectHash(transaction.inputs);
-    BinaryArray ba;
-    Common::append(ba, std::begin(auditSecretKey.data), std::end(auditSecretKey.data));
-    Common::append(ba, std::begin(inputsHash.data), std::end(inputsHash.data));
-
     KeyPair keys;
-    hash_to_scalar(ba.data(), ba.size(), keys.secretKey);
-    if (!secret_key_to_public_key(keys.secretKey, keys.publicKey)) {
+    if (!CryptoNote::generateDeterministicTransactionKeys(getObjectHash(transaction.inputs), viewSecretKey, keys)) {
       throw std::runtime_error("Failed to generate deterministic transaction keys");
     }
 

@@ -300,25 +300,7 @@ void WalletLegacy::initWithKeys(const AccountKeys& accountKeys, const std::strin
       throw std::system_error(make_error_code(error::ALREADY_INITIALIZED));
     }
 
-    // Auto-derive auditSecretKey for deterministic wallets loaded without it (older file format).
-    // auditSecretKey = sc_reduce32(keccak("view_seed"||spendSecretKey)).
-    // Only stored when the derived viewPublicKey matches the standard deterministic derivation,
-    // so non-deterministic wallets and tracking-only wallets (no spendSecretKey) keep NULL.
-    AccountKeys keys = accountKeys;
-    if (keys.auditSecretKey == NULL_SECRET_KEY && keys.spendSecretKey != NULL_SECRET_KEY) {
-      // Verify this is a deterministic wallet by checking viewPublicKey derivation.
-      Crypto::SecretKey viewKeySeed;
-      keccak((uint8_t *)&keys.spendSecretKey, sizeof(Crypto::SecretKey),
-             (uint8_t *)&viewKeySeed, sizeof(viewKeySeed));
-      Crypto::PublicKey derivedViewPub;
-      Crypto::SecretKey derivedViewSec;
-      Crypto::generate_deterministic_keys(derivedViewPub, derivedViewSec, viewKeySeed);
-      if (derivedViewPub == keys.address.viewPublicKey) {
-        keys.auditSecretKey = AccountBase::computeAuditSecretKey(keys.spendSecretKey);
-      }
-    }
-
-    m_account.setAccountKeys(keys);
+    m_account.setAccountKeys(accountKeys);
     m_account.set_createtime(scanHeightToTimestamp(scanHeight));
     m_password = password;
 
@@ -368,7 +350,7 @@ void WalletLegacy::doLoad(std::istream& source) {
     std::string cache;
     WalletLegacySerializer serializer(m_account, m_transactionsCache);
     serializer.deserialize(source, m_password, cache);
-      
+
     initSync();
 
     try {
@@ -954,16 +936,8 @@ Crypto::SecretKey WalletLegacy::getTxKey(Crypto::Hash& txid) {
     Crypto::PublicKey txPubKey = getTransactionPublicKeyFromExtra(tx.extra);
     const AccountKeys& accKeys = m_account.getAccountKeys();
     KeyPair deterministicTxKeys;
-    // Try new derivation using auditSecretKey. Fall back to viewSecretKey for pre-audit txs.
-    const Crypto::SecretKey& keyForTx = (accKeys.auditSecretKey != NULL_SECRET_KEY)
-        ? accKeys.auditSecretKey : accKeys.viewSecretKey;
-    bool ok = generateDeterministicTransactionKeys(tx, keyForTx, deterministicTxKeys)
+    bool ok = generateDeterministicTransactionKeys(tx, accKeys.viewSecretKey, deterministicTxKeys)
       && deterministicTxKeys.publicKey == txPubKey;
-    // If new scheme failed (tx predates auditSecretKey), try old viewSecretKey scheme.
-    if (!ok && accKeys.auditSecretKey != NULL_SECRET_KEY) {
-      ok = generateDeterministicTransactionKeys(tx, accKeys.viewSecretKey, deterministicTxKeys)
-        && deterministicTxKeys.publicKey == txPubKey;
-    }
 
     return ok ? deterministicTxKeys.secretKey : reinterpret_cast<const Crypto::SecretKey&>(transaction.secretKey.get());
   }

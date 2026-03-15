@@ -567,4 +567,18 @@ bool verifyMessage(const std::string &data, const CryptoNote::AccountPublicAddre
   return Crypto::check_signature(hash, address.spendPublicKey, s);
 }
 
+bool generateDeterministicTransactionKeys(const Crypto::Hash& inputsHash,
+    const Crypto::SecretKey& secretKey, CryptoNote::KeyPair& keys) {
+  BinaryArray ba;
+  Common::append(ba, std::begin(secretKey.data), std::end(secretKey.data));
+  Common::append(ba, std::begin(inputsHash.data), std::end(inputsHash.data));
+  Crypto::hash_to_scalar(ba.data(), ba.size(), keys.secretKey);
+  return Crypto::secret_key_to_public_key(keys.secretKey, keys.publicKey);
+}
+
+bool generateDeterministicTransactionKeys(const Transaction& tx,
+    const Crypto::SecretKey& secretKey, CryptoNote::KeyPair& keys) {
+  return generateDeterministicTransactionKeys(getObjectHash(tx.inputs), secretKey, keys);
+}
+
 }

@@ -46,15 +46,11 @@ void AccountBase::generate() {
 void AccountBase::generateDeterministic() {
   Crypto::generate_keys(m_keys.address.spendPublicKey, m_keys.spendSecretKey);
 
-  // Derive viewSecretKey: sc_reduce32(keccak(spendSecretKey)). Controls viewPublicKey / address. UNCHANGED.
+  // Derive viewSecretKey: sc_reduce32(keccak(spendSecretKey)). Controls viewPublicKey / address.
   Crypto::SecretKey viewKeySeed;
   keccak((uint8_t *)&m_keys.spendSecretKey, sizeof(Crypto::SecretKey),
          (uint8_t *)&viewKeySeed, sizeof(viewKeySeed));
   Crypto::generate_deterministic_keys(m_keys.address.viewPublicKey, m_keys.viewSecretKey, viewKeySeed);
-
-  // Derive auditSecretKey: sc_reduce32(keccak("view_seed"||spendSecretKey)).
-  // Domain-separated from viewSecretKey; independent capability for outgoing tx tracking.
-  m_keys.auditSecretKey = computeAuditSecretKey(m_keys.spendSecretKey);
 
   m_creation_timestamp = time(NULL);
 }
@@ -73,25 +69,6 @@ void AccountBase::generateViewFromSpend(const Crypto::SecretKey &spendSecret, Cr
   generateViewFromSpend(spendSecret, viewSecret, unused_dummy_variable);
 }
 
-Crypto::SecretKey AccountBase::computeAuditSecretKey(const Crypto::SecretKey &spendSecretKey) {
-  // auditSecretKey = sc_reduce32(keccak("view_seed" || spendSecretKey))
-  // The "view_seed" domain separator ensures independence from viewSecretKey = sc_reduce32(keccak(spendSecretKey)).
-  static const char domain[] = "view_seed";     // 9 chars, no null terminator included
-  const size_t domainLen = sizeof(domain) - 1;
-  uint8_t input[sizeof(domain) - 1 + sizeof(Crypto::SecretKey)];
-  memcpy(input, domain, domainLen);
-  memcpy(input + domainLen, &spendSecretKey, sizeof(spendSecretKey));
-
-  Crypto::SecretKey rawHash;
-  keccak(input, sizeof(input), (uint8_t *)&rawHash, sizeof(rawHash));
-
-  // Apply sc_reduce32 via generate_deterministic_keys (discarding the dummy public key).
-  Crypto::PublicKey dummyPub;
-  Crypto::SecretKey auditKey;
-  Crypto::generate_deterministic_keys(dummyPub, auditKey, rawHash);
-  return auditKey;
-}
-
 //-----------------------------------------------------------------
 const AccountKeys &AccountBase::getAccountKeys() const {
   return m_keys;
@@ -105,22 +82,5 @@ void AccountBase::setAccountKeys(const AccountKeys &keys) {
 void AccountBase::serialize(ISerializer &s) {
   s(m_keys, "m_keys");
   s(m_creation_timestamp, "m_creation_timestamp");
-
-  // Auto-upgrade: if auditSecretKey was not loaded from file (old wallet) but spend key is present,
-  // try to derive auditSecretKey. Only set it if the wallet uses deterministic view key derivation.
-  if (s.type() == ISerializer::INPUT && m_keys.auditSecretKey == NULL_SECRET_KEY
-      && m_keys.spendSecretKey != NULL_SECRET_KEY) {
-    // Verify this is a deterministic wallet: sc_reduce32(keccak(s))*G must equal viewPublicKey.
-    Crypto::SecretKey viewKeySeed;
-    keccak((uint8_t *)&m_keys.spendSecretKey, sizeof(Crypto::SecretKey),
-           (uint8_t *)&viewKeySeed, sizeof(viewKeySeed));
-    Crypto::PublicKey derivedViewPublic;
-    Crypto::SecretKey derivedViewSecret;
-    Crypto::generate_deterministic_keys(derivedViewPublic, derivedViewSecret, viewKeySeed);
-    if (derivedViewPublic == m_keys.address.viewPublicKey) {
-      m_keys.auditSecretKey = computeAuditSecretKey(m_keys.spendSecretKey);
-    }
-    // If viewPublicKey doesn't match, it's a non-deterministic wallet; auditSecretKey stays null.
-  }
 }
 }

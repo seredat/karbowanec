@@ -209,10 +209,7 @@ std::string WalletTransactionSender::makeRawTransaction(TransactionId& transacti
     std::vector<TxBuildOutput> splittedDests;
     splitDestinations(transaction.firstTransferId, transaction.transferCount, changeDts, context->dustPolicy, splittedDests);
 
-    // Use auditSecretKey for deterministic tx key: r = Hs(auditSecretKey || inputsHash).
-    // If auditSecretKey is null (non-deterministic wallet), buildTransaction uses the random R
-    // keypair from the TransactionImpl() constructor — original CryptoNote protocol, safe.
-    auto itx = buildTransaction(inputs, splittedDests, m_keys.auditSecretKey,
+    auto itx = buildTransaction(inputs, splittedDests, m_keys.viewSecretKey,
         transaction.extra, transaction.unlockTime, m_upperTransactionSizeLimit, context->tx_key);
     Transaction tx;
     if (!fromBinaryArray(tx, itx->getTransactionData()))
@@ -296,10 +293,7 @@ std::shared_ptr<WalletRequest> WalletTransactionSender::doSendTransaction(std::s
     std::vector<TxBuildOutput> splittedDests;
     splitDestinations(transaction.firstTransferId, transaction.transferCount, changeDts, context->dustPolicy, splittedDests);
 
-    // Use auditSecretKey for deterministic tx key: r = Hs(auditSecretKey || inputsHash).
-    // If auditSecretKey is null (non-deterministic wallet), buildTransaction uses the random R
-    // keypair from the TransactionImpl() constructor — original CryptoNote protocol, safe.
-    auto itx = buildTransaction(inputs, splittedDests, m_keys.auditSecretKey,
+    auto itx = buildTransaction(inputs, splittedDests, m_keys.viewSecretKey,
         transaction.extra, transaction.unlockTime, m_upperTransactionSizeLimit, context->tx_key);
     Transaction tx;
     if (!fromBinaryArray(tx, itx->getTransactionData()))

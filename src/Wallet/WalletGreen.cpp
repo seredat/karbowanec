@@ -65,7 +65,6 @@
 
 extern "C"
 {
-#include "crypto/keccak.h"
 #include "crypto/crypto-ops.h"
 }
 
@@ -374,8 +373,6 @@ void WalletGreen::initWithKeys(const std::string& path, const std::string& passw
 
   m_viewPublicKey = viewPublicKey;
   m_viewSecretKey = viewSecretKey;
-  m_auditSecretKey = {};  // Not known here — no spend key. Derived automatically in doCreateAddress()
-                          // when a spend key is added, or set explicitly by initializeWithAuditKey().
   m_password = password;
   m_path = path;
   m_logger = Logging::LoggerRef(m_logger.getLogger(), "WalletGreen/" + podToHex(m_viewPublicKey).substr(0, 5));
@@ -507,8 +504,6 @@ void WalletGreen::load(const std::string& path, const std::string& password, std
         }
 
         // Upgrade wallet file to current version if needed, or if key sets changed.
-        // This also persists auditSecretKey for deterministic wallets opened from older files
-        // so that audit key export works correctly on the next load without re-derivation.
         const uint8_t loadedVersion =
           reinterpret_cast<const ContainerStoragePrefix*>(m_containerStorage.prefix())->version;
         bool needUpgradeSave = !addedSpendKeys.empty() || !deletedSpendKeys.empty()
@@ -613,7 +608,6 @@ void WalletGreen::loadWalletCache(std::unordered_set<Crypto::PublicKey>& addedKe
     *this,
     m_viewPublicKey,
     m_viewSecretKey,
-    m_auditSecretKey,
     m_actualBalance,
     m_pendingBalance,
     m_walletsContainer,
@@ -664,7 +658,6 @@ void WalletGreen::saveWalletCache(ContainerStorage& storage, const Crypto::chach
     *this,
     m_viewPublicKey,
     m_viewSecretKey,
-    m_auditSecretKey,
     m_actualBalance,
     m_pendingBalance,
     m_walletsContainer,
@@ -680,8 +673,6 @@ void WalletGreen::saveWalletCache(ContainerStorage& storage, const Crypto::chach
   s.save(containerStream, saveLevel);
 
   // Upgrade the prefix version if the storage was created/loaded with an older format.
-  // This ensures the file header reflects the current serialization version (v6/v7 → v8
-  // so auditSecretKey is stored under the correct field name on next load).
   ContainerStoragePrefix* pfx = reinterpret_cast<ContainerStoragePrefix*>(storage.prefix());
   if (pfx->version < WalletSerializerV2::SERIALIZATION_VERSION) {
     m_logger(INFO) << "Upgrading wallet file format from v" << static_cast<int>(pfx->version)
@@ -807,20 +798,6 @@ void WalletGreen::loadSpendKeys() {
 
     if (wallet.spendSecretKey != NULL_SECRET_KEY) {
       throwIfKeysMissmatch(wallet.spendSecretKey, wallet.spendPublicKey, "Restored spend public key doesn't correspond to secret key");
-      // Auto-derive m_auditSecretKey from the spend secret key if not already set.
-      // Verify this is a deterministic wallet: sc_reduce32(keccak(spendSecretKey))*G == viewPublicKey.
-      // For audit wallets (initializeWithAuditKey), m_auditSecretKey is already set — don't overwrite it.
-      if (m_auditSecretKey == NULL_SECRET_KEY) {
-        Crypto::SecretKey viewKeySeed;
-        keccak((uint8_t *)&wallet.spendSecretKey, sizeof(Crypto::SecretKey),
-               (uint8_t *)&viewKeySeed, sizeof(viewKeySeed));
-        Crypto::PublicKey derivedViewPublic;
-        Crypto::SecretKey derivedViewSecret;
-        Crypto::generate_deterministic_keys(derivedViewPublic, derivedViewSecret, viewKeySeed);
-        if (derivedViewPublic == m_viewPublicKey) {
-          m_auditSecretKey = AccountBase::computeAuditSecretKey(wallet.spendSecretKey);
-        }
-      }
     } else {
       if (!Crypto::check_key(wallet.spendPublicKey)) {
         throw std::system_error(make_error_code(error::WRONG_PASSWORD), "Public spend key is incorrect");
@@ -846,7 +823,6 @@ void WalletGreen::subscribeWallets() {
       sub.keys.address.viewPublicKey = m_viewPublicKey;
       sub.keys.address.spendPublicKey = wallet.spendPublicKey;
       sub.keys.viewSecretKey = m_viewSecretKey;
-      sub.keys.auditSecretKey = m_auditSecretKey;
       sub.keys.spendSecretKey = wallet.spendSecretKey;
       sub.transactionSpendableAge = m_transactionSoftLockTime;
       sub.syncStart.height = 0;
@@ -1039,31 +1015,6 @@ KeyPair WalletGreen::getViewKey() const {
   return {m_viewPublicKey, m_viewSecretKey};
 }
 
-KeyPair WalletGreen::getAuditKey() const {
-  throwIfNotInitialized();
-  throwIfStopped();
-
-  Crypto::PublicKey pub = {};
-  if (m_auditSecretKey != NULL_SECRET_KEY) {
-    Crypto::secret_key_to_public_key(m_auditSecretKey, pub);
-  }
-  return {pub, m_auditSecretKey};
-}
-
-void WalletGreen::initializeWithAuditKey(const std::string& path, const std::string& password,
-                                          const Crypto::SecretKey& viewSecretKey,
-                                          const Crypto::SecretKey& auditSecretKey,
-                                          const uint64_t& creationTimestamp) {
-  // Initialize an audit tracking wallet from viewSecretKey (for incoming scan) and
-  // auditSecretKey (for tx key recovery and outgoing tracking).
-  // auditSecretKey cannot derive viewSecretKey — both must be provided.
-  Crypto::PublicKey viewPublicKey;
-  Crypto::secret_key_to_public_key(viewSecretKey, viewPublicKey);
-  uint64_t ts = creationTimestamp ? creationTimestamp : static_cast<uint64_t>(time(nullptr));
-  initWithKeys(path, password, viewPublicKey, viewSecretKey, ts);
-  m_auditSecretKey = auditSecretKey;
-  m_logger(INFO, BRIGHT_WHITE) << "Container initialized with audit key, public view key " << viewPublicKey;
-}
 
 std::string WalletGreen::createAddress() {
   KeyPair spendKey;
@@ -1278,26 +1229,10 @@ std::string WalletGreen::addWallet(const Crypto::PublicKey& spendPublicKey, cons
   incNextIv();
 
   try {
-    // Auto-derive auditSecretKey from the spend key if not yet known.
-    // Verify deterministic wallet: sc_reduce32(keccak(spendSecretKey))*G == viewPublicKey.
-    if (m_auditSecretKey == NULL_SECRET_KEY && spendSecretKey != NULL_SECRET_KEY) {
-      Crypto::SecretKey viewKeySeed;
-      keccak((uint8_t *)&spendSecretKey, sizeof(Crypto::SecretKey),
-             (uint8_t *)&viewKeySeed, sizeof(viewKeySeed));
-      Crypto::PublicKey derivedViewPublic;
-      Crypto::SecretKey derivedViewSecret;
-      Crypto::generate_deterministic_keys(derivedViewPublic, derivedViewSecret, viewKeySeed);
-      if (derivedViewPublic == m_viewPublicKey) {
-        m_auditSecretKey = AccountBase::computeAuditSecretKey(spendSecretKey);
-        m_logger(DEBUGGING) << "auditSecretKey auto-derived from first spend key";
-      }
-    }
-
     AccountSubscription sub;
     sub.keys.address.viewPublicKey = m_viewPublicKey;
     sub.keys.address.spendPublicKey = spendPublicKey;
     sub.keys.viewSecretKey = m_viewSecretKey;
-    sub.keys.auditSecretKey = m_auditSecretKey;
     sub.keys.spendSecretKey = spendSecretKey;
     sub.transactionSpendableAge = m_transactionSoftLockTime;
     sub.syncStart.height = 0;
@@ -2387,11 +2322,8 @@ std::unique_ptr<CryptoNote::ITransaction> WalletGreen::makeTransaction(const std
     }
   }
 
-  // Use auditSecretKey for deterministic tx key: r = Hs(auditSecretKey || inputsHash).
-  // auditSecretKey is domain-separated from viewSecretKey; the tx key cannot be recovered from
-  // viewSecretKey alone.  If null (non-deterministic wallet), buildTransaction uses the random R
-  // keypair created by TransactionImpl() — original CryptoNote protocol, safe.
-  auto tx = buildTransaction(inputs, outputs, m_auditSecretKey, extra, unlockTimestamp, 0, txSecretKey);
+  // Use viewSecretKey for deterministic tx key: r = Hs(viewSecretKey || inputsHash).
+  auto tx = buildTransaction(inputs, outputs, m_viewSecretKey, extra, unlockTimestamp, 0, txSecretKey);
 
   // copy ephKeys back so callers still have them if needed
   for (size_t i = 0; i < keysInfo.size(); ++i) {
@@ -2493,7 +2425,6 @@ AccountKeys WalletGreen::makeAccountKeys(const WalletRecord& wallet) const {
   keys.address.viewPublicKey = m_viewPublicKey;
   keys.spendSecretKey = wallet.spendSecretKey;
   keys.viewSecretKey = m_viewSecretKey;
-  keys.auditSecretKey = m_auditSecretKey;
 
   return keys;
 }
@@ -2832,8 +2763,6 @@ Crypto::SecretKey WalletGreen::getTransactionDeterministicSecretKey(Crypto::Hash
   throwIfNotInitialized();
   throwIfStopped();
 
-  Crypto::SecretKey txKey = CryptoNote::NULL_SECRET_KEY;
-
   auto getTransactionCompleted = std::promise<std::error_code>();
   auto getTransactionWaitFuture = getTransactionCompleted.get_future();
   CryptoNote::Transaction tx;
@@ -2850,19 +2779,10 @@ Crypto::SecretKey WalletGreen::getTransactionDeterministicSecretKey(Crypto::Hash
 
   Crypto::PublicKey txPubKey = getTransactionPublicKeyFromExtra(tx.extra);
   KeyPair deterministicTxKeys;
-  // Try to recover tx key using auditSecretKey (new scheme). Fall back to viewSecretKey (old scheme).
-  const Crypto::SecretKey& keyForTx = (m_auditSecretKey != NULL_SECRET_KEY) ? m_auditSecretKey : m_viewSecretKey;
-  bool ok = generateDeterministicTransactionKeys(tx, keyForTx, deterministicTxKeys)
+  bool ok = generateDeterministicTransactionKeys(tx, m_viewSecretKey, deterministicTxKeys)
     && deterministicTxKeys.publicKey == txPubKey;
-  // If new scheme failed (tx was generated before auditSecretKey was introduced), try old scheme.
-  if (!ok && m_auditSecretKey != NULL_SECRET_KEY) {
-    ok = generateDeterministicTransactionKeys(tx, m_viewSecretKey, deterministicTxKeys)
-      && deterministicTxKeys.publicKey == txPubKey;
-  }
 
   return ok ? deterministicTxKeys.secretKey : CryptoNote::NULL_SECRET_KEY;
-
-  return txKey;
 }
 
 Crypto::SecretKey WalletGreen::getTransactionSecretKey(size_t transactionIndex) const {

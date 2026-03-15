@@ -107,20 +107,13 @@ void findMyOutputs(
   }
 }
 
-// Detect whether WE sent a transaction by reconstructing the deterministic tx key using auditSecretKey.
-// auditSecretKey = sc_reduce32(keccak("view_seed"||spendSecretKey)); r = Hs(auditSecretKey || inputsHash); R = r*G.
-// If R == tx.publicKey then we are the sender.
-bool isOurOutgoingTransaction(const CryptoNote::ITransactionReader& tx, const Crypto::SecretKey& auditSecretKey) {
-  if (auditSecretKey == CryptoNote::NULL_SECRET_KEY) return false;
-  Crypto::Hash inputsHash = tx.getTransactionInputsHash();
-  BinaryArray ba;
-  Common::append(ba, std::begin(auditSecretKey.data), std::end(auditSecretKey.data));
-  Common::append(ba, std::begin(inputsHash.data), std::end(inputsHash.data));
-  Crypto::SecretKey r;
-  Crypto::hash_to_scalar(ba.data(), ba.size(), r);
-  Crypto::PublicKey R;
-  if (!Crypto::secret_key_to_public_key(r, R)) return false;
-  return R == tx.getTransactionPublicKey();
+// Detect whether WE sent a transaction by reconstructing the deterministic tx key.
+// r = Hs(viewSecretKey || inputsHash), R = r*G. If R == tx.publicKey then we are the sender.
+bool isOurOutgoingTransaction(const CryptoNote::ITransactionReader& tx, const Crypto::SecretKey& viewSecretKey) {
+  if (viewSecretKey == CryptoNote::NULL_SECRET_KEY) return false;
+  CryptoNote::KeyPair keys;
+  if (!CryptoNote::generateDeterministicTransactionKeys(tx.getTransactionInputsHash(), viewSecretKey, keys)) return false;
+  return keys.publicKey == tx.getTransactionPublicKey();
 }
 
 std::vector<Crypto::Hash> getBlockHashes(const CryptoNote::CompleteBlock* blocks, size_t count) {
@@ -139,8 +132,8 @@ std::vector<Crypto::Hash> getBlockHashes(const CryptoNote::CompleteBlock* blocks
 namespace CryptoNote {
 
 TransfersConsumer::TransfersConsumer(const CryptoNote::Currency& currency, INode& node, Logging::ILogger& logger,
-                                     const SecretKey& viewSecret, const SecretKey& auditSecretKey) :
-  m_node(node), m_viewSecret(viewSecret), m_auditSecretKey(auditSecretKey), m_currency(currency), m_logger(logger, "TransfersConsumer") {
+                                     const SecretKey& viewSecret) :
+  m_node(node), m_viewSecret(viewSecret), m_currency(currency), m_logger(logger, "TransfersConsumer") {
   updateSyncStart();
 }
 
@@ -154,6 +147,9 @@ ITransfersSubscription& TransfersConsumer::addSubscription(const AccountSubscrip
   if (res.get() == nullptr) {
     res.reset(new TransfersSubscription(m_currency, m_logger.getLogger(), subscription));
     m_spendKeys.insert(subscription.keys.address.spendPublicKey);
+    if (subscription.keys.spendSecretKey != NULL_SECRET_KEY) {
+      m_hasSpendKeys = true;
+    }
 
     if (m_subscriptions.size() == 1) {
       m_syncStart = res->getSyncStart();
@@ -532,12 +528,13 @@ std::error_code TransfersConsumer::preprocessOutputs(const TransactionBlockInfo&
     return std::error_code();
   }
 
-  // Detect outgoing transaction via auditSecretKey (audit wallet mode).
-  // Only relevant for view-only wallets with auditSecretKey but no spend keys.
-  // Full wallets detect outgoing txs via key image matching in addTransactionInputs.
-  if (isOurOutgoingTransaction(tx, m_auditSecretKey)) {
+  // Detect outgoing transaction via viewSecretKey (view-only wallets only).
+  // Skipped for full wallets (m_hasSpendKeys == true): they detect their own outgoing
+  // transactions via key-image matching in addTransactionInputs, so calling
+  // isOurOutgoingTransaction() on every blockchain transaction would be wasted work.
+  if (!m_hasSpendKeys && isOurOutgoingTransaction(tx, m_viewSecret)) {
     info.isOutgoing = true;
-    m_logger(DEBUGGING) << "Detected outgoing transaction via auditSecretKey, hash " << Common::podToHex(tx.getTransactionHash());
+    m_logger(DEBUGGING) << "Detected outgoing transaction via viewSecretKey, hash " << Common::podToHex(tx.getTransactionHash());
   }
 
   if (outputs.empty() && !info.isOutgoing) {

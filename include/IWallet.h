@@ -157,15 +157,7 @@ public:
   virtual KeyPair getAddressSpendKey(size_t index) const = 0;
   virtual KeyPair getAddressSpendKey(const std::string& address) const = 0;
   virtual KeyPair getViewKey() const = 0;
-  // Returns the auditSecretKey pair: {auditPublicKey, auditSecretKey}.
-  // auditSecretKey = sc_reduce32(keccak("view_seed"||spendSecretKey)); null for non-deterministic/view-only wallets.
-  virtual KeyPair getAuditKey() const = 0;
-  // Initialize an audit tracking wallet from viewSecretKey (for incoming scan) + auditSecretKey (for tx key recovery).
-  // Both are required: auditSecretKey alone cannot derive viewSecretKey.
-  virtual void initializeWithAuditKey(const std::string& path, const std::string& password,
-                                      const Crypto::SecretKey& viewSecretKey,
-                                      const Crypto::SecretKey& auditSecretKey,
-                                      const uint64_t& creationTimestamp = 0) = 0;
+
   virtual std::string createAddress() = 0;
   virtual std::string createAddress(const Crypto::SecretKey& spendSecretKey, bool reset = true) = 0;
   virtual std::string createAddress(const Crypto::PublicKey& spendPublicKey, bool reset = true) = 0;

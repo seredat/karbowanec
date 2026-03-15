@@ -150,7 +150,7 @@ public:
   TransfersContainer(const CryptoNote::Currency& currency, Logging::ILogger& logger, size_t transactionSpendableAge);
 
   // isOutgoing: when true and no outputs/inputs matched, still record the transaction as
-  // detected-outgoing (used by audit wallets that have auditSecretKey but no spend keys).
+  // detected-outgoing (used by view-only wallets using viewSecretKey for detection).
   bool addTransaction(const TransactionBlockInfo& block, const ITransactionReader& tx, const std::vector<TransactionOutputInformationIn>& transfers, bool isOutgoing = false);
   bool deleteUnconfirmedTransaction(const Crypto::Hash& transactionHash);
   bool markTransactionConfirmed(const TransactionBlockInfo& block, const Crypto::Hash& transactionHash, const std::vector<uint32_t>& globalIndices);
@@ -262,7 +262,7 @@ private:
   void addTransaction(const TransactionBlockInfo& block, const ITransactionReader& tx);
   bool addTransactionOutputs(const TransactionBlockInfo& block, const ITransactionReader& tx,
                              const std::vector<TransactionOutputInformationIn>& transfers);
-  bool addTransactionInputs(const TransactionBlockInfo& block, const ITransactionReader& tx);
+  bool addTransactionInputs(const TransactionBlockInfo& block, const ITransactionReader& tx, bool isOutgoing = false);
   void deleteTransactionTransfers(const Crypto::Hash& transactionHash);
   bool isSpendTimeUnlocked(uint64_t unlockTime) const;
   bool isIncluded(const TransactionOutputInformationEx& info, uint32_t flags) const;

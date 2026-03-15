@@ -38,11 +38,8 @@ class INode;
 class TransfersConsumer : public IObservableImpl<IBlockchainConsumerObserver, IBlockchainConsumer> {
 public:
 
-  // auditSecretKey: sc_reduce32(keccak("view_seed"||spendSecretKey)); non-null enables outgoing
-  // transaction detection for audit wallets (view-only wallets with auditSecretKey but no spend keys).
   TransfersConsumer(const CryptoNote::Currency& currency, INode& node, Logging::ILogger& logger,
-                    const Crypto::SecretKey& viewSecret,
-                    const Crypto::SecretKey& auditSecretKey = {});
+                    const Crypto::SecretKey& viewSecret);
 
   ITransfersSubscription& addSubscription(const AccountSubscription& subscription);
   // returns true if no subscribers left
@@ -75,7 +72,7 @@ private:
   struct PreprocessInfo {
     std::unordered_map<Crypto::PublicKey, std::vector<TransactionOutputInformationIn>> outputs;
     std::vector<uint32_t> globalIdxs;
-    bool isOutgoing = false;  // true if auditSecretKey identifies this as our outgoing transaction
+    bool isOutgoing = false;  // true if viewSecretKey identifies this as our outgoing transaction
   };
 
   std::error_code preprocessOutputs(const TransactionBlockInfo& blockInfo, const ITransactionReader& tx, PreprocessInfo& info);
@@ -91,7 +88,9 @@ private:
 
   SynchronizationStart m_syncStart;
   const Crypto::SecretKey m_viewSecret;
-  const Crypto::SecretKey m_auditSecretKey;  // sc_reduce32(keccak("view_seed"||spendSecretKey)); null for basic view-only wallets
+  // True once any subscription with a non-null spend secret key has been added.
+  // Used to skip isOurOutgoingTransaction() for full wallets (key-image matching suffices).
+  bool m_hasSpendKeys = false;
   // map { spend public key -> subscription }
   std::unordered_map<Crypto::PublicKey, std::unique_ptr<TransfersSubscription>> m_subscriptions;
   std::unordered_set<Crypto::PublicKey> m_spendKeys;

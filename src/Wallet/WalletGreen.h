@@ -124,16 +124,6 @@ public:
 	const Crypto::SecretKey &viewSecretKey,
 	const std::string& path);
 
-  // Get the audit key pair. Returns null key for non-deterministic/view-only wallets.
-  // auditSecretKey = sc_reduce32(keccak("view_seed"||spendSecretKey)).
-  KeyPair getAuditKey() const;
-
-  // Initialize an audit tracking wallet from viewSecretKey (incoming scan) + auditSecretKey (tx key recovery).
-  // Both are required; auditSecretKey cannot derive viewSecretKey.
-  void initializeWithAuditKey(const std::string& path, const std::string& password,
-                               const Crypto::SecretKey& viewSecretKey,
-                               const Crypto::SecretKey& auditSecretKey,
-                               const uint64_t& creationTimestamp = 0);
   uint64_t getBalanceMinusDust(const std::vector<std::string>& addresses);
 
 protected:
@@ -404,7 +394,6 @@ protected:
 
   Crypto::PublicKey m_viewPublicKey;
   Crypto::SecretKey m_viewSecretKey;
-  Crypto::SecretKey m_auditSecretKey;  // sc_reduce32(keccak("view_seed"||spendSecretKey)); null for view-only wallets
 
   uint64_t m_actualBalance;
   uint64_t m_pendingBalance;

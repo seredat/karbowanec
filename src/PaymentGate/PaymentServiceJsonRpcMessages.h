@@ -82,19 +82,6 @@ struct GetViewKey {
   };
 };
 
-struct GetAuditKey {
-  struct Request {
-    void serialize(CryptoNote::ISerializer& serializer);
-  };
-
-  struct Response {
-    // sc_reduce32(keccak("view_seed"||spendSecretKey)); empty string for view-only/non-deterministic wallets.
-    std::string auditSecretKey;
-
-    void serialize(CryptoNote::ISerializer& serializer);
-  };
-};
-
 struct GetMnemonicSeed {
   struct Request {
     std::string address;
