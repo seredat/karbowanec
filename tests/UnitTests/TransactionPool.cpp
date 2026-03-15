@@ -23,7 +23,9 @@
 
 #include "CryptoNoteCore/Account.h"
 #include "CryptoNoteCore/CryptoNoteFormatUtils.h"
+#include "CryptoNoteCore/CryptoNoteSerialization.h"
 #include "CryptoNoteCore/CryptoNoteTools.h"
+#include "Wallet/TransactionBuilder.h"
 #include "CryptoNoteCore/Currency.h"
 #include "CryptoNoteCore/TransactionExtra.h"
 #include "CryptoNoteCore/TransactionPool.h"
@@ -83,7 +85,7 @@ public:
 
     size_t real_source_idx = m_ringSize / 2;
 
-    std::vector<TransactionSourceEntry::OutputEntry> output_entries;
+    std::vector<TransactionTypes::GlobalOutput> output_entries;
     for (uint32_t i = 0; i < m_ringSize; ++i)
     {
       m_miners[i].generate();
@@ -93,19 +95,20 @@ public:
       }
 
       KeyOutput tx_out = boost::get<KeyOutput>(m_miner_txs[i].outputs[0].target);
-      output_entries.push_back(std::make_pair(i, tx_out.key));
+      output_entries.push_back({tx_out.key, i});
       m_public_keys[i] = tx_out.key;
       m_public_key_ptrs[i] = &m_public_keys[i];
     }
 
     m_source_amount = m_miner_txs[0].outputs[0].amount;
 
-    TransactionSourceEntry source_entry;
-    source_entry.amount = m_source_amount;
-    source_entry.realTransactionPublicKey = getTransactionPublicKeyFromExtra(m_miner_txs[real_source_idx].extra);
-    source_entry.realOutputIndexInTransaction = 0;
-    source_entry.outputs.swap(output_entries);
-    source_entry.realOutput = real_source_idx;
+    TxBuildInput source_entry;
+    source_entry.keyInfo.amount = m_source_amount;
+    source_entry.keyInfo.realOutput.transactionPublicKey = getTransactionPublicKeyFromExtra(m_miner_txs[real_source_idx].extra);
+    source_entry.keyInfo.realOutput.outputInTransaction = 0;
+    source_entry.keyInfo.outputs.swap(output_entries);
+    source_entry.keyInfo.realOutput.transactionIndex = real_source_idx;
+    source_entry.senderKeys = m_miners[real_source_idx].getAccountKeys();
 
     m_sources.push_back(source_entry);
 
@@ -116,19 +119,23 @@ public:
 
   void construct(uint64_t amount, uint64_t fee, size_t outputs, Transaction& tx) {
 
-    std::vector<TransactionDestinationEntry> destinations;
+    std::vector<TxBuildOutput> destinations;
     uint64_t amountPerOut = (amount - fee) / outputs;
 
     for (size_t i = 0; i < outputs; ++i) {
-      destinations.push_back(TransactionDestinationEntry(amountPerOut, rv_acc.getAccountKeys().address));
+      destinations.push_back(TxBuildOutput{rv_acc.getAccountKeys().address, amountPerOut});
     }
 
-    constructTransaction(m_realSenderKeys, m_sources, destinations, std::vector<uint8_t>(), tx, 0, m_logger);
+    try {
+      Crypto::SecretKey txkey;
+      auto itx = buildTransaction(m_sources, destinations, m_realSenderKeys.viewSecretKey, {}, 0, 0, txkey);
+      fromBinaryArray(tx, itx->getTransactionData());
+    } catch (...) {}
   }
 
   std::vector<AccountBase> m_miners;
   std::vector<Transaction> m_miner_txs;
-  std::vector<TransactionSourceEntry> m_sources;
+  std::vector<TxBuildInput> m_sources;
   std::vector<Crypto::PublicKey> m_public_keys;
   std::vector<const Crypto::PublicKey*> m_public_key_ptrs;
 

@@ -157,6 +157,7 @@ public:
   virtual KeyPair getAddressSpendKey(size_t index) const = 0;
   virtual KeyPair getAddressSpendKey(const std::string& address) const = 0;
   virtual KeyPair getViewKey() const = 0;
+
   virtual std::string createAddress() = 0;
   virtual std::string createAddress(const Crypto::SecretKey& spendSecretKey, bool reset = true) = 0;
   virtual std::string createAddress(const Crypto::PublicKey& spendPublicKey, bool reset = true) = 0;

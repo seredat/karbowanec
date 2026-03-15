@@ -38,7 +38,8 @@ class INode;
 class TransfersConsumer : public IObservableImpl<IBlockchainConsumerObserver, IBlockchainConsumer> {
 public:
 
-  TransfersConsumer(const CryptoNote::Currency& currency, INode& node, Logging::ILogger& logger, const Crypto::SecretKey& viewSecret);
+  TransfersConsumer(const CryptoNote::Currency& currency, INode& node, Logging::ILogger& logger,
+                    const Crypto::SecretKey& viewSecret);
 
   ITransfersSubscription& addSubscription(const AccountSubscription& subscription);
   // returns true if no subscribers left
@@ -71,13 +72,15 @@ private:
   struct PreprocessInfo {
     std::unordered_map<Crypto::PublicKey, std::vector<TransactionOutputInformationIn>> outputs;
     std::vector<uint32_t> globalIdxs;
+    bool isOutgoing = false;  // true if viewSecretKey identifies this as our outgoing transaction
   };
 
   std::error_code preprocessOutputs(const TransactionBlockInfo& blockInfo, const ITransactionReader& tx, PreprocessInfo& info);
   std::error_code processTransaction(const TransactionBlockInfo& blockInfo, const ITransactionReader& tx);
   void processTransaction(const TransactionBlockInfo& blockInfo, const ITransactionReader& tx, const PreprocessInfo& info);
   void processOutputs(const TransactionBlockInfo& blockInfo, TransfersSubscription& sub, const ITransactionReader& tx,
-    const std::vector<TransactionOutputInformationIn>& outputs, const std::vector<uint32_t>& globalIdxs, bool& contains, bool& updated);
+    const std::vector<TransactionOutputInformationIn>& outputs, const std::vector<uint32_t>& globalIdxs, bool& contains, bool& updated,
+    bool isOutgoing = false);
 
   std::error_code getGlobalIndices(const Crypto::Hash& transactionHash, std::vector<uint32_t>& outsGlobalIndices);
 
@@ -85,6 +88,9 @@ private:
 
   SynchronizationStart m_syncStart;
   const Crypto::SecretKey m_viewSecret;
+  // True once any subscription with a non-null spend secret key has been added.
+  // Used to skip isOurOutgoingTransaction() for full wallets (key-image matching suffices).
+  bool m_hasSpendKeys = false;
   // map { spend public key -> subscription }
   std::unordered_map<Crypto::PublicKey, std::unique_ptr<TransfersSubscription>> m_subscriptions;
   std::unordered_set<Crypto::PublicKey> m_spendKeys;

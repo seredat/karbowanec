@@ -37,7 +37,6 @@ namespace NodeErrors
 }
 
 #include <Common/ColouredMsg.h>
-#include <GreenWallet/Fusion.h>
 #include <GreenWallet/Tools.h>
 #include <GreenWallet/WalletConfig.h>
 
@@ -570,29 +569,7 @@ void doTransfer(std::string address, uint64_t amount, uint64_t fee,
         {
             if (walletInfo->wallet.txIsTooLarge(p))
             {
-                if (!fusionTX(walletInfo->wallet, p))
-                {
-                    return;
-                }
-
-                if (walletInfo->wallet.txIsTooLarge(p))
-                {
-                    splitTx(walletInfo->wallet, p);
-                }
-                else
-                {
-
-                    const size_t id = walletInfo->wallet.transfer(p, txSecretKey);
-
-                    const CryptoNote::WalletTransaction tx
-                        = walletInfo->wallet.getTransaction(id);
-
-                    std::cout << SuccessMsg("Transaction has been sent!")
-                              << std::endl
-                              << SuccessMsg("Hash:"
-                                          + Common::podToHex(tx.hash))
-                              << std::endl;
-                }
+                splitTx(walletInfo->wallet, p);
             }
             else
             {

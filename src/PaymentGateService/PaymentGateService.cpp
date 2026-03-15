@@ -307,7 +307,7 @@ void PaymentGateService::runWalletService(const CryptoNote::Currency& currency, 
 
   std::unique_ptr<CryptoNote::WalletGreen> wallet(new CryptoNote::WalletGreen(*dispatcher, currency, node, logger));
 
-  service = new PaymentService::WalletService(currency, *dispatcher, node, *wallet, *wallet, walletConfiguration, logger);
+  service = new PaymentService::WalletService(currency, *dispatcher, node, *wallet, walletConfiguration, logger);
   std::unique_ptr<PaymentService::WalletService> serviceGuard(service);
   try {
     service->init();

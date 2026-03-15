@@ -158,7 +158,7 @@ TransfersContainer::TransfersContainer(const Currency& currency, Logging::ILogge
 }
 
 bool TransfersContainer::addTransaction(const TransactionBlockInfo& block, const ITransactionReader& tx,
-  const std::vector<TransactionOutputInformationIn>& transfers) {
+  const std::vector<TransactionOutputInformationIn>& transfers, bool isOutgoing) {
 
   try {
     std::unique_lock<std::mutex> lock(m_mutex);
@@ -176,9 +176,13 @@ bool TransfersContainer::addTransaction(const TransactionBlockInfo& block, const
     }
 
     bool added = addTransactionOutputs(block, tx, transfers);
-    added |= addTransactionInputs(block, tx);
+    added |= addTransactionInputs(block, tx, isOutgoing);
 
-    if (added) {
+    // For view-only wallets, the sender detection via viewSecretKey may find an outgoing tx
+    // that has no change outputs and no trackable inputs.
+    // Force-record it so the wallet can report the transaction as outgoing.
+    bool forceAdded = isOutgoing && !added;
+    if (added || forceAdded) {
       addTransaction(block, tx);
     }
 
@@ -186,7 +190,7 @@ bool TransfersContainer::addTransaction(const TransactionBlockInfo& block, const
       m_currentHeight = block.height;
     }
 
-    return added;
+    return added || forceAdded;
   } catch (...) {
     if (m_transactions.count(tx.getTransactionHash()) == 0) {
       m_logger(ERROR, BRIGHT_RED) << "Failed to add transaction, remove transaction transfers, block " << block.height <<
@@ -301,7 +305,7 @@ bool TransfersContainer::addTransactionOutputs(const TransactionBlockInfo& block
 /**
  * \pre m_mutex is locked.
  */
-bool TransfersContainer::addTransactionInputs(const TransactionBlockInfo& block, const ITransactionReader& tx) {
+bool TransfersContainer::addTransactionInputs(const TransactionBlockInfo& block, const ITransactionReader& tx, bool isOutgoing) {
   bool inputsAdded = false;
 
   for (size_t i = 0; i < tx.getInputCount(); ++i) {
@@ -346,10 +350,51 @@ bool TransfersContainer::addTransactionInputs(const TransactionBlockInfo& block,
           auto message = "Failed to add key input: spend output of unconfirmed transaction";
           m_logger(ERROR, BRIGHT_RED) << message << ", key image " << input.keyImage;
           throw std::runtime_error(message);
-        } else {
-          // This input doesn't spend any transfer from this container
-          continue;
         }
+
+        // Fallback for view-only wallets: generate_key_image_helper() with a null spendSecretKey
+        // produces a partial key image ki_partial = Hs(a·R,i)·Hp(P) rather than the real
+        // ki = (Hs(a·R,i)+b)·Hp(P), so the key-image lookup above finds nothing.
+        // When isOutgoing is true (confirmed by viewSecretKey match in TransfersConsumer),
+        // identify the spent output by ring membership: decode the input's ring-member global
+        // output indices and find which of our available outputs is one of them.
+        // This is RingCT-compatible — global output indices are always visible even when
+        // amounts are committed, unlike amount-based matching.
+        if (isOutgoing) {
+          // Decode relative offsets -- absolute global output indices.
+          // outputIndexes[0] is the first absolute index; subsequent entries are differences.
+          std::vector<uint32_t> ringAbsoluteIdxs;
+          ringAbsoluteIdxs.reserve(input.outputIndexes.size());
+          uint32_t accum = 0;
+          for (uint32_t rel : input.outputIndexes) {
+            accum += rel;
+            ringAbsoluteIdxs.push_back(accum);
+          }
+
+          bool ringMatched = false;
+          for (auto it = m_availableTransfers.begin(); it != m_availableTransfers.end(); ++it) {
+            if (it->globalOutputIndex == UNCONFIRMED_TRANSACTION_GLOBAL_OUTPUT_INDEX) continue;
+            if (std::find(ringAbsoluteIdxs.begin(), ringAbsoluteIdxs.end(),
+                          it->globalOutputIndex) == ringAbsoluteIdxs.end()) continue;
+            // Our output's global index appears in this input's ring -- it is the spent one.
+            // Correct the stored partial key image to the real one from the input.
+            TransactionOutputInformationEx corrected = *it;
+            corrected.keyImage = input.keyImage;
+            m_availableTransfers.erase(it);   // iterator invalid after erase
+            copyToSpent(block, tx, i, corrected);
+            updateTransfersVisibility(input.keyImage);
+            inputsAdded = true;
+            ringMatched = true;
+            break;
+          }
+          if (!ringMatched) {
+            m_logger(DEBUGGING) << "Audit wallet: outgoing input key image " << input.keyImage
+              << " has no ring member matching any available output"
+              << " (may have been received before sync start)";
+          }
+        }
+        // Whether we matched or not, move on to the next input.
+        continue;
       }
 
       auto& outputDescriptorIndex = m_availableTransfers.get<SpentOutputDescriptorIndex>();

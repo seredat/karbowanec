@@ -13,6 +13,7 @@
 #include <Common/Base58.h>
 #include <Common/StringTools.h>
 
+#include <crypto/crypto.h>
 #include <CryptoNoteCore/Account.h>
 #include <CryptoNoteCore/CryptoNoteBasicImpl.h>
 #include <CryptoNoteCore/CryptoNoteTools.h>
@@ -31,11 +32,20 @@
 
 std::shared_ptr<WalletInfo> createViewWallet(CryptoNote::WalletGreen &wallet)
 {
-    std::cout << WarningMsg("View wallets are only for viewing incoming ")
-              << WarningMsg("transactions, and cannot make transfers.")
+    // Accept either:
+    //   (A) A Tracking Key (192 hex chars):
+    //       spendPublicKey | viewPublicKey | viewSecretKey
+    //       — tracks incoming transactions only.
+    //   (B) A Private View Key (64 hex chars):
+    //       — tracking-only; wallet address must be entered separately.
+    std::cout << InformationMsg("A TRACKING wallet accepts a Tracking Key or Private View Key and")
+              << std::endl
+              << InformationMsg("allows audit of transactions.")
+              << std::endl
+              << WarningMsg("This wallet type does not allow spending funds.")
               << std::endl;
 
-    bool create = confirm("Is this OK?");
+    bool create = confirm("Continue?");
 
     std::cout << std::endl;
 
@@ -44,42 +54,107 @@ std::shared_ptr<WalletInfo> createViewWallet(CryptoNote::WalletGreen &wallet)
         return nullptr;
     }
 
-    Crypto::SecretKey privateViewKey = getPrivateKey("Private View Key: ");
-
-    std::string address;
-
+    std::string keyInput;
     while (true)
     {
-        std::cout << InformationMsg("Enter your public ")
-                  << InformationMsg(WalletConfig::ticker)
-                  << InformationMsg(" address: ");
+        std::cout << InformationMsg("Paste your Tracking Key (192 hex) or Private View Key (64 hex): ");
+        std::getline(std::cin, keyInput);
+        boost::algorithm::trim(keyInput);
 
-        std::getline(std::cin, address);
-        boost::algorithm::trim(address);
-
-        if (parseAddress(address))
-        {
+        if (keyInput.size() == 64 || keyInput.size() == 192)
             break;
-        }
+
+        std::cout << WarningMsg("Invalid key length — expected 64 or 192 hex characters. Try again.")
+                  << std::endl;
     }
 
     const std::string walletFileName = getNewWalletFileName();
+    const std::string walletPass = getWalletPassword(true, "Give your new wallet a password: ");
 
-    const std::string msg = "Give your new wallet a password: ";
+    if (keyInput.size() == 192)
+    {
+        // Parse the three 32-byte fields from the 192-hex string.
+        size_t sz;
+        Crypto::Hash spendPubHash, viewPubHash, viewSecretHash;
 
-    const std::string walletPass = getWalletPassword(true, msg);
+        if (!Common::fromHex(keyInput.substr(0, 64),   &spendPubHash,   sizeof(spendPubHash),   sz) ||
+            !Common::fromHex(keyInput.substr(64, 64),  &viewPubHash,    sizeof(viewPubHash),    sz) ||
+            !Common::fromHex(keyInput.substr(128, 64), &viewSecretHash, sizeof(viewSecretHash), sz))
+        {
+            std::cout << WarningMsg("Invalid key — could not decode hex fields.") << std::endl;
+            return nullptr;
+        }
 
-    wallet.createViewWallet(walletPass, address, privateViewKey, walletFileName);
+        Crypto::PublicKey spendPublicKey = *reinterpret_cast<Crypto::PublicKey*>(&spendPubHash);
+        Crypto::PublicKey viewPublicKey  = *reinterpret_cast<Crypto::PublicKey*>(&viewPubHash);
+        Crypto::SecretKey viewSecretKey  = *reinterpret_cast<Crypto::SecretKey*>(&viewSecretHash);
 
-    std::cout << std::endl << InformationMsg("Your view wallet ")
-              << InformationMsg(address)
-              << InformationMsg(" has been successfully imported!")
-              << std::endl << std::endl;
+        // Reconstruct the address string from the embedded public keys.
+        CryptoNote::AccountPublicAddress addrKeys { spendPublicKey, viewPublicKey };
+        CryptoNote::BinaryArray addrData;
+        toBinaryArray(addrKeys, addrData);
+        std::string address = Tools::Base58::encode_addr(
+            CryptoNote::parameters::CRYPTONOTE_PUBLIC_ADDRESS_BASE58_PREFIX,
+            std::string(reinterpret_cast<const char*>(addrData.data()), addrData.size()));
 
-    viewWalletMsg();
+        wallet.createViewWallet(walletPass, address, viewSecretKey, walletFileName);
 
-    return std::make_shared<WalletInfo>(walletFileName, walletPass,
-                                        address, true, wallet);
+        std::cout << std::endl
+                  << InformationMsg("Your view wallet ")
+                  << InformationMsg(address)
+                  << InformationMsg(" has been successfully imported!")
+                  << std::endl << std::endl;
+        viewWalletMsg();
+
+        return std::make_shared<WalletInfo>(walletFileName, walletPass,
+                                            address, true, wallet);
+    }
+    else
+    {
+        // 64-hex: legacy private view key — ask for address separately.
+        Crypto::Hash viewKeyHash;
+        size_t sz;
+        if (!Common::fromHex(keyInput, &viewKeyHash, sizeof(viewKeyHash), sz) ||
+            sz != sizeof(viewKeyHash))
+        {
+            std::cout << WarningMsg("Invalid private view key — not a valid hex string.") << std::endl;
+            return nullptr;
+        }
+
+        Crypto::SecretKey privateViewKey = *reinterpret_cast<Crypto::SecretKey*>(&viewKeyHash);
+        Crypto::PublicKey derivedPub;
+        if (!Crypto::secret_key_to_public_key(privateViewKey, derivedPub))
+        {
+            std::cout << WarningMsg("Invalid private view key — not on the ed25519 curve.") << std::endl;
+            return nullptr;
+        }
+
+        std::string address;
+        while (true)
+        {
+            std::cout << InformationMsg("Enter your public ")
+                      << InformationMsg(WalletConfig::ticker)
+                      << InformationMsg(" address: ");
+
+            std::getline(std::cin, address);
+            boost::algorithm::trim(address);
+
+            if (parseAddress(address))
+                break;
+        }
+
+        wallet.createViewWallet(walletPass, address, privateViewKey, walletFileName);
+
+        std::cout << std::endl
+                  << InformationMsg("Your view wallet ")
+                  << InformationMsg(address)
+                  << InformationMsg(" has been successfully imported!")
+                  << std::endl << std::endl;
+        viewWalletMsg();
+
+        return std::make_shared<WalletInfo>(walletFileName, walletPass,
+                                            address, true, wallet);
+    }
 }
 
 std::shared_ptr<WalletInfo> importWallet(CryptoNote::WalletGreen &wallet)
@@ -95,13 +170,15 @@ std::shared_ptr<WalletInfo> importWallet(CryptoNote::WalletGreen &wallet)
 
 std::shared_ptr<WalletInfo> importGUIWallet(CryptoNote::WalletGreen &wallet)
 {
-    const int privateKeyLen = 184;
+    // GUI private key is base58-encoded AccountKeys (spend+view keys).
+    // Format: 128 bytes (spendPub|viewPub|spendSec|viewSec) -> 184 base58 chars.
+    static constexpr size_t kLegacyKeyBytes = 128;  // old format without extra fields
+    static constexpr size_t kNewKeyBytes    = sizeof(CryptoNote::AccountKeys);
 
     std::string guiPrivateKey;
 
     uint64_t addressPrefix;
     std::string data;
-    CryptoNote::AccountKeys keys;
 
     while (true)
     {
@@ -109,21 +186,11 @@ std::shared_ptr<WalletInfo> importGUIWallet(CryptoNote::WalletGreen &wallet)
         std::getline(std::cin, guiPrivateKey);
         boost::algorithm::trim(guiPrivateKey);
 
-        if (guiPrivateKey.length() != privateKeyLen)
-        {
-            std::cout << WarningMsg("Invalid GUI Private Key, should be ")
-                      << WarningMsg(std::to_string(privateKeyLen))
-                      << WarningMsg(" characters! Try again.")
-                      << std::endl;
-
-            continue;
-        }
-
         if (!Tools::Base58::decode_addr(guiPrivateKey, addressPrefix, data)
-          || data.size() != sizeof(keys))
+          || (data.size() != kLegacyKeyBytes && data.size() != kNewKeyBytes))
         {
-            std::cout << WarningMsg("Failed to decode GUI Private Key!")
-                      << WarningMsg("Ensure you have entered it correctly.")
+            std::cout << WarningMsg("Invalid GUI Private Key — failed to decode or wrong size. "
+                                    "Try again.")
                       << std::endl;
 
             continue;
@@ -144,11 +211,16 @@ std::shared_ptr<WalletInfo> importGUIWallet(CryptoNote::WalletGreen &wallet)
         break;
     }
 
-    if (!fromBinaryArray(keys, Common::asBinaryArray(data))) {
-        std::cout << WarningMsg("Failed to parse account keys") << std::endl;
-    }
+    // Extract keys from known fixed offsets (identical in both legacy and new format):
+    //   offset  0: spendPublicKey  (32 bytes)
+    //   offset 32: viewPublicKey   (32 bytes)
+    //   offset 64: spendSecretKey  (32 bytes)
+    //   offset 96: viewSecretKey   (32 bytes)
+    Crypto::SecretKey spendSecretKey, viewSecretKey;
+    memcpy(&spendSecretKey, data.data() + 64, sizeof(Crypto::SecretKey));
+    memcpy(&viewSecretKey,  data.data() + 96, sizeof(Crypto::SecretKey));
 
-    return importFromKeys(wallet, keys.spendSecretKey, keys.viewSecretKey);
+    return importFromKeys(wallet, spendSecretKey, viewSecretKey);
 }
 
 std::shared_ptr<WalletInfo> mnemonicImportWallet(CryptoNote::WalletGreen
@@ -535,11 +607,10 @@ std::string getWalletPassword(bool verifyPwd, std::string msg)
 void viewWalletMsg()
 {
     std::cout << InformationMsg("Please remember that when using a view wallet "
-                                "you can only view incoming transactions!")
+                                "you can only view transactions!")
               << std::endl
-              << InformationMsg("Therefore, if you have recieved transactions ")
-              << InformationMsg("which you then spent, your balance will ")
-              << InformationMsg("appear inflated.") << std::endl;
+              << InformationMsg("If you used old software for sending, ")
+              << InformationMsg("your balance may appear incorrect.") << std::endl;
 }
 
 void connectingMsg()

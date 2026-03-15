@@ -1,4 +1,5 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2016-2026, Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -123,6 +124,10 @@ public:
 
   // transaction info
   virtual void setTransactionSecretKey(const Crypto::SecretKey& key) = 0;
+
+  // Generate deterministic transaction keys: r = Hs(viewSecretKey || inputsHash); R = r*G.
+  // Must be called after all inputs are added and before any outputs are added.
+  virtual void generateDeterministicTransactionKeys(const Crypto::SecretKey& viewSecretKey) = 0;
 
   // signing
   virtual void signInputKey(size_t input, const TransactionTypes::InputKeyInfo& info, const KeyPair& ephKeys) = 0;

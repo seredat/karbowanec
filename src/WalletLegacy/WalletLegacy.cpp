@@ -190,7 +190,6 @@ void WalletLegacy::initAndGenerateNonDeterministic(const std::string& password) 
     }
 
     m_account.generate();
-	//m_account.generateDeterministic();
     m_password = password;
 
     initSync();
@@ -217,21 +216,12 @@ void WalletLegacy::initAndGenerateDeterministic(const std::string& password) {
 }
 
 void WalletLegacy::initWithKeys(const AccountKeys& accountKeys, const std::string& password) {
-  {
-    std::unique_lock<std::mutex> stateLock(m_cacheMutex);
-
-    if (m_state != NOT_INITIALIZED) {
-      throw std::system_error(make_error_code(error::ALREADY_INITIALIZED));
-    }
-
-    m_account.setAccountKeys(accountKeys);
-    m_account.set_createtime(ACCOUNT_CREATE_TIME_ACCURACY);
-    m_password = password;
-
-    initSync();
-  }
-
-  m_observerManager.notify(&IWalletLegacyObserver::initCompleted, std::error_code());
+  // Delegate to the scanHeight overload with 0 (sync from chain start).
+  // scanHeightToTimestamp(0) returns 0; the initSync() formula
+  //   max(createtime, ACCOUNT_CREATE_TIME_ACCURACY) - ACCOUNT_CREATE_TIME_ACCURACY
+  // yields 0 for both createtime=0 and createtime=ACCOUNT_CREATE_TIME_ACCURACY, so
+  // the sync behaviour is identical to the old standalone implementation.
+  initWithKeys(accountKeys, password, 0);
 }
 
 uint64_t WalletLegacy::getBlockTimestamp(const uint32_t blockHeight) {
@@ -311,8 +301,7 @@ void WalletLegacy::initWithKeys(const AccountKeys& accountKeys, const std::strin
     }
 
     m_account.setAccountKeys(accountKeys);
-    uint64_t newTimestamp = scanHeightToTimestamp(scanHeight);
-    m_account.set_createtime(newTimestamp);
+    m_account.set_createtime(scanHeightToTimestamp(scanHeight));
     m_password = password;
 
     initSync();
@@ -361,7 +350,7 @@ void WalletLegacy::doLoad(std::istream& source) {
     std::string cache;
     WalletLegacySerializer serializer(m_account, m_transactionsCache);
     serializer.deserialize(source, m_password, cache);
-      
+
     initSync();
 
     try {
@@ -665,96 +654,6 @@ std::vector<TransactionSpentOutputInformation> WalletLegacy::getSpentOutputs() {
   return m_transferDetails->getSpentOutputs();
 }
 
-size_t WalletLegacy::estimateFusion(const uint64_t& threshold) {
-  size_t fusionReadyCount = 0;
-  std::vector<TransactionOutputInformation> outputs;
-  m_transferDetails->getOutputs(outputs, ITransfersContainer::IncludeKeyUnlocked);
-  std::array<size_t, std::numeric_limits<uint64_t>::digits10 + 1> bucketSizes;
-  bucketSizes.fill(0);
-  for (auto& out : outputs) {
-    uint8_t powerOfTen = 0;
-	if (m_currency.isAmountApplicableInFusionTransactionInput(out.amount, threshold, powerOfTen, m_node.getLastKnownBlockHeight())) {
-      assert(powerOfTen < std::numeric_limits<uint64_t>::digits10 + 1);
-      bucketSizes[powerOfTen]++;
-	}
-  }
-  for (auto bucketSize : bucketSizes) {
-    if (bucketSize >= m_currency.fusionTxMinInputCount()) {
-      fusionReadyCount += bucketSize;
-    }
-  }
-  return fusionReadyCount;
-}
-
-std::list<TransactionOutputInformation> WalletLegacy::selectFusionTransfersToSend(uint64_t threshold, size_t minInputCount, size_t maxInputCount) {
-  std::list<TransactionOutputInformation> selectedOutputs;
-  std::vector<TransactionOutputInformation> outputs;
-  std::vector<TransactionOutputInformation> allFusionReadyOuts;
-  m_transferDetails->getOutputs(outputs, ITransfersContainer::IncludeKeyUnlocked);
-  std::array<size_t, std::numeric_limits<uint64_t>::digits10 + 1> bucketSizes;
-  bucketSizes.fill(0);
-  for (auto& out : outputs) {
-    uint8_t powerOfTen = 0;
-    if (m_currency.isAmountApplicableInFusionTransactionInput(out.amount, threshold, powerOfTen, m_node.getLastKnownBlockHeight())) {
-      allFusionReadyOuts.push_back(std::move(out));
-      assert(powerOfTen < std::numeric_limits<uint64_t>::digits10 + 1);
-      bucketSizes[powerOfTen]++;
-    }
-  }
-
-  //now, pick the bucket
-  std::vector<uint8_t> bucketNumbers(bucketSizes.size());
-  std::iota(bucketNumbers.begin(), bucketNumbers.end(), 0);
-  std::shuffle(bucketNumbers.begin(), bucketNumbers.end(), Random::generator());
-  size_t bucketNumberIndex = 0;
-  for (; bucketNumberIndex < bucketNumbers.size(); ++bucketNumberIndex) {
-	  if (bucketSizes[bucketNumbers[bucketNumberIndex]] >= minInputCount) {
-		  break;
-	  }
-  }
-
-  if (bucketNumberIndex == bucketNumbers.size()) {
-	  return {};
-  }
-
-  size_t selectedBucket = bucketNumbers[bucketNumberIndex];
-  assert(selectedBucket < std::numeric_limits<uint64_t>::digits10 + 1);
-  assert(bucketSizes[selectedBucket] >= minInputCount);
-  uint64_t lowerBound = 1;
-  for (size_t i = 0; i < selectedBucket; ++i) {
-	  lowerBound *= 10;
-  }
-
-  uint64_t upperBound = selectedBucket == std::numeric_limits<uint64_t>::digits10 ? UINT64_MAX : lowerBound * 10;
-  std::vector<TransactionOutputInformation> selectedOuts;
-  selectedOuts.reserve(bucketSizes[selectedBucket]);
-  for (size_t outIndex = 0; outIndex < allFusionReadyOuts.size(); ++outIndex) {
-	  if (allFusionReadyOuts[outIndex].amount >= lowerBound && allFusionReadyOuts[outIndex].amount < upperBound) {
-		  selectedOuts.push_back(std::move(allFusionReadyOuts[outIndex]));
-	  }
-  }
-
-  assert(selectedOuts.size() >= minInputCount);
-
-  auto outputsSortingFunction = [](const TransactionOutputInformation& l, const TransactionOutputInformation& r) { return l.amount < r.amount; };
-  if (selectedOuts.size() <= maxInputCount) {
-	  std::sort(selectedOuts.begin(), selectedOuts.end(), outputsSortingFunction);
-	  std::copy(selectedOuts.begin(), selectedOuts.end(), std::back_inserter(selectedOutputs));
-	  return selectedOutputs;
-  }
-
-  ShuffleGenerator<size_t> generator(selectedOuts.size());
-  std::vector<TransactionOutputInformation> trimmedSelectedOuts;
-  trimmedSelectedOuts.reserve(maxInputCount);
-  for (size_t i = 0; i < maxInputCount; ++i) {
-	  trimmedSelectedOuts.push_back(std::move(selectedOuts[generator()]));
-  }
-
-  std::sort(trimmedSelectedOuts.begin(), trimmedSelectedOuts.end(), outputsSortingFunction);
-  std::copy(trimmedSelectedOuts.begin(), trimmedSelectedOuts.end(), std::back_inserter(selectedOutputs));
-  return selectedOutputs;
-}
-
 TransactionId WalletLegacy::sendTransaction(const WalletLegacyTransfer& transfer, uint64_t fee, const std::string& extra, uint64_t mixIn, uint64_t unlockTimestamp) {
   std::vector<WalletLegacyTransfer> transfers;
   transfers.push_back(transfer);
@@ -848,36 +747,6 @@ std::string WalletLegacy::prepareRawTransaction(TransactionId& transactionId, co
 
   return prepareRawTransaction(transactionId, transfers, fee, extra, mixIn, unlockTimestamp);
 }
-
-TransactionId WalletLegacy::sendFusionTransaction(const std::list<TransactionOutputInformation>& fusionInputs, uint64_t fee, const std::string& extra, uint64_t mixIn, uint64_t unlockTimestamp) {
-	TransactionId txId = 0;
-	std::shared_ptr<WalletRequest> request;
-	std::deque<std::shared_ptr<WalletLegacyEvent>> events;
-	throwIfNotInitialised();
-	std::vector<WalletLegacyTransfer> transfers;
-	WalletLegacyTransfer destination;
-	destination.amount = 0;
-	for (auto& out : fusionInputs) {
-		destination.amount += out.amount;
-	}
-	destination.address = getAddress();
-	transfers.push_back(destination);
-
-	{
-		std::unique_lock<std::mutex> lock(m_cacheMutex);
-		request = m_sender->makeSendFusionRequest(txId, events, transfers, fusionInputs, fee, extra, mixIn, unlockTimestamp);
-	}
-
-	notifyClients(events);
-
-	if (request) {
-		m_asyncContextCounter.addAsyncContext();
-		request->perform(m_node, std::bind(&WalletLegacy::sendTransactionCallback, this, std::placeholders::_1, std::placeholders::_2));
-	}
-
-	return txId;
-}
-
 
 void WalletLegacy::sendTransactionCallback(WalletRequest::Callback callback, std::error_code ec) {
   ContextCounterHolder counterHolder(m_asyncContextCounter);
@@ -1065,8 +934,9 @@ Crypto::SecretKey WalletLegacy::getTxKey(Crypto::Hash& txid) {
     }
 
     Crypto::PublicKey txPubKey = getTransactionPublicKeyFromExtra(tx.extra);
+    const AccountKeys& accKeys = m_account.getAccountKeys();
     KeyPair deterministicTxKeys;
-    bool ok = generateDeterministicTransactionKeys(tx, m_account.getAccountKeys().viewSecretKey, deterministicTxKeys)
+    bool ok = generateDeterministicTransactionKeys(tx, accKeys.viewSecretKey, deterministicTxKeys)
       && deterministicTxKeys.publicKey == txPubKey;
 
     return ok ? deterministicTxKeys.secretKey : reinterpret_cast<const Crypto::SecretKey&>(transaction.secretKey.get());
@@ -1147,47 +1017,5 @@ std::vector<TransactionOutputInformation> WalletLegacy::getTransactionOutputs(co
 std::vector<TransactionOutputInformation> WalletLegacy::getTransactionInputs(const Crypto::Hash& transactionHash, uint32_t flags) const {
   return m_transferDetails->getTransactionInputs(transactionHash, flags);
 };
-
-bool WalletLegacy::isFusionTransaction(const CryptoNote::WalletLegacyTransaction& walletTx) const {
-  if (walletTx.fee != 0) {
-    return false;
-  }
-
-  uint64_t inputsSum = 0;
-  uint64_t outputsSum = 0;
-  std::vector<uint64_t> outputsAmounts;
-  std::vector<uint64_t> inputsAmounts;
-
-  CryptoNote::TransactionInformation txInfo;
-
-  for (const CryptoNote::TransactionOutputInformation& output :
-       getTransactionOutputs(walletTx.hash, CryptoNote::ITransfersContainer::Flags::IncludeTypeKey
-                                       | CryptoNote::ITransfersContainer::Flags::IncludeStateAll)) {
-    if (outputsAmounts.size() <= output.outputInTransaction) {
-        outputsAmounts.resize(output.outputInTransaction + 1, 0);
-    }
-
-    assert(output.amount != 0);
-    assert(outputsAmounts[output.outputInTransaction] == 0);
-    outputsAmounts[output.outputInTransaction] = output.amount;
-    outputsSum += output.amount;
-  }
-
-  for (const CryptoNote::TransactionOutputInformation& input :
-       getTransactionInputs(walletTx.hash, CryptoNote::ITransfersContainer::Flags::IncludeTypeKey)) {
-    inputsSum += input.amount;
-    inputsAmounts.push_back(input.amount);
-  }
-
-  if (!getTransactionInformation(walletTx.hash, txInfo)) {
-    return false;
-  }
-
-  if (outputsSum != inputsSum || outputsSum != txInfo.totalAmountOut || inputsSum != txInfo.totalAmountIn) {
-    return false;
-  }
-
-  return m_currency.isFusionTransaction(inputsAmounts, outputsAmounts, 0, txInfo.blockHeight); //size = 0 here because can't get real size of tx in wallet.
-}
 
 } //namespace CryptoNote
