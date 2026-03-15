@@ -149,6 +149,10 @@ std::shared_ptr<WalletInfo> handleLaunchCommand(CryptoNote::WalletGreen &wallet,
     {
         return importWallet(wallet);
     }
+    else if (launchCommand == "gui_restore")
+    {
+      return importGUIWallet(wallet);
+    }
     else if (launchCommand == "view_wallet")
     {
         return createViewWallet(wallet);

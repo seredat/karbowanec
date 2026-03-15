@@ -17,6 +17,7 @@ std::vector<Command> startupCommands()
         Command("create", "Create a new wallet"),
         Command("seed_restore", "Restore a wallet using a seed phrase of words"),
         Command("key_restore", "Restore a wallet using a view and spend key"),
+        Command("gui_restore", "Restore a wallet using base58-encoded keys from GUI wallet"),
         Command("view_wallet", "Import a view only wallet"),
         Command("exit", "Exit the program"),
     };

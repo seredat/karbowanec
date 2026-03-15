@@ -12,7 +12,6 @@
 #include "Common/Base58.h"
 #include "Common/StringTools.h"
 #include "Common/FormatTools.h"
-#include "Tools.h"
 #include "CryptoNoteCore/Account.h"
 #include "CryptoNoteCore/CryptoNoteBasicImpl.h"
 
