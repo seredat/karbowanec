@@ -109,6 +109,7 @@ namespace CryptoNote
     bool show_keys(const std::vector<std::string> &args = std::vector<std::string>());
     bool export_keys_to_file(const std::vector<std::string>& args = std::vector<std::string>());
     bool show_tracking_key(const std::vector<std::string> &args = std::vector<std::string>());
+    bool restore_seed(const std::vector<std::string> &args = std::vector<std::string>());
     bool show_incoming_transfers(const std::vector<std::string> &args);
     bool show_outgoing_transfers(const std::vector<std::string> &args);
     bool show_payments(const std::vector<std::string> &args);
@@ -193,6 +194,7 @@ namespace CryptoNote
     std::string m_generate_new;
     std::string m_import_new;
     std::string m_restore_new;
+    std::string m_mnemonic_new;
     std::string m_track_new;
     std::string m_import_path;
     std::string m_daemon_address;

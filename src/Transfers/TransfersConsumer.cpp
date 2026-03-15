@@ -594,7 +594,7 @@ void TransfersConsumer::processTransaction(const TransactionBlockInfo& blockInfo
     bool containerContainsTx;
     bool containerUpdated;
     // Pass isOutgoing so subscriptions with no matching outputs still record the tx
-    // when detected as our outgoing tx (audit wallet mode).
+    // when detected as our outgoing tx (tracking wallet mode).
     processOutputs(blockInfo, *kv.second, tx, subscriptionOutputs, info.globalIdxs, containerContainsTx, containerUpdated, info.isOutgoing);
     someContainerUpdated = someContainerUpdated || containerUpdated;
     if (containerContainsTx) {

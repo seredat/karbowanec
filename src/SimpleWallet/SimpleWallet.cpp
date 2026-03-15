@@ -639,6 +639,7 @@ simple_wallet::simple_wallet(System::Dispatcher& dispatcher, const CryptoNote::C
   m_consoleHandler.setHandler("start_mining", std::bind(&simple_wallet::start_mining, this, std::placeholders::_1), "start_mining [<number_of_threads>] - Start mining in daemon");
   m_consoleHandler.setHandler("stop_mining", std::bind(&simple_wallet::stop_mining, this, std::placeholders::_1), "Stop mining in daemon");
   m_consoleHandler.setHandler("show_keys", std::bind(&simple_wallet::show_keys, this, std::placeholders::_1), "Show the secret keys and mnemonic phrase (for deterministic wallet)");
+  m_consoleHandler.setHandler("restore_seed", std::bind(&simple_wallet::restore_seed, this, std::placeholders::_1), "Restore wallet from 25-word mnemonic seed phrase");
   m_consoleHandler.setHandler("export_keys", std::bind(&simple_wallet::export_keys_to_file, this, std::placeholders::_1), "Save current wallet private keys to file");
   m_consoleHandler.setHandler("tracking_key", std::bind(&simple_wallet::show_tracking_key, this, std::placeholders::_1), "Show the tracking key (192 hex chars) - import into a view-only wallet for audit");
   m_consoleHandler.setHandler("balance", std::bind(&simple_wallet::show_balance, this, std::placeholders::_1), "Show current wallet balance");
@@ -869,7 +870,8 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     std::cout << "G - generate new wallet\n";
     std::cout << "I - import wallet from keys\n";
     std::cout << "R - restore backup/paperwallet\n";
-    std::cout << "T - import tracking (audit) wallet\n";
+    std::cout << "M - restore wallet from mnemonic seed phrase\n";
+    std::cout << "T - import tracking wallet\n";
     std::cout << "E - exit\n";
 
     char c;
@@ -878,7 +880,7 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
       std::string answer;
       std::getline(std::cin, answer);
       c = answer[0];
-      if (!(c == 'O' || c == 'G' || c == 'E' || c == 'I' || c == 'R' || c == 'T' || c == 'o' || c == 'g' || c == 'e' || c == 'i' || c == 'r' || c == 't'))
+      if (!(c == 'O' || c == 'G' || c == 'E' || c == 'I' || c == 'R' || c == 'M' || c == 'T' || c == 'o' || c == 'g' || c == 'e' || c == 'i' || c == 'r' || c == 'm' || c == 't'))
         std::cout << "Unknown command: " << c << std::endl;
       else
         break;
@@ -941,6 +943,8 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
       m_import_new = userInput;
     else if (c == 'r' || c == 'R')
       m_restore_new = userInput;
+    else if (c == 'm' || c == 'M')
+      m_mnemonic_new = userInput;
     else if (c == 'g' || c == 'G')
       m_generate_new = userInput;
     else if (c == 't' || c == 'T')
@@ -972,7 +976,7 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
   }
 
   std::string walletFileName;
-  if (!m_generate_new.empty() || !m_import_new.empty() || !m_restore_new.empty() || !m_track_new.empty())
+  if (!m_generate_new.empty() || !m_import_new.empty() || !m_restore_new.empty() || !m_mnemonic_new.empty() || !m_track_new.empty())
   {
     std::string ignoredString;
     if (!m_generate_new.empty())
@@ -981,6 +985,8 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
       WalletHelper::prepareFileNames(m_import_new, ignoredString, walletFileName);
     else if (!m_restore_new.empty())
       WalletHelper::prepareFileNames(m_restore_new, ignoredString, walletFileName);
+    else if (!m_mnemonic_new.empty())
+      WalletHelper::prepareFileNames(m_mnemonic_new, ignoredString, walletFileName);
     else if (!m_track_new.empty())
       WalletHelper::prepareFileNames(m_track_new, ignoredString, walletFileName);
 
@@ -1013,7 +1019,7 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
   {
     pwd_container.password(command_line::get_arg(vm, arg_password));
   }
-  else if (!pwd_container.read_password(!m_generate_new.empty() || !m_import_new.empty() || !m_restore_new.empty() || !m_track_new.empty()))
+  else if (!pwd_container.read_password(!m_generate_new.empty() || !m_import_new.empty() || !m_restore_new.empty() || !m_mnemonic_new.empty() || !m_track_new.empty()))
   {
     fail_msg_writer() << "failed to read wallet password";
     return false;
@@ -1280,6 +1286,53 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     }
 
     if (!new_wallet(walletFileName, pwd_container.password(), keys))
+    {
+      logger(ERROR, BRIGHT_RED) << "Account creation failed";
+      return false;
+    }
+
+    if (!writeToFile(walletAddressFile, m_wallet->getAddress()))
+    {
+      logger(WARNING, BRIGHT_RED) << "Couldn't write wallet address file: " + walletAddressFile;
+    }
+  }
+  else if (!m_mnemonic_new.empty())
+  {
+    std::string walletAddressFile = prepareWalletAddressFilename(m_mnemonic_new);
+    boost::system::error_code ignore;
+    if (boost::filesystem::exists(walletAddressFile, ignore))
+    {
+      logger(ERROR, BRIGHT_RED) << "Address file already exists: " + walletAddressFile;
+      return false;
+    }
+
+    std::string mnemonicPhrase;
+    Crypto::SecretKey private_spend_key;
+    std::string languageName;
+    bool mnemonicValid = false;
+
+    do
+    {
+      std::cout << "Enter your 25-word mnemonic phrase: ";
+      std::getline(std::cin, mnemonicPhrase);
+      boost::algorithm::trim(mnemonicPhrase);
+
+      if (mnemonicPhrase.empty())
+      {
+        fail_msg_writer() << "No mnemonic phrase entered.";
+        return false;
+      }
+
+      mnemonicValid = Crypto::ElectrumWords::words_to_bytes(mnemonicPhrase, private_spend_key, languageName);
+      if (!mnemonicValid)
+        std::cout << "Invalid mnemonic phrase. Please check and try again." << std::endl;
+    }
+    while (!mnemonicValid);
+
+    Crypto::SecretKey private_view_key;
+    CryptoNote::AccountBase::generateViewFromSpend(private_spend_key, private_view_key);
+
+    if (!new_wallet(walletFileName, pwd_container.password(), private_spend_key, private_view_key))
     {
       logger(ERROR, BRIGHT_RED) << "Account creation failed";
       return false;
@@ -1973,7 +2026,7 @@ bool simple_wallet::show_tracking_key(const std::vector<std::string>& args/* = s
   AccountKeys keys;
   m_wallet->getAccountKeys(keys);
 
-  // Tracking key format (view-only, audit wallet):
+  // Tracking key format (view-only wallet):
   // spendPublicKey(32) | viewPublicKey(32) | viewSecretKey(32) = 192 hex chars.
   success_msg_writer(true) << "Tracking key: "
     << Common::podToHex(keys.address.spendPublicKey)
@@ -1982,6 +2035,13 @@ bool simple_wallet::show_tracking_key(const std::vector<std::string>& args/* = s
   success_msg_writer() << "This tracking key allows viewing and auditing transactions.\n"
                        << "Share this key ONLY with a TRUSTED party.";
 
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::restore_seed(const std::vector<std::string>& args/* = std::vector<std::string>()*/) {
+  success_msg_writer() << "To restore a wallet from a 25-word mnemonic seed phrase, restart simplewallet\n"
+                       << "and select 'M' at the startup menu, or use the command-line options:\n"
+                       << "  simplewallet --restore --wallet-file <new_wallet_name> --mnemonic-seed \"<25 words>\"";
   return true;
 }
 //----------------------------------------------------------------------------------------------------

@@ -171,8 +171,8 @@ std::shared_ptr<WalletInfo> importWallet(CryptoNote::WalletGreen &wallet)
 std::shared_ptr<WalletInfo> importGUIWallet(CryptoNote::WalletGreen &wallet)
 {
     // GUI private key is base58-encoded AccountKeys (spend+view keys).
-    // Format: 128 bytes (AccountKeys without auditSecretKey) -> 184 base58 chars.
-    static constexpr size_t kLegacyKeyBytes = 128;  // sizeof(AccountKeys) before auditSecretKey field
+    // Format: 128 bytes (spendPub|viewPub|spendSec|viewSec) -> 184 base58 chars.
+    static constexpr size_t kLegacyKeyBytes = 128;  // old format without extra fields
     static constexpr size_t kNewKeyBytes    = sizeof(CryptoNote::AccountKeys);
 
     std::string guiPrivateKey;
