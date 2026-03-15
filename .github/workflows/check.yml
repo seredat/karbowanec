@@ -125,7 +125,6 @@ jobs:
           mv build/src/karbowanecd.exe build/karbo
           mv build/src/simplewallet.exe build/karbo
           mv build/src/greenwallet.exe build/karbo
-          mv build/src/optimizer.exe build/karbo
           mv build/src/walletd.exe build/karbo
           mv build/src/vanitygen.exe build/karbo
 
