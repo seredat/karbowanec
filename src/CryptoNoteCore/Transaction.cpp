@@ -112,7 +112,7 @@ namespace CryptoNote {
     // secret key
     virtual bool getTransactionSecretKey(SecretKey& key) const override;
     virtual void setTransactionSecretKey(const SecretKey& key) override;
-    virtual void generateDeterministicTransactionKeys(const SecretKey& viewSecretKey) override;
+    virtual void generateDeterministicTransactionKeys(const SecretKey& auditSecretKey) override;
 
   private:
 
@@ -243,14 +243,20 @@ namespace CryptoNote {
     secretKey = key;
   }
 
-  void TransactionImpl::generateDeterministicTransactionKeys(const SecretKey& viewSecretKey) {
+  void TransactionImpl::generateDeterministicTransactionKeys(const SecretKey& auditSecretKey) {
     checkIfSigning();
 
-    // Derive deterministic keypair: secretKey = hash_to_scalar(viewSecretKey || hash(inputs))
-    // Inputs must be added before calling this method; outputs must be added after.
+    if (auditSecretKey == NULL_SECRET_KEY) {
+      throw std::runtime_error("generateDeterministicTransactionKeys: auditSecretKey is null — "
+          "view-only wallets cannot generate deterministic transaction keys");
+    }
+
+    // Derive deterministic keypair: secretKey = Hs(auditSecretKey || inputsHash)
+    // auditSecretKey = sc_reduce32(keccak("view_seed"||spendSecretKey)) — already domain-separated.
+    // No extra prefix needed. Inputs must be added before calling; outputs must be added after.
     Crypto::Hash inputsHash = getObjectHash(transaction.inputs);
     BinaryArray ba;
-    Common::append(ba, std::begin(viewSecretKey.data), std::end(viewSecretKey.data));
+    Common::append(ba, std::begin(auditSecretKey.data), std::end(auditSecretKey.data));
     Common::append(ba, std::begin(inputsHash.data), std::end(inputsHash.data));
 
     KeyPair keys;

@@ -108,7 +108,8 @@ namespace CryptoNote
     bool show_balance(const std::vector<std::string> &args = std::vector<std::string>());
     bool show_keys(const std::vector<std::string> &args = std::vector<std::string>());
     bool export_keys_to_file(const std::vector<std::string>& args = std::vector<std::string>());
-    bool show_tracking_key(const std::vector<std::string> &args = std::vector<std::string>());
+    bool show_tracking_key(const std::vector<std::string> &args = std::vector<std::string>());  // legacy: view-only, incoming only
+    bool show_audit_key(const std::vector<std::string> &args = std::vector<std::string>());     // new: full audit (incoming+outgoing)
     bool show_incoming_transfers(const std::vector<std::string> &args);
     bool show_outgoing_transfers(const std::vector<std::string> &args);
     bool show_payments(const std::vector<std::string> &args);
@@ -124,8 +125,6 @@ namespace CryptoNote
     bool set_log(const std::vector<std::string> &args);
     bool payment_id(const std::vector<std::string> &args);
     bool change_password(const std::vector<std::string> &args);
-    bool estimate_fusion(const std::vector<std::string> &args);
-    bool optimize(const std::vector<std::string> &args);
     bool get_tx_key(const std::vector<std::string> &args);
     bool get_tx_proof(const std::vector<std::string> &args);
     bool get_reserve_proof(const std::vector<std::string> &args);
@@ -195,7 +194,8 @@ namespace CryptoNote
     std::string m_generate_new;
     std::string m_import_new;
     std::string m_restore_new;
-    std::string m_track_new;
+    std::string m_track_new;   // filename for new legacy tracking wallet (view key only)
+    std::string m_audit_new;   // filename for new audit wallet (view key + audit key)
     std::string m_import_path;
     std::string m_daemon_address;
     std::string m_daemon_host;

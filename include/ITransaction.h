@@ -125,9 +125,11 @@ public:
   // transaction info
   virtual void setTransactionSecretKey(const Crypto::SecretKey& key) = 0;
 
-  // Generate deterministic transaction keys from wallet view secret key and inputs hash.
+  // Generate deterministic transaction keys: r = Hs(auditSecretKey || inputsHash); R = r*G.
+  // auditSecretKey = sc_reduce32(keccak("view_seed"||spendSecretKey)) — domain-separated from
+  // viewSecretKey, ensuring the tx key cannot be reconstructed from the view key alone.
   // Must be called after all inputs are added and before any outputs are added.
-  virtual void generateDeterministicTransactionKeys(const Crypto::SecretKey& viewSecretKey) = 0;
+  virtual void generateDeterministicTransactionKeys(const Crypto::SecretKey& auditSecretKey) = 0;
 
   // signing
   virtual void signInputKey(size_t input, const TransactionTypes::InputKeyInfo& info, const KeyPair& ephKeys) = 0;

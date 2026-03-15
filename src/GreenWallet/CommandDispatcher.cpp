@@ -10,7 +10,6 @@
 #include <GreenWallet/AddressBook.h>
 #include <Common/ColouredMsg.h>
 #include <GreenWallet/CommandImplementations.h>
-#include <GreenWallet/Fusion.h>
 #include <GreenWallet/Open.h>
 #include <GreenWallet/Transfer.h>
 
@@ -76,10 +75,6 @@ bool handleCommand(const std::string command,
     else if (command == "list_transfers")
     {
         listTransfers(true, true, walletInfo->wallet, node);
-    }
-    else if (command == "optimize")
-    {
-        fullOptimize(walletInfo->wallet);
     }
     else if (command == "outgoing_transfers")
     {

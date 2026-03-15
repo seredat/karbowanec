@@ -23,6 +23,7 @@
 #include <future>
 
 #include "CommonTypes.h"
+#include "Common/BinaryArray.hpp"
 #include "Common/BlockingQueue.h"
 #include "CryptoNoteCore/CryptoNoteBasicImpl.h"
 #include "CryptoNoteCore/CryptoNoteFormatUtils.h"
@@ -106,6 +107,22 @@ void findMyOutputs(
   }
 }
 
+// Detect whether WE sent a transaction by reconstructing the deterministic tx key using auditSecretKey.
+// auditSecretKey = sc_reduce32(keccak("view_seed"||spendSecretKey)); r = Hs(auditSecretKey || inputsHash); R = r*G.
+// If R == tx.publicKey then we are the sender.
+bool isOurOutgoingTransaction(const CryptoNote::ITransactionReader& tx, const Crypto::SecretKey& auditSecretKey) {
+  if (auditSecretKey == CryptoNote::NULL_SECRET_KEY) return false;
+  Crypto::Hash inputsHash = tx.getTransactionInputsHash();
+  BinaryArray ba;
+  Common::append(ba, std::begin(auditSecretKey.data), std::end(auditSecretKey.data));
+  Common::append(ba, std::begin(inputsHash.data), std::end(inputsHash.data));
+  Crypto::SecretKey r;
+  Crypto::hash_to_scalar(ba.data(), ba.size(), r);
+  Crypto::PublicKey R;
+  if (!Crypto::secret_key_to_public_key(r, R)) return false;
+  return R == tx.getTransactionPublicKey();
+}
+
 std::vector<Crypto::Hash> getBlockHashes(const CryptoNote::CompleteBlock* blocks, size_t count) {
   std::vector<Crypto::Hash> result;
   result.reserve(count);
@@ -121,8 +138,9 @@ std::vector<Crypto::Hash> getBlockHashes(const CryptoNote::CompleteBlock* blocks
 
 namespace CryptoNote {
 
-TransfersConsumer::TransfersConsumer(const CryptoNote::Currency& currency, INode& node, Logging::ILogger& logger, const SecretKey& viewSecret) :
-  m_node(node), m_viewSecret(viewSecret), m_currency(currency), m_logger(logger, "TransfersConsumer") {
+TransfersConsumer::TransfersConsumer(const CryptoNote::Currency& currency, INode& node, Logging::ILogger& logger,
+                                     const SecretKey& viewSecret, const SecretKey& auditSecretKey) :
+  m_node(node), m_viewSecret(viewSecret), m_auditSecretKey(auditSecretKey), m_currency(currency), m_logger(logger, "TransfersConsumer") {
   updateSyncStart();
 }
 
@@ -514,7 +532,15 @@ std::error_code TransfersConsumer::preprocessOutputs(const TransactionBlockInfo&
     return std::error_code();
   }
 
-  if (outputs.empty()) {
+  // Detect outgoing transaction via auditSecretKey (audit wallet mode).
+  // Only relevant for view-only wallets with auditSecretKey but no spend keys.
+  // Full wallets detect outgoing txs via key image matching in addTransactionInputs.
+  if (isOurOutgoingTransaction(tx, m_auditSecretKey)) {
+    info.isOutgoing = true;
+    m_logger(DEBUGGING) << "Detected outgoing transaction via auditSecretKey, hash " << Common::podToHex(tx.getTransactionHash());
+  }
+
+  if (outputs.empty() && !info.isOutgoing) {
     return std::error_code();
   }
 
@@ -570,7 +596,9 @@ void TransfersConsumer::processTransaction(const TransactionBlockInfo& blockInfo
 
     bool containerContainsTx;
     bool containerUpdated;
-    processOutputs(blockInfo, *kv.second, tx, subscriptionOutputs, info.globalIdxs, containerContainsTx, containerUpdated);
+    // Pass isOutgoing so subscriptions with no matching outputs still record the tx
+    // when detected as our outgoing tx (audit wallet mode).
+    processOutputs(blockInfo, *kv.second, tx, subscriptionOutputs, info.globalIdxs, containerContainsTx, containerUpdated, info.isOutgoing);
     someContainerUpdated = someContainerUpdated || containerUpdated;
     if (containerContainsTx) {
       transactionContainers.emplace_back(&kv.second->getContainer());
@@ -586,7 +614,8 @@ void TransfersConsumer::processTransaction(const TransactionBlockInfo& blockInfo
 }
 
 void TransfersConsumer::processOutputs(const TransactionBlockInfo& blockInfo, TransfersSubscription& sub, const ITransactionReader& tx,
-  const std::vector<TransactionOutputInformationIn>& transfers, const std::vector<uint32_t>& globalIdxs, bool& contains, bool& updated) {
+  const std::vector<TransactionOutputInformationIn>& transfers, const std::vector<uint32_t>& globalIdxs, bool& contains, bool& updated,
+  bool isOutgoing) {
 
   TransactionInformation subscriptionTxInfo;
   contains = sub.getContainer().getTransactionInformation(tx.getTransactionHash(), subscriptionTxInfo);
@@ -606,7 +635,7 @@ void TransfersConsumer::processOutputs(const TransactionBlockInfo& blockInfo, Tr
       assert(subscriptionTxInfo.blockHeight == blockInfo.height);
     }
   } else {
-    updated = sub.addTransaction(blockInfo, tx, transfers);
+    updated = sub.addTransaction(blockInfo, tx, transfers, isOutgoing);
     contains = updated;
   }
 }

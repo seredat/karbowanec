@@ -82,6 +82,19 @@ struct GetViewKey {
   };
 };
 
+struct GetAuditKey {
+  struct Request {
+    void serialize(CryptoNote::ISerializer& serializer);
+  };
+
+  struct Response {
+    // sc_reduce32(keccak("view_seed"||spendSecretKey)); empty string for view-only/non-deterministic wallets.
+    std::string auditSecretKey;
+
+    void serialize(CryptoNote::ISerializer& serializer);
+  };
+};
+
 struct GetMnemonicSeed {
   struct Request {
     std::string address;
@@ -522,39 +535,6 @@ struct SendDelayedTransaction {
   };
 
   struct Response {
-    void serialize(CryptoNote::ISerializer& serializer);
-  };
-};
-
-struct SendFusionTransaction {
-  struct Request {
-    uint64_t threshold;
-    uint32_t anonymity = DEFAULT_ANONYMITY_LEVEL;
-    std::vector<std::string> addresses;
-    std::string destinationAddress;
-
-    void serialize(CryptoNote::ISerializer& serializer);
-  };
-
-  struct Response {
-    std::string transactionHash;
-
-    void serialize(CryptoNote::ISerializer& serializer);
-  };
-};
-
-struct EstimateFusion {
-  struct Request {
-    uint64_t threshold;
-    std::vector<std::string> addresses;
-
-    void serialize(CryptoNote::ISerializer& serializer);
-  };
-
-  struct Response {
-    uint32_t fusionReadyCount;
-    uint32_t totalOutputCount;
-
     void serialize(CryptoNote::ISerializer& serializer);
   };
 };

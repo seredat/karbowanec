@@ -53,8 +53,9 @@ const AccountKeys& TransfersSubscription::getKeys() const {
 }
 
 bool TransfersSubscription::addTransaction(const TransactionBlockInfo& blockInfo, const ITransactionReader& tx,
-                                           const std::vector<TransactionOutputInformationIn>& transfersList) {
-  bool added = transfers.addTransaction(blockInfo, tx, transfersList);
+                                           const std::vector<TransactionOutputInformationIn>& transfersList,
+                                           bool isOutgoing) {
+  bool added = transfers.addTransaction(blockInfo, tx, transfersList, isOutgoing);
   if (added) {
     m_observerManager.notify(&ITransfersObserver::onTransactionUpdated, this, tx.getTransactionHash());
   }

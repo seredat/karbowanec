@@ -31,6 +31,7 @@ public:
     ITransfersObserver& transfersObserver,
     Crypto::PublicKey& viewPublicKey,
     Crypto::SecretKey& viewSecretKey,
+    Crypto::SecretKey& auditSecretKey,
     uint64_t& actualBalance,
     uint64_t& pendingBalance,
     WalletsContainer& walletsContainer,
@@ -50,7 +51,7 @@ public:
   std::unordered_set<Crypto::PublicKey>& deletedKeys();
 
   static const uint8_t MIN_VERSION = 6;
-  static const uint8_t SERIALIZATION_VERSION = 6;
+  static const uint8_t SERIALIZATION_VERSION = 8;
 
 private:
   void loadKeyListAndBalances(CryptoNote::ISerializer& serializer, bool saveCache);
@@ -69,6 +70,7 @@ private:
   void saveUnlockTransactionsJobs(CryptoNote::ISerializer& serializer);
 
   ITransfersObserver& m_transfersObserver;
+  Crypto::SecretKey& m_auditSecretKey;
   uint64_t& m_actualBalance;
   uint64_t& m_pendingBalance;
   WalletsContainer& m_walletsContainer;

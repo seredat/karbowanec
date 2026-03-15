@@ -54,6 +54,13 @@ void GetViewKey::Response::serialize(CryptoNote::ISerializer& serializer) {
   serializer(viewSecretKey, "viewSecretKey");
 }
 
+void GetAuditKey::Request::serialize(CryptoNote::ISerializer& serializer) {
+}
+
+void GetAuditKey::Response::serialize(CryptoNote::ISerializer& serializer) {
+  serializer(auditSecretKey, "auditSecretKey");
+}
+
 void GetMnemonicSeed::Request::serialize(CryptoNote::ISerializer& serializer) {
   if (!serializer(address, "address")) {
     throw RequestSerializationError();
@@ -439,36 +446,6 @@ void SendDelayedTransaction::Request::serialize(CryptoNote::ISerializer& seriali
 }
 
 void SendDelayedTransaction::Response::serialize(CryptoNote::ISerializer& serializer) {
-}
-
-void SendFusionTransaction::Request::serialize(CryptoNote::ISerializer& serializer) {
-  if (!serializer(threshold, "threshold")) {
-    throw RequestSerializationError();
-  }
-
-  if (!serializer(anonymity, "anonymity")) {
-    throw RequestSerializationError();
-  }
-
-  serializer(addresses, "addresses");
-  serializer(destinationAddress, "destinationAddress");
-}
-
-void SendFusionTransaction::Response::serialize(CryptoNote::ISerializer& serializer) {
-  serializer(transactionHash, "transactionHash");
-}
-
-void EstimateFusion::Request::serialize(CryptoNote::ISerializer& serializer) {
-  if (!serializer(threshold, "threshold")) {
-    throw RequestSerializationError();
-  }
-
-  serializer(addresses, "addresses");
-}
-
-void EstimateFusion::Response::serialize(CryptoNote::ISerializer& serializer) {
-  serializer(fusionReadyCount, "fusionReadyCount");
-  serializer(totalOutputCount, "totalOutputCount");
 }
 
 }

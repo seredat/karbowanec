@@ -24,6 +24,7 @@
 #include <Common/StringTools.h>
 #include "crypto/crypto.h"
 #include "crypto/random.h"
+#include "CryptoNoteCore/CryptoNoteBasic.h"
 #include "CryptoNoteCore/CryptoNoteTools.h"
 #include "CryptoNoteCore/TransactionApi.h"
 #include "Wallet/WalletErrors.h"
@@ -31,24 +32,24 @@
 namespace CryptoNote {
 
 bool generateDeterministicTransactionKeys(const Crypto::Hash& inputsHash,
-    const Crypto::SecretKey& viewSecretKey, KeyPair& generatedKeys) {
+    const Crypto::SecretKey& auditSecretKey, KeyPair& generatedKeys) {
   BinaryArray ba;
-  Common::append(ba, std::begin(viewSecretKey.data), std::end(viewSecretKey.data));
+  Common::append(ba, std::begin(auditSecretKey.data), std::end(auditSecretKey.data));
   Common::append(ba, std::begin(inputsHash.data), std::end(inputsHash.data));
   hash_to_scalar(ba.data(), ba.size(), generatedKeys.secretKey);
   return Crypto::secret_key_to_public_key(generatedKeys.secretKey, generatedKeys.publicKey);
 }
 
 bool generateDeterministicTransactionKeys(const Transaction& tx,
-    const Crypto::SecretKey& viewSecretKey, KeyPair& generatedKeys) {
+    const Crypto::SecretKey& auditSecretKey, KeyPair& generatedKeys) {
   Crypto::Hash inputsHash = getObjectHash(tx.inputs);
-  return generateDeterministicTransactionKeys(inputsHash, viewSecretKey, generatedKeys);
+  return generateDeterministicTransactionKeys(inputsHash, auditSecretKey, generatedKeys);
 }
 
 std::unique_ptr<ITransaction> buildTransaction(
     std::vector<TxBuildInput>& inputs,
     std::vector<TxBuildOutput>& outputs,
-    const Crypto::SecretKey& viewSecretKey,
+    const Crypto::SecretKey& auditSecretKey,
     const std::string& extra,
     uint64_t unlockTimestamp,
     uint64_t sizeLimit,
@@ -64,9 +65,17 @@ std::unique_ptr<ITransaction> buildTransaction(
     tx->addInput(input.senderKeys, input.keyInfo, input.ephKeys);
   }
 
-  // 3. Generate deterministic transaction keys (must come after inputs, before outputs)
-  //    Inputs hash is used as key material; outputs derivation uses the resulting tx secret key.
-  tx->generateDeterministicTransactionKeys(viewSecretKey);
+  // 3. Generate deterministic transaction keys (must come after inputs, before outputs).
+  //    auditSecretKey = sc_reduce32(keccak("view_seed"||spendSecretKey)) — domain-separated from
+  //    viewSecretKey, so the tx key r = Hs(auditSecretKey || inputsHash) is NOT recoverable from
+  //    the view key alone.
+  //    If auditSecretKey is null (non-deterministic wallet), keep the random keypair already set
+  //    by createTransaction() — original CryptoNote protocol, safe, does NOT expose any wallet key.
+  //    Using viewSecretKey as fallback would be WRONG: it would leak the view key and violate privacy.
+  if (auditSecretKey != NULL_SECRET_KEY) {
+    tx->generateDeterministicTransactionKeys(auditSecretKey);
+  }
+  // else: random tx keypair from TransactionImpl() constructor is used (safe, original protocol)
 
   // 4. Sort outputs ascending by amount (shuffle first for privacy, then stable sort)
   std::shuffle(outputs.begin(), outputs.end(), Random::generator());

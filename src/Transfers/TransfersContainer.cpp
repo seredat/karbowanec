@@ -158,7 +158,7 @@ TransfersContainer::TransfersContainer(const Currency& currency, Logging::ILogge
 }
 
 bool TransfersContainer::addTransaction(const TransactionBlockInfo& block, const ITransactionReader& tx,
-  const std::vector<TransactionOutputInformationIn>& transfers) {
+  const std::vector<TransactionOutputInformationIn>& transfers, bool isOutgoing) {
 
   try {
     std::unique_lock<std::mutex> lock(m_mutex);
@@ -178,7 +178,11 @@ bool TransfersContainer::addTransaction(const TransactionBlockInfo& block, const
     bool added = addTransactionOutputs(block, tx, transfers);
     added |= addTransactionInputs(block, tx);
 
-    if (added) {
+    // For audit wallets (view-only with auditSecretKey), the sender detection via auditSecretKey
+    // may find an outgoing tx that has no change outputs and no trackable inputs.
+    // Force-record it so the wallet can report the transaction as outgoing.
+    bool forceAdded = isOutgoing && !added;
+    if (added || forceAdded) {
       addTransaction(block, tx);
     }
 
@@ -186,7 +190,7 @@ bool TransfersContainer::addTransaction(const TransactionBlockInfo& block, const
       m_currentHeight = block.height;
     }
 
-    return added;
+    return added || forceAdded;
   } catch (...) {
     if (m_transactions.count(tx.getTransactionHash()) == 0) {
       m_logger(ERROR, BRIGHT_RED) << "Failed to add transaction, remove transaction transfers, block " << block.height <<

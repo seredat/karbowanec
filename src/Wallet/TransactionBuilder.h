@@ -28,14 +28,15 @@
 
 namespace CryptoNote {
 
-// Derive deterministic transaction keypair: secretKey = hash_to_scalar(viewSecretKey || inputsHash).
+// Derive deterministic transaction keypair: secretKey = hash_to_scalar(auditSecretKey || inputsHash).
+// auditSecretKey = keccak(spendSecretKey) — not recoverable from the view key alone.
 // Enables sending-proof recovery without storing the tx secret key in wallet cache.
 bool generateDeterministicTransactionKeys(const Crypto::Hash& inputsHash,
-    const Crypto::SecretKey& viewSecretKey, KeyPair& generatedKeys);
+    const Crypto::SecretKey& auditSecretKey, KeyPair& generatedKeys);
 
 // Overload: computes inputs hash from an existing transaction.
 bool generateDeterministicTransactionKeys(const Transaction& tx,
-    const Crypto::SecretKey& viewSecretKey, KeyPair& generatedKeys);
+    const Crypto::SecretKey& auditSecretKey, KeyPair& generatedKeys);
 
 // Input descriptor: holds resolved mixin outputs + sender keys needed to generate key image and sign.
 // ephKeys is populated by buildTransaction() during addInput.
@@ -57,18 +58,21 @@ struct TxBuildOutput {
 // Construction order (preserves deterministic key correctness):
 //   1. setUnlockTime
 //   2. addInput x N  (generates key images, stores ephKeys back into inputs[i].ephKeys)
-//   3. generateDeterministicTransactionKeys(viewSecretKey)  [ITransaction method]
+//   3. generateDeterministicTransactionKeys(auditSecretKey)  [ITransaction method]
 //   4. addOutput x N — sorted ascending by amount (derivation uses deterministic tx key)
 //   5. appendExtra
 //   6. signInputKey x N
 //
+// auditSecretKey: keccak(spendSecretKey) — the view seed, not the view secret key itself.
+//           If NULL_SECRET_KEY (view-only wallet), the function falls back to using
+//           senderKeys.viewSecretKey so existing view-only wallets still work.
 // sizeLimit: throws TRANSACTION_SIZE_TOO_BIG if the serialized size exceeds the limit.
 //            Pass 0 to disable the check.
 // txSecretKey: [out] the deterministic secret key, for sending-proof storage.
 std::unique_ptr<ITransaction> buildTransaction(
     std::vector<TxBuildInput>& inputs,
     std::vector<TxBuildOutput>& outputs,
-    const Crypto::SecretKey& viewSecretKey,
+    const Crypto::SecretKey& auditSecretKey,
     const std::string& extra,
     uint64_t unlockTimestamp,
     uint64_t sizeLimit,

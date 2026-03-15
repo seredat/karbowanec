@@ -36,6 +36,11 @@ namespace CryptoNote {
     static void generateViewFromSpend(const Crypto::SecretKey&, Crypto::SecretKey&, Crypto::PublicKey&);
     static void generateViewFromSpend(const Crypto::SecretKey&, Crypto::SecretKey&);
 
+    // Compute auditSecretKey = sc_reduce32(keccak("view_seed"||spendSecretKey)).
+    // Domain-separated from viewSecretKey = sc_reduce32(keccak(spendSecretKey)).
+    // Used for deterministic tx key generation and payment proofs (outgoing tracking).
+    static Crypto::SecretKey computeAuditSecretKey(const Crypto::SecretKey& spendSecretKey);
+
     const AccountKeys& getAccountKeys() const;
     void setAccountKeys(const AccountKeys& keys);
     uint64_t get_createtime() const { return m_creation_timestamp; }

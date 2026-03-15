@@ -95,6 +95,11 @@ struct AccountKeys {
   AccountPublicAddress address;
   Crypto::SecretKey spendSecretKey;
   Crypto::SecretKey viewSecretKey;
+  // auditSecretKey = sc_reduce32(keccak("view_seed"||spendSecretKey)).
+  // Domain-separated from viewSecretKey; cannot be derived from it.
+  // Null for view-only and non-deterministic wallets.
+  // Enables: deterministic tx keys (r = Hs(auditSecretKey||inputsHash)), payment proofs, outgoing tracking.
+  Crypto::SecretKey auditSecretKey;
 };
 
 struct KeyPair {

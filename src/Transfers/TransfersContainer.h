@@ -149,7 +149,9 @@ class TransfersContainer : public ITransfersContainer {
 public:
   TransfersContainer(const CryptoNote::Currency& currency, Logging::ILogger& logger, size_t transactionSpendableAge);
 
-  bool addTransaction(const TransactionBlockInfo& block, const ITransactionReader& tx, const std::vector<TransactionOutputInformationIn>& transfers);
+  // isOutgoing: when true and no outputs/inputs matched, still record the transaction as
+  // detected-outgoing (used by audit wallets that have auditSecretKey but no spend keys).
+  bool addTransaction(const TransactionBlockInfo& block, const ITransactionReader& tx, const std::vector<TransactionOutputInformationIn>& transfers, bool isOutgoing = false);
   bool deleteUnconfirmedTransaction(const Crypto::Hash& transactionHash);
   bool markTransactionConfirmed(const TransactionBlockInfo& block, const Crypto::Hash& transactionHash, const std::vector<uint32_t>& globalIndices);
 

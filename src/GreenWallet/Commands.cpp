@@ -54,7 +54,6 @@ std::vector<AdvancedCommand> allCommands()
 		//AdvancedCommand("make_integrated_address", "Make a combined address + payment ID", true, true),
 		AdvancedCommand("incoming_transfers", "Show incoming transfers", true, true),
 		AdvancedCommand("list_transfers", "Show all transfers", false, true),
-		AdvancedCommand("optimize", "Optimize your wallet to send large amounts", false, true),
 		AdvancedCommand("outgoing_transfers", "Show outgoing transfers", false, true),
 		AdvancedCommand("reserve_proof", "Get proof of balance", false, true),
 		AdvancedCommand("reset", "Recheck the chain from zero for transactions", true, true),

@@ -23,7 +23,6 @@
 #include <queue>
 #include <unordered_map>
 
-#include "IFusionManager.h"
 #include "WalletIndices.h"
 
 #include "Logging/LoggerRef.h"
@@ -38,8 +37,7 @@ namespace CryptoNote {
 class WalletGreen : public IWallet,
                     ITransfersObserver,
                     IBlockchainSynchronizerObserver,
-                    ITransfersSynchronizerObserver,
-                    public IFusionManager {
+                    ITransfersSynchronizerObserver {
 public:
   WalletGreen(System::Dispatcher& dispatcher, const Currency& currency, INode& node, Logging::ILogger& logger, uint32_t transactionSoftLockTime = CryptoNote::parameters::CRYPTONOTE_TX_SPENDABLE_AGE);
   virtual ~WalletGreen();
@@ -115,11 +113,6 @@ public:
   virtual void stop() override;
   virtual WalletEvent getEvent() override;
 
-  virtual size_t createFusionTransaction(uint64_t threshold, uint64_t mixin,
-    const std::vector<std::string>& sourceAddresses = {}, const std::string& destinationAddress = "") override;
-  virtual bool isFusionTransaction(size_t transactionId) const override;
-  virtual IFusionManager::EstimateResult estimate(uint64_t threshold, const std::vector<std::string>& sourceAddresses = {}) const override;
-
   void updateInternalCache();
   size_t getMaxTxSize();
   bool txIsTooLarge(const TransactionParameters& sendingTransaction);
@@ -130,6 +123,17 @@ public:
 	const std::string address,
 	const Crypto::SecretKey &viewSecretKey,
 	const std::string& path);
+
+  // Get the audit key pair. Returns null key for non-deterministic/view-only wallets.
+  // auditSecretKey = sc_reduce32(keccak("view_seed"||spendSecretKey)).
+  KeyPair getAuditKey() const;
+
+  // Initialize an audit tracking wallet from viewSecretKey (incoming scan) + auditSecretKey (tx key recovery).
+  // Both are required; auditSecretKey cannot derive viewSecretKey.
+  void initializeWithAuditKey(const std::string& path, const std::string& password,
+                               const Crypto::SecretKey& viewSecretKey,
+                               const Crypto::SecretKey& auditSecretKey,
+                               const uint64_t& creationTimestamp = 0);
   uint64_t getBalanceMinusDust(const std::vector<std::string>& addresses);
 
 protected:
@@ -252,7 +256,6 @@ protected:
   AccountKeys makeAccountKeys(const WalletRecord& wallet) const;
   size_t getTransactionId(const Crypto::Hash& transactionHash) const;
   void pushEvent(const WalletEvent& event);
-  bool isFusionTransaction(const WalletTransaction& walletTx) const;
 
   struct PreparedTransaction {
     std::unique_ptr<ITransaction> transaction;
@@ -281,7 +284,7 @@ protected:
   uint64_t pushDonationTransferIfPossible(const DonationSettings& donation, uint64_t freeAmount, uint64_t dustThreshold, std::vector<WalletTransfer>& destinations) const;
   void validateAddresses(const std::vector<std::string>& addresses) const;
   void validateOrders(const std::vector<WalletOrder>& orders) const;
-  void validateChangeDestination(const std::vector<std::string>& sourceAddresses, const std::string& changeDestination, bool isFusion) const;
+  void validateChangeDestination(const std::vector<std::string>& sourceAddresses, const std::string& changeDestination) const;
   void validateSourceAddresses(const std::vector<std::string>& sourceAddresses) const;
   void validateTransactionParameters(const TransactionParameters& transactionParameters) const;
 
@@ -308,7 +311,7 @@ protected:
     std::vector<InputInfo>& keysInfo, const std::string& extra, uint64_t unlockTimestamp, Crypto::SecretKey& txSecretKey);
 
   void sendTransaction(const CryptoNote::Transaction& cryptoNoteTransaction);
-  size_t validateSaveAndSendTransaction(const ITransactionReader& transaction, const std::vector<WalletTransfer>& destinations, bool isFusion, bool send);
+  size_t validateSaveAndSendTransaction(const ITransactionReader& transaction, const std::vector<WalletTransfer>& destinations, bool send);
 
   size_t insertBlockchainTransaction(const TransactionInformation& info, int64_t txBalance);
   size_t insertOutgoingTransactionAndPushEvent(const Crypto::Hash& transactionHash, uint64_t fee, const BinaryArray& extra, uint64_t unlockTimestamp, Crypto::SecretKey& txSecretKey);
@@ -344,10 +347,6 @@ protected:
   void loadWalletCache(std::unordered_set<Crypto::PublicKey>& addedKeys, std::unordered_set<Crypto::PublicKey>& deletedKeys, std::string& extra);
   void saveWalletCache(ContainerStorage& storage, const Crypto::chacha8_key& key, WalletSaveLevel saveLevel, const std::string& extra);
   void subscribeWallets();
-
-  std::vector<OutputToTransfer> pickRandomFusionInputs(const std::vector<std::string>& addresses,
-    uint64_t threshold, size_t minInputCount, size_t maxInputCount);
-  static ReceiverAmounts decomposeFusionOutputs(const AccountPublicAddress& address, uint64_t inputsAmount);
 
   enum class WalletState {
     INITIALIZED,
@@ -386,7 +385,6 @@ protected:
   UnlockTransactionJobs m_unlockTransactionsJob;
   WalletTransactions m_transactions;
   WalletTransfers m_transfers; //sorted
-  mutable std::unordered_map<size_t, bool> m_fusionTxsCache; // txIndex -> isFusion
   UncommitedTransactions m_uncommitedTransactions;
 
   bool m_blockchainSynchronizerStarted;
@@ -406,6 +404,7 @@ protected:
 
   Crypto::PublicKey m_viewPublicKey;
   Crypto::SecretKey m_viewSecretKey;
+  Crypto::SecretKey m_auditSecretKey;  // sc_reduce32(keccak("view_seed"||spendSecretKey)); null for view-only wallets
 
   uint64_t m_actualBalance;
   uint64_t m_pendingBalance;
