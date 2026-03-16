@@ -387,7 +387,7 @@ struct COMMAND_RPC_GET_INFO {
     uint32_t height;
     std::string top_block_hash;
     uint64_t difficulty;
-    uint64_t cumulative_difficulty;
+    std::string cumulative_difficulty;
     uint64_t max_cumulative_block_size;
     uint64_t next_reward;
     uint64_t min_fee;
@@ -599,7 +599,7 @@ struct block_header_response {
   uint32_t height;
   uint32_t depth;
   std::string hash;
-  difficulty_type difficulty;
+  uint64_t difficulty;
   uint64_t reward;
 
   void serialize(ISerializer &s) {
@@ -663,7 +663,7 @@ struct block_short_response {
   std::string hash;
   uint64_t transactions_count;
   uint64_t cumulative_size;
-  difficulty_type difficulty;
+  Difficulty difficulty;
 
   void serialize(ISerializer &s) {
     KV_MEMBER(timestamp)
