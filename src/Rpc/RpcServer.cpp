@@ -156,6 +156,8 @@ std::unordered_map<std::string, RpcServer::RpcHandler<RpcServer::HandlerFunction
   { "/getrandom_outs.bin", { binMethod<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS>(&RpcServer::on_get_random_outs_bin), true } },
   { "/get_pool_changes.bin", { binMethod<COMMAND_RPC_GET_POOL_CHANGES>(&RpcServer::on_get_pool_changes), true } },
   { "/get_pool_changes_lite.bin", { binMethod<COMMAND_RPC_GET_POOL_CHANGES_LITE>(&RpcServer::on_get_pool_changes_lite), true } },
+  { "/get_hashing_blob.bin", { binMethod<COMMAND_RPC_GET_HASHING_BLOB>(&RpcServer::on_get_hashing_blob), false } },
+  { "/get_hashing_blobs.bin", { binMethod<COMMAND_RPC_GET_HASHING_BLOBS>(&RpcServer::on_get_hashing_blobs), false } },
 
   // plain text/html handlers
   { "/", { httpMethod<COMMAND_HTTP>(&RpcServer::on_get_index), true } },
@@ -176,6 +178,7 @@ std::unordered_map<std::string, RpcServer::RpcHandler<RpcServer::HandlerFunction
   { "/getblocks", { jsonMethod<COMMAND_RPC_GET_BLOCKS_FAST>(&RpcServer::on_get_blocks), false } },
   { "/queryblocks", { jsonMethod<COMMAND_RPC_QUERY_BLOCKS>(&RpcServer::on_query_blocks), false } },
   { "/queryblockslite", { jsonMethod<COMMAND_RPC_QUERY_BLOCKS_LITE>(&RpcServer::on_query_blocks_lite), false } },
+  { "/get_hashing_blob", { jsonMethod<COMMAND_RPC_GET_HASHING_BLOB>(&RpcServer::on_get_hashing_blob), false } },
   { "/get_o_indexes", { jsonMethod<COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES>(&RpcServer::on_get_indexes), false } },
   { "/getrandom_outs", { jsonMethod<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_JSON>(&RpcServer::on_get_random_outs_json), false } },
   { "/get_pool_changes", { jsonMethod<COMMAND_RPC_GET_POOL_CHANGES>(&RpcServer::on_get_pool_changes), true } },
@@ -846,6 +849,51 @@ bool RpcServer::on_get_pool_changes(const COMMAND_RPC_GET_POOL_CHANGES::request&
 bool RpcServer::on_get_pool_changes_lite(const COMMAND_RPC_GET_POOL_CHANGES_LITE::request& req, COMMAND_RPC_GET_POOL_CHANGES_LITE::response& rsp) {
   rsp.status = CORE_RPC_STATUS_OK;
   rsp.isTailBlockActual = m_core.getPoolChangesLite(req.tailBlockId, req.knownTxsIds, rsp.addedTxs, rsp.deletedTxsIds);
+
+  return true;
+}
+
+bool RpcServer::on_get_hashing_blob(const COMMAND_RPC_GET_HASHING_BLOB::request& req, COMMAND_RPC_GET_HASHING_BLOB::response& res) {
+  if (m_restricted_rpc) {
+    res.status = "Method disabled";
+    return false;
+  }
+
+  BinaryArray blob;
+
+  if (!m_core.getHashingBlob(req.height, blob)) {
+    throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_INTERNAL_ERROR, "Internal error: can't get hashing blob." };
+  }
+
+  res.blob = blob;
+  res.status = CORE_RPC_STATUS_OK;
+
+  return true;
+}
+
+bool RpcServer::on_get_hashing_blobs(const COMMAND_RPC_GET_HASHING_BLOBS::request& req, COMMAND_RPC_GET_HASHING_BLOBS::response& res) {
+  if (m_restricted_rpc) {
+    res.status = "Method disabled";
+    return false;
+  }
+
+  try {
+    std::vector<BinaryArray> blobs = m_core.getHashingBlobs();
+    //res.blobs = std::move(blobs);
+    for (const auto& b : blobs) {
+      res.blobs.emplace_back(Common::asString(b));
+    }
+  }
+  catch (std::system_error& e) {
+    throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_INTERNAL_ERROR, e.what() };
+    return false;
+  }
+  catch (std::exception& e) {
+    throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_INTERNAL_ERROR, "Error: " + std::string(e.what()) };
+    return false;
+  }
+
+  res.status = CORE_RPC_STATUS_OK;
 
   return true;
 }
