@@ -256,3 +256,72 @@ jobs:
           path: ${{ steps.build.outputs.artifact_path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-linux-static:
+    name: Linux static (portable)
+    runs-on: ubuntu-latest
+    container:
+      image: alpine:3.19
+
+    steps:
+      - name: Install build dependencies
+        run: |
+          apk add --no-cache \
+            git build-base cmake \
+            boost-dev boost-static \
+            openssl-dev openssl-libs-static \
+            lmdb-dev \
+            linux-headers \
+            binutils
+
+      - uses: actions/checkout@master
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref }}
+
+      - name: Build static
+        id: build
+        run: |
+          build_folder="build/release"
+          krb_ver=${GITHUB_SHA::7}
+          release_name="Karbo-cli-linux-static-$krb_ver"
+          mkdir -p "$build_folder"
+          cd "$build_folder"
+          cmake ../.. \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DARCH=default \
+            -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=OFF \
+            -DCMAKE_CXX_FLAGS_RELEASE="-O3 -DNDEBUG" \
+            -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+            -DCMAKE_EXE_LINKER_FLAGS="-static -Wl,--no-export-dynamic" \
+            -DCMAKE_FIND_LIBRARY_SUFFIXES=".a" \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DBoost_USE_STATIC_LIBS=ON \
+            -DOPENSSL_USE_STATIC_LIBS=ON \
+            -DBOOST_ROOT=/usr
+          make -j$(nproc)
+          mkdir -p "$release_name"
+          exeFiles=()
+          for f in src/*; do [[ -x $f && -f $f ]] && exeFiles+=( "$f" ); done
+          strip "${exeFiles[@]}"
+          cp "${exeFiles[@]}" "$release_name/"
+          echo "release_name=${release_name}" >> $GITHUB_OUTPUT
+          echo "artifact_path=$build_folder/$release_name" >> $GITHUB_OUTPUT
+
+      - name: Verify static linkage
+        run: |
+          for f in build/release/src/*; do
+            if [[ -x $f && -f $f ]]; then
+              echo "=== $f ==="
+              file "$f"
+              ldd "$f" 2>&1 || true
+            fi
+          done
+
+      - name: Upload To GH Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.build.outputs.release_name }}
+          path: ${{ steps.build.outputs.artifact_path }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
