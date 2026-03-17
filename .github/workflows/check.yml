@@ -283,6 +283,9 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.ref }}
 
+      - name: Mark git repo as safe
+        run: git config --global --add safe.directory '*'
+
       - name: Build static
         id: build
         run: |
