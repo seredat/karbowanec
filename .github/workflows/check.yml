@@ -315,7 +315,7 @@ jobs:
           done
 
           echo "release_name=$release_name" >> $GITHUB_OUTPUT
-          echo "artifact_path=$PWD/$release_name" >> $GITHUB_OUTPUT
+          echo "artifact_path=$build_folder/$release_name" >> $GITHUB_OUTPUT
 
       - name: Verify static linkage
         run: |
@@ -339,3 +339,4 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.build.outputs.release_name }}
+          path: ${{ steps.build.outputs.artifact_path }}
