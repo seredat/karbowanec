@@ -162,6 +162,8 @@ public:
   // pending writes.
   void setFastSyncMode(bool enable);
 
+  MDB_env* getEnv() const { return m_env; }
+
 private:
   MDB_env* m_env      = nullptr;
   MDB_txn* m_writeTxn = nullptr;
