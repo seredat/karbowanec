@@ -193,8 +193,98 @@ bool Blockchain::init(const std::string& config_folder, bool load_existing) {
   }
 
   if (!m_db.open(lmdbPath)) {
-    logger(ERROR, BRIGHT_RED) << "Failed to open LMDB database at " << lmdbPath;
-    return false;
+    namespace fs = std::filesystem;
+
+    logger(WARNING, BRIGHT_YELLOW)
+        << "Failed to open LMDB database at " << lmdbPath
+        << ", attempting recovery...";
+
+    // --- 1. Try clearing stale readers ---
+    try {
+      MDB_env* env = m_db.getEnv();
+      if (env) {
+        int dead = 0;
+        mdb_reader_check(env, &dead);
+        logger(INFO) << "Cleared stale LMDB readers: " << dead;
+      }
+    } catch (...) {
+      logger(WARNING) << "mdb_reader_check failed";
+    }
+
+    // --- 2. Retry open ---
+    if (m_db.open(lmdbPath)) {
+       logger(INFO) << "LMDB opened successfully after reader cleanup";
+    } else {
+
+      // --- 3. Try salvage ---
+      bool recovered = false;
+
+      try {
+        MDB_env* env = m_db.getEnv();
+        if (env) {
+          fs::path salvagePath = lmdbPath + ".salvage";
+
+          logger(WARNING) << "Attempting LMDB salvage copy...";
+
+          int rc = mdb_env_copy2(env, salvagePath.string().c_str(), MDB_CP_COMPACT);
+          if (rc == MDB_SUCCESS) {
+            logger(WARNING) << "Salvage DB created at: " << salvagePath;
+
+            fs::path corruptPath = lmdbPath + ".corrupt";
+
+            if (fs::exists(lmdbPath)) {
+              fs::rename(lmdbPath, corruptPath);
+              logger(WARNING) << "Original DB moved to: " << corruptPath;
+            }
+
+            fs::rename(salvagePath, lmdbPath);
+
+            if (m_db.open(lmdbPath)) {
+              logger(INFO) << "LMDB successfully recovered from salvage";
+              recovered = true;
+            } else {
+              logger(WARNING) << "Salvaged DB failed to open";
+            }
+          } else {
+            logger(WARNING) << "mdb_env_copy2 failed with code: " << rc;
+          }
+        }
+      } catch (const std::exception& e) {
+        logger(WARNING) << "Salvage exception: " << e.what();
+      } catch (...) {
+        logger(WARNING) << "Unknown error during salvage";
+      }
+
+      // --- 4. Rebuild if still not recovered ---
+      if (!recovered) {
+        logger(ERROR, BRIGHT_RED)
+            << "LMDB unrecoverable. Rebuilding database...";
+
+        try {
+          fs::path corruptPath = lmdbPath + ".corrupt";
+
+          if (fs::exists(lmdbPath)) {
+            fs::rename(lmdbPath, corruptPath);
+            logger(WARNING) << "Corrupted DB moved to: " << corruptPath;
+          }
+
+          fs::create_directories(lmdbPath);
+
+          if (!m_db.open(lmdbPath)) {
+            logger(ERROR, BRIGHT_RED)
+                << "Failed to create fresh LMDB after rebuild";
+            return false;
+          }
+
+          logger(WARNING)
+              << "New LMDB created. Blockchain resync required.";
+        } catch (const std::exception& e) {
+          logger(ERROR, BRIGHT_RED)
+              << "Rebuild failed: " << e.what();
+          return false;
+        }
+      }
+    }
   }
 
   // Migration from legacy SwappedVector files.
