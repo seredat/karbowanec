@@ -219,41 +219,44 @@ bool Blockchain::init(const std::string& config_folder, bool load_existing) {
 
       // --- 3. Try salvage ---
       bool recovered = false;
-
+      logger(WARNING) << "Attempting LMDB salvage copy...";
       try {
-        MDB_env* env = m_db.getEnv();
-        if (env) {
+        MDB_env* env = nullptr;
+
+        int rc = mdb_env_create(&env);
+        if (rc != MDB_SUCCESS) {
+          logger(WARNING) << "mdb_env_create failed: " << rc;
+        }
+        else {
           fs::path salvagePath = lmdbPath + ".salvage";
 
-          logger(WARNING) << "Attempting LMDB salvage copy...";
-
-          int rc = mdb_env_copy2(env, salvagePath.string().c_str(), MDB_CP_COMPACT);
-          if (rc == MDB_SUCCESS) {
-            logger(WARNING) << "Salvage DB created at: " << salvagePath;
-
-            fs::path corruptPath = lmdbPath + ".corrupt";
-
-            if (fs::exists(lmdbPath)) {
-              fs::rename(lmdbPath, corruptPath);
-              logger(WARNING) << "Original DB moved to: " << corruptPath;
-            }
-
-            fs::rename(salvagePath, lmdbPath);
-
-            if (m_db.open(lmdbPath)) {
-              logger(INFO) << "LMDB successfully recovered from salvage";
-              recovered = true;
-            } else {
-              logger(WARNING) << "Salvaged DB failed to open";
-            }
-          } else {
-            logger(WARNING) << "mdb_env_copy2 failed with code: " << rc;
+          // Open in read-only mode for salvage
+          rc = mdb_env_open(env, lmdbPath.c_str(), MDB_RDONLY, 0664);
+          if (rc != MDB_SUCCESS) {
+            logger(WARNING) << "mdb_env_open (salvage) failed: " << rc;
           }
+          else {
+            rc = mdb_env_copy2(env, salvagePath.string().c_str(), MDB_CP_COMPACT);
+            if (rc != MDB_SUCCESS) {
+              logger(WARNING) << "mdb_env_copy2 failed: " << rc;
+            } else {
+              logger(WARNING) << "Salvage DB created at: " << salvagePath;
+
+              fs::rename(lmdbPath, lmdbPath + ".corrupt");
+              fs::rename(salvagePath, lmdbPath);
+
+              if (m_db.open(lmdbPath)) {
+                logger(INFO) << "LMDB recovered from salvage";
+                mdb_env_close(env);
+                recovered = true;
+              }
+            }
+          }
+          mdb_env_close(env);
         }
-      } catch (const std::exception& e) {
-        logger(WARNING) << "Salvage exception: " << e.what();
-      } catch (...) {
-        logger(WARNING) << "Unknown error during salvage";
+      }
+      catch (...) {
+        logger(WARNING) << "Salvage attempt failed";
       }
 
       // --- 4. Rebuild if still not recovered ---
