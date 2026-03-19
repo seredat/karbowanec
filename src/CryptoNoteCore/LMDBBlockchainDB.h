@@ -27,6 +27,8 @@
 #include "crypto/crypto.h"
 #include "liblmdb/lmdb.h"
 
+#include <Logging/LoggerRef.h>
+
 namespace CryptoNote {
 
 // ─── On-disk block metadata ────────────────────────────────────────────────
@@ -56,7 +58,7 @@ public:
 // ─── LMDB wrapper ──────────────────────────────────────────────────────────
 class LMDBBlockchainDB {
 public:
-  explicit LMDBBlockchainDB();
+  explicit LMDBBlockchainDB(Logging::ILogger& logger);
   ~LMDBBlockchainDB();
 
   // No copy/move
@@ -162,7 +164,11 @@ public:
   // pending writes.
   void setFastSyncMode(bool enable);
 
+  MDB_env* getEnv() const { return m_env; }
+
 private:
+  Logging::LoggerRef logger;
+
   MDB_env* m_env      = nullptr;
   MDB_txn* m_writeTxn = nullptr;
 

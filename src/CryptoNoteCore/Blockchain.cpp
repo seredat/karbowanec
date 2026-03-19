@@ -73,6 +73,7 @@ Blockchain::Blockchain(const Currency& currency, tx_memory_pool& tx_pool,
   : logger(logger, "Blockchain"),
     m_currency(currency),
     m_tx_pool(tx_pool),
+    m_db(logger),
     m_blockView(m_db),
     m_upgradeDetectorV2(currency, m_blockView, BLOCK_MAJOR_VERSION_2, logger),
     m_upgradeDetectorV3(currency, m_blockView, BLOCK_MAJOR_VERSION_3, logger),
@@ -193,8 +194,101 @@ bool Blockchain::init(const std::string& config_folder, bool load_existing) {
   }
 
   if (!m_db.open(lmdbPath)) {
-    logger(ERROR, BRIGHT_RED) << "Failed to open LMDB database at " << lmdbPath;
-    return false;
+    namespace fs = std::filesystem;
+
+    logger(WARNING, BRIGHT_YELLOW)
+        << "Failed to open LMDB database at " << lmdbPath
+        << ", attempting recovery...";
+
+    // --- 1. Try clearing stale readers ---
+    try {
+      MDB_env* env = m_db.getEnv();
+      if (env) {
+        int dead = 0;
+        mdb_reader_check(env, &dead);
+        logger(INFO) << "Cleared stale LMDB readers: " << dead;
+      }
+    } catch (...) {
+      logger(WARNING) << "mdb_reader_check failed";
+    }
+
+    // --- 2. Retry open ---
+    if (m_db.open(lmdbPath)) {
+       logger(INFO) << "LMDB opened successfully after reader cleanup";
+    } else {
+
+      // --- 3. Try salvage ---
+      bool recovered = false;
+      logger(WARNING) << "Attempting LMDB salvage copy...";
+      try {
+        MDB_env* env = nullptr;
+
+        int rc = mdb_env_create(&env);
+        if (rc != MDB_SUCCESS) {
+          logger(WARNING) << "mdb_env_create failed: " << rc;
+        }
+        else {
+          fs::path salvagePath = lmdbPath + ".salvage";
+
+          // Open in read-only mode for salvage
+          rc = mdb_env_open(env, lmdbPath.c_str(), MDB_RDONLY, 0664);
+          if (rc != MDB_SUCCESS) {
+            logger(WARNING) << "mdb_env_open (salvage) failed: " << rc;
+          }
+          else {
+            rc = mdb_env_copy2(env, salvagePath.string().c_str(), MDB_CP_COMPACT);
+            if (rc != MDB_SUCCESS) {
+              logger(WARNING) << "mdb_env_copy2 failed: " << rc;
+            } else {
+              logger(WARNING) << "Salvage DB created at: " << salvagePath;
+
+              fs::rename(lmdbPath, lmdbPath + ".corrupt");
+              fs::rename(salvagePath, lmdbPath);
+
+              if (m_db.open(lmdbPath)) {
+                logger(INFO) << "LMDB recovered from salvage";
+                mdb_env_close(env);
+                recovered = true;
+              }
+            }
+          }
+          mdb_env_close(env);
+        }
+      }
+      catch (...) {
+        logger(WARNING) << "Salvage attempt failed";
+      }
+
+      // --- 4. Rebuild if still not recovered ---
+      if (!recovered) {
+        logger(ERROR, BRIGHT_RED)
+            << "LMDB unrecoverable. Rebuilding database...";
+
+        try {
+          fs::path corruptPath = lmdbPath + ".corrupt";
+
+          if (fs::exists(lmdbPath)) {
+            fs::rename(lmdbPath, corruptPath);
+            logger(WARNING) << "Corrupted DB moved to: " << corruptPath;
+          }
+
+          fs::create_directories(lmdbPath);
+
+          if (!m_db.open(lmdbPath)) {
+            logger(ERROR, BRIGHT_RED)
+                << "Failed to create fresh LMDB after rebuild";
+            return false;
+          }
+
+          logger(WARNING)
+              << "New LMDB created. Blockchain resync required.";
+        } catch (const std::exception& e) {
+          logger(ERROR, BRIGHT_RED)
+              << "Rebuild failed: " << e.what();
+          return false;
+        }
+      }
+    }
   }
 
   // Migration from legacy SwappedVector files.

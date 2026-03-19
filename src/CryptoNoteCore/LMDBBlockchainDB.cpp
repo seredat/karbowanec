@@ -83,7 +83,9 @@ void LMDBBlockchainDB::endReadTxn(MDB_txn* txn) {
 
 // ─── Constructor / Destructor ──────────────────────────────────────────────
 
-LMDBBlockchainDB::LMDBBlockchainDB() = default;
+LMDBBlockchainDB::LMDBBlockchainDB(Logging::ILogger& logger)
+  : logger(logger, "BlockchainDB") {
+}
 
 LMDBBlockchainDB::~LMDBBlockchainDB() {
   close();
@@ -93,7 +95,10 @@ LMDBBlockchainDB::~LMDBBlockchainDB() {
 
 bool LMDBBlockchainDB::open(const std::string& path) {
   int rc = mdb_env_create(&m_env);
-  if (rc) return false;
+  if (rc) {
+    logger(Logging::ERROR) << "mdb_env_create failed: " << rc << " (" << mdb_strerror(rc) << ")";
+    return false;
+  }
 
   mdb_env_set_maxdbs(m_env, 16);
 
@@ -103,11 +108,12 @@ bool LMDBBlockchainDB::open(const std::string& path) {
   // MDB_WRITEMAP: use writable memory-map for fast writes
   // MDB_MAPASYNC: async flush (best-effort; still crash-safe at OS level)
   // MDB_NORDAHEAD: no read-ahead (saves RAM on large chains)
-  unsigned int envFlags = MDB_WRITEMAP | MDB_MAPASYNC | MDB_NORDAHEAD;
+  unsigned int envFlags = MDB_MAPASYNC | MDB_NORDAHEAD;
 
   // Ensure the directory exists
   rc = mdb_env_open(m_env, path.c_str(), envFlags, 0664);
   if (rc) {
+    logger(Logging::ERROR) << "mdb_env_open failed: " << rc << " (" << mdb_strerror(rc) << ")";
     mdb_env_close(m_env);
     m_env = nullptr;
     return false;
@@ -135,7 +141,16 @@ bool LMDBBlockchainDB::open(const std::string& path) {
     openDb(setupTxn, "payment_id_idx",    MDB_DUPSORT | MDB_DUPFIXED, m_dbiPaymentIdIdx);
     openDb(setupTxn, "timestamp_idx",     0,                         m_dbiTimestampIdx);
     openDb(setupTxn, "gen_tx_idx",        0,                         m_dbiGenTxIdx);
-  } catch (...) {
+  }
+  catch (const std::exception& e) {
+    logger(Logging::ERROR) << "Exception during DB setup: " << e.what();
+    mdb_txn_abort(setupTxn);
+    mdb_env_close(m_env);
+    m_env = nullptr;
+    return false;
+  }
+  catch (...) {
+    logger(Logging::ERROR) << "Unknown exception during DB setup";
     mdb_txn_abort(setupTxn);
     mdb_env_close(m_env);
     m_env = nullptr;
