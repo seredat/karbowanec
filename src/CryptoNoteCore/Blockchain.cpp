@@ -200,91 +200,155 @@ bool Blockchain::init(const std::string& config_folder, bool load_existing) {
         << "Failed to open LMDB database at " << lmdbPath
         << ", attempting recovery...";
 
-    // --- 1. Try clearing stale readers ---
-    try {
-      MDB_env* env = m_db.getEnv();
-      if (env) {
-        int dead = 0;
-        mdb_reader_check(env, &dead);
-        logger(INFO) << "Cleared stale LMDB readers: " << dead;
+    // --- 1. Try clearing stale readers via a fresh raw env ---
+    // Do NOT use m_db.getEnv() here — the open failed, the handle is invalid.
+    {
+      MDB_env* rawEnv = nullptr;
+      if (mdb_env_create(&rawEnv) == MDB_SUCCESS) {
+        // Open read-only just enough to call mdb_reader_check
+        if (mdb_env_open(rawEnv, lmdbPath.c_str(), MDB_RDONLY, 0664) == MDB_SUCCESS) {
+          int dead = 0;
+          if (mdb_reader_check(rawEnv, &dead) == MDB_SUCCESS) {
+            logger(INFO) << "Cleared " << dead << " stale LMDB reader(s)";
+          } else {
+            logger(WARNING) << "mdb_reader_check returned error";
+          }
+        } else {
+          logger(WARNING) << "Could not open LMDB read-only for reader check";
+        }
+        mdb_env_close(rawEnv);
+      } else {
+        logger(WARNING) << "mdb_env_create failed during reader check";
       }
-    } catch (...) {
-      logger(WARNING) << "mdb_reader_check failed";
     }
 
-    // --- 2. Retry open ---
+    // --- 2. Retry open after reader cleanup ---
     if (m_db.open(lmdbPath)) {
-       logger(INFO) << "LMDB opened successfully after reader cleanup";
+      logger(INFO) << "LMDB opened successfully after stale reader cleanup";
     } else {
-
-      // --- 3. Try salvage ---
+      // --- 3. Attempt salvage copy ---
       bool recovered = false;
+
       logger(WARNING) << "Attempting LMDB salvage copy...";
+
+      fs::path origPath    = lmdbPath;
+      fs::path salvagePath = fs::path(lmdbPath).parent_path() / "blockchain.lmdb.salvage";
+
+      // Remove any leftover salvage directory from a prior crashed attempt
       try {
-        MDB_env* env = nullptr;
-
-        int rc = mdb_env_create(&env);
-        if (rc != MDB_SUCCESS) {
-          logger(WARNING) << "mdb_env_create failed: " << rc;
+        if (fs::exists(salvagePath)) {
+          fs::remove_all(salvagePath);
+          logger(WARNING) << "Removed leftover salvage directory: " << salvagePath;
         }
-        else {
-          fs::path salvagePath = lmdbPath + ".salvage";
+      } catch (const std::exception& e) {
+        logger(WARNING) << "Could not remove leftover salvage path: " << e.what();
+      }
 
-          // Open in read-only mode for salvage
-          rc = mdb_env_open(env, lmdbPath.c_str(), MDB_RDONLY, 0664);
+      // Perform the salvage copy — env is created, used, and closed exactly once
+      bool salvageCopyOk = false;
+      {
+        MDB_env* env = nullptr;
+        do {
+          if (mdb_env_create(&env) != MDB_SUCCESS) {
+            logger(WARNING) << "mdb_env_create failed during salvage";
+            break;
+          }
+          // Match your production schema's named-DB count
+          if (mdb_env_set_maxdbs(env, 16) != MDB_SUCCESS) {
+            logger(WARNING) << "mdb_env_set_maxdbs failed during salvage";
+            mdb_env_close(env);
+            env = nullptr;
+            break;
+          }
+          if (mdb_env_open(env, lmdbPath.c_str(), MDB_RDONLY, 0664) != MDB_SUCCESS) {
+            logger(WARNING) << "mdb_env_open (read-only for salvage) failed";
+            mdb_env_close(env);
+            env = nullptr;
+            break;
+          }
+          int rc = mdb_env_copy2(env, salvagePath.string().c_str(), MDB_CP_COMPACT);
           if (rc != MDB_SUCCESS) {
-            logger(WARNING) << "mdb_env_open (salvage) failed: " << rc;
+            logger(WARNING) << "mdb_env_copy2 failed: " << mdb_strerror(rc);
+          } else {
+            logger(INFO) << "Salvage copy written to: " << salvagePath;
+            salvageCopyOk = true;
           }
-          else {
-            rc = mdb_env_copy2(env, salvagePath.string().c_str(), MDB_CP_COMPACT);
-            if (rc != MDB_SUCCESS) {
-              logger(WARNING) << "mdb_env_copy2 failed: " << rc;
-            } else {
-              logger(WARNING) << "Salvage DB created at: " << salvagePath;
+          // Always close exactly once here — no other close for this env
+          mdb_env_close(env);
+          env = nullptr;
+        } while (false);
 
-              fs::rename(lmdbPath, lmdbPath + ".corrupt");
-              fs::rename(salvagePath, lmdbPath);
-
-              if (m_db.open(lmdbPath)) {
-                logger(INFO) << "LMDB recovered from salvage";
-                mdb_env_close(env);
-                recovered = true;
-              }
-            }
-          }
+        // Safety net: if we broke out with env still open
+        if (env) {
           mdb_env_close(env);
         }
       }
-      catch (...) {
-        logger(WARNING) << "Salvage attempt failed";
-      }
 
-      // --- 4. Rebuild if still not recovered ---
-      if (!recovered) {
-        logger(ERROR, BRIGHT_RED)
-            << "LMDB unrecoverable. Rebuilding database...";
-
+      // Rotate files and attempt to open the salvaged copy
+      if (salvageCopyOk) {
         try {
-          fs::path corruptPath = lmdbPath + ".corrupt";
-
-          if (fs::exists(lmdbPath)) {
-            fs::rename(lmdbPath, corruptPath);
-            logger(WARNING) << "Corrupted DB moved to: " << corruptPath;
+          // Build a unique .corrupt name so we never overwrite a prior backup
+          fs::path corruptPath = fs::path(lmdbPath + ".corrupt");
+          if (fs::exists(corruptPath)) {
+            // Append a counter suffix to avoid collision
+            int suffix = 2;
+            fs::path candidate;
+            do {
+              candidate = fs::path(lmdbPath + ".corrupt." + std::to_string(suffix++));
+            } while (fs::exists(candidate) && suffix < 100);
+            corruptPath = candidate;
           }
 
+          fs::rename(origPath, corruptPath);
+          logger(WARNING) << "Original (corrupt) DB moved to: " << corruptPath;
+
+          fs::rename(salvagePath, origPath);
+          logger(INFO) << "Salvage copy promoted to: " << origPath;
+
+          if (m_db.open(lmdbPath)) {
+            logger(INFO) << "LMDB recovered successfully from salvage copy";
+            recovered = true;
+          } else {
+            logger(WARNING) << "Could not open salvaged DB — will proceed to rebuild";
+          }
+        } catch (const std::exception& e) {
+          logger(WARNING) << "File rotation during salvage failed: " << e.what();
+        }
+      }
+
+      // --- 4. Full rebuild — wipe and start fresh ---
+      if (!recovered) {
+        logger(ERROR, BRIGHT_RED)
+            << "LMDB unrecoverable. Rebuilding database from scratch. "
+               "A full blockchain resync will be required.";
+        try {
+          // Move whatever is left to a unique .corrupt path
+          if (fs::exists(lmdbPath)) {
+            fs::path corruptPath = fs::path(lmdbPath + ".corrupt");
+            if (fs::exists(corruptPath)) {
+              int suffix = 2;
+              fs::path candidate;
+              do {
+                candidate = fs::path(lmdbPath + ".corrupt." + std::to_string(suffix++));
+              } while (fs::exists(candidate) && suffix < 100);
+              corruptPath = candidate;
+            }
+            fs::rename(lmdbPath, corruptPath);
+            logger(WARNING) << "Unrecoverable DB moved to: " << corruptPath;
+          }
+
+          // Re-create an empty directory for a fresh environment
           fs::create_directories(lmdbPath);
 
           if (!m_db.open(lmdbPath)) {
             logger(ERROR, BRIGHT_RED)
-                << "Failed to create fresh LMDB after rebuild";
+                << "Failed to create fresh LMDB environment after rebuild";
             return false;
           }
 
-          logger(WARNING)
-              << "New LMDB created. Blockchain resync required.";
+          logger(WARNING) << "Fresh LMDB environment created. Blockchain resync required.";
         } catch (const std::exception& e) {
-          logger(ERROR, BRIGHT_RED)
-              << "Rebuild failed: " << e.what();
+          logger(ERROR, BRIGHT_RED) << "Rebuild failed: " << e.what();
           return false;
         }
       }
