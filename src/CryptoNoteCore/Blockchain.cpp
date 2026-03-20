@@ -505,7 +505,10 @@ bool Blockchain::flushBatch() {
   } catch (const std::exception& e) {
     m_db.abortTxn();
     m_batchCount = 0;
-    m_batchFastMode = false;
+    if (m_batchFastMode) {
+      m_db.setFastSyncMode(false);  // disable stale MDB_NOSYNC flag
+      m_batchFastMode = false;
+    }
     logger(ERROR, BRIGHT_RED) << "flushBatch: " << e.what();
     return false;
   }
@@ -1159,6 +1162,7 @@ bool Blockchain::validate_block_signature(const Block& b, const Crypto::Hash& id
 bool Blockchain::rollback_blockchain_switching(std::list<Block>& original_chain,
                                                 size_t rollback_height) {
   std::lock_guard<decltype(m_blockchain_lock)> lk(m_blockchain_lock);
+  flushBatch();  // ensure no pending batch before popping blocks
   while (m_db.getChainHeight() > rollback_height) {
     popBlock();
   }
@@ -1177,6 +1181,11 @@ bool Blockchain::rollback_blockchain_switching(std::list<Block>& original_chain,
 bool Blockchain::switch_to_alternative_blockchain(const std::list<Crypto::Hash>& alt_chain,
                                                    bool discard_disconnected_chain) {
   std::lock_guard<decltype(m_blockchain_lock)> lk(m_blockchain_lock);
+
+  // Flush any pending IBD batch before disconnecting blocks.
+  // removeLastBlock() needs its own write txn for each block removal;
+  // a stale batch txn would cause a nested-write-txn deadlock.
+  flushBatch();
 
   if (alt_chain.empty()) {
     logger(ERROR, BRIGHT_RED) << "switch_to_alternative_blockchain: empty chain passed";
@@ -2639,7 +2648,7 @@ void Blockchain::removeLastBlock() {
 
   logger(DEBUGGING) << "Removing last block with height " << height;
 
-  // Phase 1: Read all tx data (uses read-txn since no write txn is active)
+  // Phase 1: Read all tx data (reads work through the active write txn if present)
   std::vector<uint8_t> bdata;
   if (!m_db.getBlockData(height, bdata)) {
     logger(ERROR, BRIGHT_RED) << "removeLastBlock: cannot read block data";
@@ -2669,8 +2678,13 @@ void Blockchain::removeLastBlock() {
   Crypto::Hash blockHash;
   memcpy(blockHash.data, meta.hash, 32);
 
-  // Phase 2: Atomic removal via write txn
-  m_db.beginWriteTxn();
+  // Phase 2: Atomic removal.
+  // If a write txn is already active (caller manages it), reuse it;
+  // otherwise open and commit our own.
+  const bool ownTxn = !m_db.hasActiveTxn();
+  if (ownTxn) {
+    m_db.beginWriteTxn();
+  }
 
   // Pop transactions in reverse (last non-coinbase first, coinbase last)
   for (int i = static_cast<int>(txToRemove.size()) - 1; i >= 0; --i) {
@@ -2686,7 +2700,10 @@ void Blockchain::removeLastBlock() {
   m_db.removeTimestamp(meta.timestamp, blockHash);
 
   m_db.removeLastBlockMeta();
-  m_db.commitTxn();
+
+  if (ownTxn) {
+    m_db.commitTxn();
+  }
 
   if (!m_no_blobs && !m_blobs.empty()) {
     m_blobs.pop_back();
@@ -2709,6 +2726,7 @@ bool Blockchain::checkCheckpoints(uint32_t& lastValidCheckpointHeight) {
 }
 
 void Blockchain::rollbackBlockchainTo(uint32_t height) {
+  flushBatch();  // ensure no pending batch before removing blocks
   while (height + 1 < m_db.getChainHeight()) {
     removeLastBlock();
   }
