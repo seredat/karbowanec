@@ -309,6 +309,9 @@ namespace CryptoNote {
     // ── Batch-commit state (Monero-style) ──────────────────────────────────
     // Blocks written into the currently-open batch write txn (0 = no open txn).
     uint32_t m_batchCount = 0;
+    // True when the currently-open batch write txn was started with MDB_NOSYNC
+    // (fast-sync mode).  Reset to false when the batch is committed or aborted.
+    bool m_batchFastMode = false;
     // Commit the batch write txn every this many blocks during initial sync.
     static constexpr uint32_t BATCH_SIZE = 1000;
 

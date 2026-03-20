@@ -83,9 +83,7 @@ void LMDBBlockchainDB::endReadTxn(MDB_txn* txn) {
 
 // ─── Constructor / Destructor ──────────────────────────────────────────────
 
-LMDBBlockchainDB::LMDBBlockchainDB(Logging::ILogger& logger)
-  : logger(logger, "BlockchainDB") {
-}
+LMDBBlockchainDB::LMDBBlockchainDB() = default;
 
 LMDBBlockchainDB::~LMDBBlockchainDB() {
   close();
@@ -95,25 +93,24 @@ LMDBBlockchainDB::~LMDBBlockchainDB() {
 
 bool LMDBBlockchainDB::open(const std::string& path) {
   int rc = mdb_env_create(&m_env);
-  if (rc) {
-    logger(Logging::ERROR) << "mdb_env_create failed: " << rc << " (" << mdb_strerror(rc) << ")";
-    return false;
-  }
+  if (rc) return false;
 
   mdb_env_set_maxdbs(m_env, 16);
 
   // Start at 1 GB; grows as needed via resizeMap()
   mdb_env_set_mapsize(m_env, size_t(1) << 30);
 
-  // MDB_WRITEMAP: use writable memory-map for fast writes
-  // MDB_MAPASYNC: async flush (best-effort; still crash-safe at OS level)
-  // MDB_NORDAHEAD: no read-ahead (saves RAM on large chains)
-  unsigned int envFlags = MDB_MAPASYNC | MDB_NORDAHEAD;
+  // MDB_NORDAHEAD: no read-ahead (saves RAM on large chains).
+  // MDB_WRITEMAP and MDB_MAPASYNC are intentionally absent: WRITEMAP writes
+  // directly into the mmap and MAPASYNC makes those writes asynchronous,
+  // which means a crash can corrupt committed data.  Without WRITEMAP, LMDB
+  // uses write()/pwrite() + fdatasync() — fully crash-safe.
+  // MDB_MAPASYNC alone (without WRITEMAP) is also a no-op, so it is removed.
+  unsigned int envFlags = MDB_NORDAHEAD;
 
   // Ensure the directory exists
   rc = mdb_env_open(m_env, path.c_str(), envFlags, 0664);
   if (rc) {
-    logger(Logging::ERROR) << "mdb_env_open failed: " << rc << " (" << mdb_strerror(rc) << ")";
     mdb_env_close(m_env);
     m_env = nullptr;
     return false;
@@ -141,16 +138,7 @@ bool LMDBBlockchainDB::open(const std::string& path) {
     openDb(setupTxn, "payment_id_idx",    MDB_DUPSORT | MDB_DUPFIXED, m_dbiPaymentIdIdx);
     openDb(setupTxn, "timestamp_idx",     0,                         m_dbiTimestampIdx);
     openDb(setupTxn, "gen_tx_idx",        0,                         m_dbiGenTxIdx);
-  }
-  catch (const std::exception& e) {
-    logger(Logging::ERROR) << "Exception during DB setup: " << e.what();
-    mdb_txn_abort(setupTxn);
-    mdb_env_close(m_env);
-    m_env = nullptr;
-    return false;
-  }
-  catch (...) {
-    logger(Logging::ERROR) << "Unknown exception during DB setup";
+  } catch (...) {
     mdb_txn_abort(setupTxn);
     mdb_env_close(m_env);
     m_env = nullptr;
@@ -257,17 +245,26 @@ void LMDBBlockchainDB::growMapIfNeeded(double threshold) {
 
 void LMDBBlockchainDB::setFastSyncMode(bool enable) {
   // MDB_NOSYNC: skip ALL per-commit syncs (data pages AND meta page).
-  // Combined with MDB_WRITEMAP | MDB_MAPASYNC, commits become pure in-memory
-  // B-tree operations with zero kernel sync calls — same as Monero does
-  // during initial sync.  On crash the current open batch is lost, but for
-  // IBD that just means re-downloading a batch worth of blocks.
+  // Used only during initial block download; on crash the uncommitted batch is
+  // lost and the node re-syncs from the last checkpoint.  Must NOT be used
+  // for live blocks — each live commit must be fully durable.
   int rc = mdb_env_set_flags(m_env, MDB_NOSYNC, enable ? 1 : 0);
   checkRc(rc, "setFastSyncMode/set_flags");
   if (!enable) {
-    // Returning to normal mode: force a full flush so all dirty pages hit disk.
+    // Returning to normal mode: force a full flush so all dirty pages hit disk
+    // before any live-block commits begin.
     rc = mdb_env_sync(m_env, 1);
     checkRc(rc, "setFastSyncMode/env_sync");
   }
+}
+
+void LMDBBlockchainDB::syncToDisk() {
+  // Force-flush all dirty pages to disk without changing the MDB_NOSYNC flag.
+  // Called periodically during IBD to create durability checkpoints: a crash
+  // between checkpoints reverts to the previous checkpoint rather than leaving
+  // the database in a partially-written (corrupted) state.
+  int rc = mdb_env_sync(m_env, 1);
+  checkRc(rc, "syncToDisk");
 }
 
 // ─── getChainHeight ───────────────────────────────────────────────────────

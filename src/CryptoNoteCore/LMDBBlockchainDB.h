@@ -27,8 +27,6 @@
 #include "crypto/crypto.h"
 #include "liblmdb/lmdb.h"
 
-#include <Logging/LoggerRef.h>
-
 namespace CryptoNote {
 
 // ─── On-disk block metadata ────────────────────────────────────────────────
@@ -58,7 +56,7 @@ public:
 // ─── LMDB wrapper ──────────────────────────────────────────────────────────
 class LMDBBlockchainDB {
 public:
-  explicit LMDBBlockchainDB(Logging::ILogger& logger);
+  explicit LMDBBlockchainDB();
   ~LMDBBlockchainDB();
 
   // No copy/move
@@ -158,17 +156,20 @@ public:
   // IBD batch so it can reuse rather than re-open the transaction.
   bool hasActiveTxn() const noexcept { return m_writeTxn != nullptr; }
 
-  // Enable/disable MDB_NOMETASYNC (skips the per-commit meta-page fdatasync).
-  // Safe to use during IBD; call with enable=false when returning to normal
+  // Enable/disable MDB_NOSYNC (skips ALL per-commit fdatasyncs).
+  // Only safe during IBD; call with enable=false when returning to live
   // operation — that call also forces a full mdb_env_sync to flush all
-  // pending writes.
+  // pending writes.  Must NOT be called with enable=true for live blocks.
   void setFastSyncMode(bool enable);
+
+  // Force-flush all dirty pages to disk (mdb_env_sync force=1) without
+  // changing the MDB_NOSYNC flag.  Use as a checkpoint during IBD batches
+  // so a crash reverts to the previous checkpoint rather than corrupting the DB.
+  void syncToDisk();
 
   MDB_env* getEnv() const { return m_env; }
 
 private:
-  Logging::LoggerRef logger;
-
   MDB_env* m_env      = nullptr;
   MDB_txn* m_writeTxn = nullptr;
 
