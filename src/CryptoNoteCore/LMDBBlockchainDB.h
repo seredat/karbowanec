@@ -186,10 +186,26 @@ private:
   MDB_dbi m_dbiTimestampIdx;
   MDB_dbi m_dbiGenTxIdx;
 
-  // Returns m_writeTxn if active; otherwise opens a temporary read-only txn.
-  // Callers MUST call endReadTxn(txn) when m_writeTxn is null.
-  MDB_txn* activeTxn() const;
-  static void endReadTxn(MDB_txn* txn);
+  // RAII guard for read transactions.  If a write txn is active the guard
+  // borrows it (no cleanup); otherwise it opens a temporary read-only txn
+  // that is automatically aborted when the guard goes out of scope.
+  struct TxnGuard {
+    MDB_txn* txn   = nullptr;
+    bool     owning = false;
+    TxnGuard() = default;
+    TxnGuard(MDB_txn* t, bool own) : txn(t), owning(own) {}
+    ~TxnGuard() { if (owning && txn) mdb_txn_abort(txn); }
+    TxnGuard(const TxnGuard&)            = delete;
+    TxnGuard& operator=(const TxnGuard&) = delete;
+    TxnGuard(TxnGuard&& o) noexcept : txn(o.txn), owning(o.owning) { o.owning = false; }
+    TxnGuard& operator=(TxnGuard&& o) noexcept {
+      if (owning && txn) mdb_txn_abort(txn);
+      txn = o.txn; owning = o.owning; o.owning = false;
+      return *this;
+    }
+  };
+
+  TxnGuard readTxn() const;
 
   void checkRc(int rc, const char* op) const;
   void openDb(MDB_txn* setupTxn, const char* name, unsigned int flags, MDB_dbi& dbi);

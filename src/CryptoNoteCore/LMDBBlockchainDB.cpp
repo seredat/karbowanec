@@ -69,16 +69,12 @@ void LMDBBlockchainDB::openDb(MDB_txn* setupTxn, const char* name,
   checkRc(rc, name);
 }
 
-MDB_txn* LMDBBlockchainDB::activeTxn() const {
-  if (m_writeTxn) return m_writeTxn;
+LMDBBlockchainDB::TxnGuard LMDBBlockchainDB::readTxn() const {
+  if (m_writeTxn) return TxnGuard{m_writeTxn, false};
   MDB_txn* txn = nullptr;
   int rc = mdb_txn_begin(m_env, nullptr, MDB_RDONLY, &txn);
-  checkRc(rc, "activeTxn:begin");
-  return txn;
-}
-
-void LMDBBlockchainDB::endReadTxn(MDB_txn* txn) {
-  mdb_txn_abort(txn);
+  checkRc(rc, "readTxn:begin");
+  return TxnGuard{txn, true};
 }
 
 // ─── Constructor / Destructor ──────────────────────────────────────────────
@@ -270,16 +266,15 @@ void LMDBBlockchainDB::syncToDisk() {
 // ─── getChainHeight ───────────────────────────────────────────────────────
 
 uint32_t LMDBBlockchainDB::getChainHeight() const {
-  MDB_txn* txn  = activeTxn();
-  bool ownTxn   = !m_writeTxn;
+  auto guard = readTxn();
 
   MDB_cursor* cur = nullptr;
-  mdb_cursor_open(txn, m_dbiBlockMeta, &cur);
+  int rc = mdb_cursor_open(guard.txn, m_dbiBlockMeta, &cur);
+  checkRc(rc, "getChainHeight:cursor_open");
 
   MDB_val key{}, val{};
-  int rc = mdb_cursor_get(cur, &key, &val, MDB_LAST);
+  rc = mdb_cursor_get(cur, &key, &val, MDB_LAST);
   mdb_cursor_close(cur);
-  if (ownTxn) endReadTxn(txn);
 
   if (rc == MDB_NOTFOUND) return 0;
   checkRc(rc, "getChainHeight");
@@ -299,12 +294,10 @@ bool LMDBBlockchainDB::putBlockMeta(uint32_t height, const DbBlockMeta& meta) {
 }
 
 bool LMDBBlockchainDB::getBlockMeta(uint32_t height, DbBlockMeta& meta) const {
-  MDB_txn* txn = activeTxn();
-  bool ownTxn  = !m_writeTxn;
+  auto guard = readTxn();
   uint8_t keyBuf[4]; encBE32(keyBuf, height);
   MDB_val k = {4, keyBuf}, v{};
-  int rc = mdb_get(txn, m_dbiBlockMeta, &k, &v);
-  if (ownTxn) endReadTxn(txn);
+  int rc = mdb_get(guard.txn, m_dbiBlockMeta, &k, &v);
   if (rc == MDB_NOTFOUND) return false;
   checkRc(rc, "getBlockMeta");
   std::memcpy(&meta, v.mv_data, sizeof(DbBlockMeta));
@@ -314,11 +307,10 @@ bool LMDBBlockchainDB::getBlockMeta(uint32_t height, DbBlockMeta& meta) const {
 bool LMDBBlockchainDB::getBlockMetaRange(uint32_t fromHeight, uint32_t toHeight,
                                           std::vector<DbBlockMeta>& out) const {
   if (fromHeight > toHeight) return true;
-  MDB_txn* txn   = activeTxn();
-  bool   ownTxn  = !m_writeTxn;
+  auto guard = readTxn();
   MDB_cursor* cur = nullptr;
-  int rc = mdb_cursor_open(txn, m_dbiBlockMeta, &cur);
-  if (rc) { if (ownTxn) endReadTxn(txn); return false; }
+  int rc = mdb_cursor_open(guard.txn, m_dbiBlockMeta, &cur);
+  if (rc) return false;
 
   out.reserve(out.size() + (toHeight - fromHeight + 1));
 
@@ -336,7 +328,6 @@ bool LMDBBlockchainDB::getBlockMetaRange(uint32_t fromHeight, uint32_t toHeight,
     rc = mdb_cursor_get(cur, &k, &v, MDB_NEXT);
   }
   mdb_cursor_close(cur);
-  if (ownTxn) endReadTxn(txn);
   return true;
 }
 
@@ -367,12 +358,10 @@ bool LMDBBlockchainDB::putBlockData(uint32_t height, const uint8_t* data, size_t
 }
 
 bool LMDBBlockchainDB::getBlockData(uint32_t height, std::vector<uint8_t>& out) const {
-  MDB_txn* txn = activeTxn();
-  bool ownTxn  = !m_writeTxn;
+  auto guard = readTxn();
   uint8_t keyBuf[4]; encBE32(keyBuf, height);
   MDB_val k = {4, keyBuf}, v{};
-  int rc = mdb_get(txn, m_dbiBlockData, &k, &v);
-  if (ownTxn) endReadTxn(txn);
+  int rc = mdb_get(guard.txn, m_dbiBlockData, &k, &v);
   if (rc == MDB_NOTFOUND) return false;
   checkRc(rc, "getBlockData");
   out.assign(static_cast<const uint8_t*>(v.mv_data),
@@ -408,15 +397,13 @@ bool LMDBBlockchainDB::putTxEntry(uint32_t height, uint16_t txIdx,
 
 bool LMDBBlockchainDB::getTxEntry(uint32_t height, uint16_t txIdx,
                                    std::vector<uint8_t>& out) const {
-  MDB_txn* txn = activeTxn();
-  bool ownTxn  = !m_writeTxn;
+  auto guard = readTxn();
   uint8_t keyBuf[6];
   encBE32(keyBuf, height);
   keyBuf[4] = (txIdx >> 8) & 0xFF;
   keyBuf[5] =  txIdx       & 0xFF;
   MDB_val k = {6, keyBuf}, v{};
-  int rc = mdb_get(txn, m_dbiTxEntries, &k, &v);
-  if (ownTxn) endReadTxn(txn);
+  int rc = mdb_get(guard.txn, m_dbiTxEntries, &k, &v);
   if (rc == MDB_NOTFOUND) return false;
   checkRc(rc, "getTxEntry");
   out.assign(static_cast<const uint8_t*>(v.mv_data),
@@ -451,11 +438,9 @@ bool LMDBBlockchainDB::putHashHeight(const Crypto::Hash& hash, uint32_t height) 
 }
 
 bool LMDBBlockchainDB::getHashHeight(const Crypto::Hash& hash, uint32_t& height) const {
-  MDB_txn* txn = activeTxn();
-  bool ownTxn  = !m_writeTxn;
+  auto guard = readTxn();
   MDB_val k = {sizeof(hash), const_cast<Crypto::Hash*>(&hash)}, v{};
-  int rc = mdb_get(txn, m_dbiHashToHeight, &k, &v);
-  if (ownTxn) endReadTxn(txn);
+  int rc = mdb_get(guard.txn, m_dbiHashToHeight, &k, &v);
   if (rc == MDB_NOTFOUND) return false;
   checkRc(rc, "getHashHeight");
   height = decBE32(static_cast<const uint8_t*>(v.mv_data));
@@ -484,12 +469,10 @@ bool LMDBBlockchainDB::putHashingBlob(uint32_t height, const uint8_t* data, size
 }
 
 bool LMDBBlockchainDB::getHashingBlob(uint32_t height, std::vector<uint8_t>& out) const {
-  MDB_txn* txn = activeTxn();
-  bool ownTxn  = !m_writeTxn;
+  auto guard = readTxn();
   uint8_t keyBuf[4]; encBE32(keyBuf, height);
   MDB_val k = {4, keyBuf}, v{};
-  int rc = mdb_get(txn, m_dbiHashingBlobs, &k, &v);
-  if (ownTxn) endReadTxn(txn);
+  int rc = mdb_get(guard.txn, m_dbiHashingBlobs, &k, &v);
   if (rc == MDB_NOTFOUND) return false;
   checkRc(rc, "getHashingBlob");
   out.assign(static_cast<const uint8_t*>(v.mv_data),
@@ -520,22 +503,18 @@ bool LMDBBlockchainDB::putSpentKey(const Crypto::KeyImage& ki, uint32_t blockHei
 }
 
 bool LMDBBlockchainDB::hasSpentKey(const Crypto::KeyImage& ki) const {
-  MDB_txn* txn = activeTxn();
-  bool ownTxn  = !m_writeTxn;
+  auto guard = readTxn();
   MDB_val k = {sizeof(ki), const_cast<Crypto::KeyImage*>(&ki)}, v{};
-  int rc = mdb_get(txn, m_dbiSpentKeys, &k, &v);
-  if (ownTxn) endReadTxn(txn);
+  int rc = mdb_get(guard.txn, m_dbiSpentKeys, &k, &v);
   if (rc == MDB_NOTFOUND) return false;
   checkRc(rc, "hasSpentKey");
   return true;
 }
 
 bool LMDBBlockchainDB::getSpentKeyHeight(const Crypto::KeyImage& ki, uint32_t& height) const {
-  MDB_txn* txn = activeTxn();
-  bool ownTxn  = !m_writeTxn;
+  auto guard = readTxn();
   MDB_val k = {sizeof(ki), const_cast<Crypto::KeyImage*>(&ki)}, v{};
-  int rc = mdb_get(txn, m_dbiSpentKeys, &k, &v);
-  if (ownTxn) endReadTxn(txn);
+  int rc = mdb_get(guard.txn, m_dbiSpentKeys, &k, &v);
   if (rc == MDB_NOTFOUND) return false;
   checkRc(rc, "getSpentKeyHeight");
   height = decBE32(static_cast<const uint8_t*>(v.mv_data));
@@ -570,11 +549,9 @@ bool LMDBBlockchainDB::putTxIndex(const Crypto::Hash& txHash,
 
 bool LMDBBlockchainDB::getTxIndex(const Crypto::Hash& txHash,
                                    uint32_t& block, uint16_t& txSlot) const {
-  MDB_txn* txn = activeTxn();
-  bool ownTxn  = !m_writeTxn;
+  auto guard = readTxn();
   MDB_val k = {sizeof(txHash), const_cast<Crypto::Hash*>(&txHash)}, v{};
-  int rc = mdb_get(txn, m_dbiTxIndices, &k, &v);
-  if (ownTxn) endReadTxn(txn);
+  int rc = mdb_get(guard.txn, m_dbiTxIndices, &k, &v);
   if (rc == MDB_NOTFOUND) return false;
   checkRc(rc, "getTxIndex");
   const uint8_t* b = static_cast<const uint8_t*>(v.mv_data);
@@ -631,14 +608,12 @@ bool LMDBBlockchainDB::putKeyOutput(uint64_t amount, uint32_t globalIdx,
 
 bool LMDBBlockchainDB::getKeyOutput(uint64_t amount, uint32_t globalIdx,
                                      uint32_t& block, uint16_t& txSlot, uint16_t& outIdx) const {
-  MDB_txn* txn = activeTxn();
-  bool ownTxn  = !m_writeTxn;
+  auto guard = readTxn();
   uint8_t keyBuf[12];
   encBE64(keyBuf,   amount);
   encBE32(keyBuf+8, globalIdx);
   MDB_val k = {12, keyBuf}, v{};
-  int rc = mdb_get(txn, m_dbiKeyOutputs, &k, &v);
-  if (ownTxn) endReadTxn(txn);
+  int rc = mdb_get(guard.txn, m_dbiKeyOutputs, &k, &v);
   if (rc == MDB_NOTFOUND) return false;
   checkRc(rc, "getKeyOutput");
   const uint8_t* b = static_cast<const uint8_t*>(v.mv_data);
@@ -649,12 +624,10 @@ bool LMDBBlockchainDB::getKeyOutput(uint64_t amount, uint32_t globalIdx,
 }
 
 uint32_t LMDBBlockchainDB::getKeyOutputCount(uint64_t amount) const {
-  MDB_txn* txn = activeTxn();
-  bool ownTxn  = !m_writeTxn;
+  auto guard = readTxn();
   uint8_t keyBuf[8]; encBE64(keyBuf, amount);
   MDB_val k = {8, keyBuf}, v{};
-  int rc = mdb_get(txn, m_dbiKeyOutputCounts, &k, &v);
-  if (ownTxn) endReadTxn(txn);
+  int rc = mdb_get(guard.txn, m_dbiKeyOutputCounts, &k, &v);
   if (rc == MDB_NOTFOUND) return 0;
   checkRc(rc, "getKeyOutputCount");
   return decBE32(static_cast<const uint8_t*>(v.mv_data));
@@ -704,14 +677,14 @@ bool LMDBBlockchainDB::putPaymentId(const Crypto::Hash& paymentId, const Crypto:
 
 bool LMDBBlockchainDB::getPaymentIdTxHashes(const Crypto::Hash& paymentId,
                                               std::vector<Crypto::Hash>& txHashes) const {
-  MDB_txn* txn = activeTxn();
-  bool ownTxn  = !m_writeTxn;
+  auto guard = readTxn();
 
   MDB_cursor* cur = nullptr;
-  mdb_cursor_open(txn, m_dbiPaymentIdIdx, &cur);
+  int rc = mdb_cursor_open(guard.txn, m_dbiPaymentIdIdx, &cur);
+  checkRc(rc, "getPaymentIdTxHashes:cursor_open");
 
   MDB_val k = {sizeof(paymentId), const_cast<Crypto::Hash*>(&paymentId)}, v{};
-  int rc = mdb_cursor_get(cur, &k, &v, MDB_SET);
+  rc = mdb_cursor_get(cur, &k, &v, MDB_SET);
   while (rc == 0) {
     Crypto::Hash h;
     std::memcpy(&h, v.mv_data, sizeof(h));
@@ -719,7 +692,6 @@ bool LMDBBlockchainDB::getPaymentIdTxHashes(const Crypto::Hash& paymentId,
     rc = mdb_cursor_get(cur, &k, &v, MDB_NEXT_DUP);
   }
   mdb_cursor_close(cur);
-  if (ownTxn) endReadTxn(txn);
   return !txHashes.empty();
 }
 
@@ -753,11 +725,11 @@ bool LMDBBlockchainDB::getBlockHashesByTimestampRange(uint64_t tsBegin, uint64_t
                                                        uint32_t limit,
                                                        std::vector<Crypto::Hash>& hashes,
                                                        uint32_t& totalInRange) const {
-  MDB_txn* txn = activeTxn();
-  bool ownTxn  = !m_writeTxn;
+  auto guard = readTxn();
 
   MDB_cursor* cur = nullptr;
-  mdb_cursor_open(txn, m_dbiTimestampIdx, &cur);
+  int rc = mdb_cursor_open(guard.txn, m_dbiTimestampIdx, &cur);
+  checkRc(rc, "getBlockHashesByTimestampRange:cursor_open");
 
   totalInRange = 0;
   uint8_t seekBuf[40];
@@ -765,7 +737,7 @@ bool LMDBBlockchainDB::getBlockHashesByTimestampRange(uint64_t tsBegin, uint64_t
   std::memset(seekBuf + 8, 0, 32);  // smallest hash for this timestamp
 
   MDB_val k = {40, seekBuf}, v{};
-  int rc = mdb_cursor_get(cur, &k, &v, MDB_SET_RANGE);
+  rc = mdb_cursor_get(cur, &k, &v, MDB_SET_RANGE);
   while (rc == 0) {
     uint64_t ts = decBE64(static_cast<const uint8_t*>(k.mv_data));
     if (ts > tsEnd) break;
@@ -778,7 +750,6 @@ bool LMDBBlockchainDB::getBlockHashesByTimestampRange(uint64_t tsBegin, uint64_t
     rc = mdb_cursor_get(cur, &k, &v, MDB_NEXT);
   }
   mdb_cursor_close(cur);
-  if (ownTxn) endReadTxn(txn);
   return true;
 }
 
@@ -808,12 +779,10 @@ bool LMDBBlockchainDB::putGeneratedTxCount(uint32_t height, uint64_t count) {
 }
 
 bool LMDBBlockchainDB::getGeneratedTxCount(uint32_t height, uint64_t& count) const {
-  MDB_txn* txn = activeTxn();
-  bool ownTxn  = !m_writeTxn;
+  auto guard = readTxn();
   uint8_t keyBuf[4]; encBE32(keyBuf, height);
   MDB_val k = {4, keyBuf}, v{};
-  int rc = mdb_get(txn, m_dbiGenTxIdx, &k, &v);
-  if (ownTxn) endReadTxn(txn);
+  int rc = mdb_get(guard.txn, m_dbiGenTxIdx, &k, &v);
   if (rc == MDB_NOTFOUND) return false;
   checkRc(rc, "getGeneratedTxCount");
   count = decBE64(static_cast<const uint8_t*>(v.mv_data));
