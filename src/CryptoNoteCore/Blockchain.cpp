@@ -234,14 +234,18 @@ bool Blockchain::init(const std::string& config_folder, bool load_existing) {
       fs::path origPath    = lmdbPath;
       fs::path salvagePath = fs::path(lmdbPath).parent_path() / "blockchain.lmdb.salvage";
 
-      // Remove any leftover salvage directory from a prior crashed attempt
+      // Remove any leftover salvage directory from a prior crashed attempt,
+      // then create a fresh empty directory — mdb_env_copy2 requires it to exist.
+      bool salvageDirReady = false;
       try {
         if (fs::exists(salvagePath)) {
           fs::remove_all(salvagePath);
           logger(WARNING) << "Removed leftover salvage directory: " << salvagePath;
         }
+        fs::create_directories(salvagePath);
+        salvageDirReady = true;
       } catch (const std::exception& e) {
-        logger(WARNING) << "Could not remove leftover salvage path: " << e.what();
+        logger(WARNING) << "Could not prepare salvage directory: " << e.what();
       }
 
       // Perform the salvage copy — env is created, used, and closed exactly once
@@ -249,6 +253,10 @@ bool Blockchain::init(const std::string& config_folder, bool load_existing) {
       {
         MDB_env* env = nullptr;
         do {
+          if (!salvageDirReady) {
+            logger(WARNING) << "Skipping salvage copy: destination directory unavailable";
+            break;
+          }
           if (mdb_env_create(&env) != MDB_SUCCESS) {
             logger(WARNING) << "mdb_env_create failed during salvage";
             break;
