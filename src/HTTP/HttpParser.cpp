@@ -7,10 +7,6 @@
 #include <algorithm>
 #include <stdexcept>
 
-namespace {
-  const size_t MAX_HTTP_BODY_SIZE = 10 * 1024 * 1024; // 10 MB
-}
-
 namespace CryptoNote {
 
 HttpParser::HttpParser() {
@@ -144,10 +140,6 @@ void HttpParser::receiveHeaders(std::istream& stream, HttpRequest::Headers& head
 }
 
 void HttpParser::receiveBody(std::istream& stream, std::string& body, size_t bodyLength) {
-  if (bodyLength > MAX_HTTP_BODY_SIZE) {
-    throw std::runtime_error("HTTP body too large: " + std::to_string(bodyLength) + " bytes");
-  }
-
   body.resize(bodyLength);
   stream.read(&body[0], bodyLength);
 
