@@ -506,10 +506,14 @@ bool Blockchain::flushBatch() {
   } catch (const std::exception& e) {
     m_db.abortTxn();
     m_batchCount = 0;
+    m_batchFastMode = false;
     logger(ERROR, BRIGHT_RED) << "flushBatch: " << e.what();
     return false;
   }
-  m_db.setFastSyncMode(false);  // restores fdatasync + forces flush to disk
+  if (m_batchFastMode) {
+    m_db.setFastSyncMode(false);  // disable MDB_NOSYNC + force flush to disk
+    m_batchFastMode = false;
+  }
   return true;
 }
 
@@ -524,19 +528,41 @@ bool Blockchain::isSyncing() const {
 
 void Blockchain::beginBatchIfNeeded() {
   if (m_batchCount == 0) {
-    m_db.growMapIfNeeded();      // preemptively resize if >=80% full
-    m_db.setFastSyncMode(true);  // enable MDB_NOSYNC for zero-cost commits
+    m_db.growMapIfNeeded();  // preemptively resize if >=80% full
+    bool shouldBeFast = isSyncing();
+    // Reconcile MDB_NOSYNC state with the current sync status.
+    // This also handles the case where a previous fast-mode batch was aborted
+    // (via an early return) without disabling MDB_NOSYNC: the stale flag is
+    // detected here and cleaned up before the new batch begins.
+    if (m_batchFastMode && !shouldBeFast) {
+      m_db.setFastSyncMode(false);  // disable MDB_NOSYNC + force flush
+    } else if (!m_batchFastMode && shouldBeFast) {
+      m_db.setFastSyncMode(true);
+    }
+    m_batchFastMode = shouldBeFast;
     m_db.beginWriteTxn();
   }
 }
 
 void Blockchain::commitBatchOrBlock(bool forceSingle) {
   ++m_batchCount;
-  if (forceSingle || !isSyncing() || m_batchCount >= BATCH_SIZE) {
+  bool syncing = isSyncing();
+  if (forceSingle || !syncing || m_batchCount >= BATCH_SIZE) {
     m_db.commitTxn();
     m_batchCount = 0;
-    if (!isSyncing()) {
-      m_db.setFastSyncMode(false);  // restore normal durability when caught up
+    if (m_batchFastMode) {
+      if (!syncing) {
+        // Caught up to chain tip: disable fast mode and force a full flush
+        // so the next live-block commit is fully durable.
+        m_db.setFastSyncMode(false);
+        m_batchFastMode = false;
+      } else {
+        // Still syncing but batch is full: checkpoint flush.
+        // MDB_NOSYNC stays active; next batch continues in fast mode.
+        // This ensures a crash causes a clean rollback to this height
+        // rather than leaving the database in a corrupted state.
+        m_db.syncToDisk();
+      }
     }
   }
   // else: leave write txn open; next block reuses it
@@ -2346,10 +2372,24 @@ bool Blockchain::pushBlock(const Block& blockData, const std::vector<Transaction
     // last committed height; the protocol handler will re-sync from there.
     m_db.abortTxn();
     m_batchCount = 0;
+    if (m_batchFastMode) {
+      m_db.setFastSyncMode(false);
+      m_batchFastMode = false;
+    }
     logger(WARNING, BRIGHT_YELLOW) << "LMDB map full at height " << newHeight
       << "; batch aborted. Re-syncing from height " << m_db.getChainHeight()
       << ". Map will be doubled on next block.";
     m_db.resizeMap();
+    return false;
+  } catch (const std::exception& e) {
+    // Any other LMDB error (e.g. MDB_CORRUPTED): abort and clean up batch state.
+    m_db.abortTxn();
+    m_batchCount = 0;
+    if (m_batchFastMode) {
+      m_db.setFastSyncMode(false);
+      m_batchFastMode = false;
+    }
+    logger(ERROR, BRIGHT_RED) << "Exception adding block " << blockHash << ": " << e.what();
     return false;
   }
 
