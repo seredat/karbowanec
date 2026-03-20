@@ -90,26 +90,19 @@ namespace CryptoNote {
     }
 
     try {
-      std::iostream* stream = nullptr;
-
-      if (m_useSsl) {
-        stream = new std::iostream(m_sslStreamBuf.get());
-      }
-      else {
-        stream = new std::iostream(m_streamBuf.get());
-      }
-
-      std::unique_ptr<std::iostream> streamPtr(stream);
+      std::iostream stream(m_useSsl ?
+        static_cast<std::streambuf*>(m_sslStreamBuf.get()) :
+        static_cast<std::streambuf*>(m_streamBuf.get()));
       HttpParser parser;
 
-      *stream << req;
-      stream->flush();
+      stream << req;
+      stream.flush();
 
-      if (!(*stream)) {
+      if (!stream) {
         throw std::runtime_error("Failed to send request");
       }
 
-      parser.receiveResponse(*stream, res);
+      parser.receiveResponse(stream, res);
 
     }
     catch (const std::exception&) {

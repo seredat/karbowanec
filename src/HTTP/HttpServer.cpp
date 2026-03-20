@@ -174,8 +174,8 @@ void HttpServer::acceptLoop() {
     // Spawn new accept loop for next connection
     workingContextGroup.spawn(std::bind(&HttpServer::acceptLoop, this));
 
-    // Handle this connection
-    connectionWorker(std::move(connection));
+    // Handle this connection (pass by reference - connection lives on this stack frame)
+    connectionWorker(connection);
 
   } catch (System::InterruptedException&) {
     // Normal shutdown
@@ -184,7 +184,7 @@ void HttpServer::acceptLoop() {
   }
 }
 
-void HttpServer::connectionWorker(System::TcpConnection connection) {
+void HttpServer::connectionWorker(System::TcpConnection& connection) {
   std::pair<System::Ipv4Address, uint16_t> addr(static_cast<System::Ipv4Address>(0), 0);
   try {
     addr = connection.getPeerAddressAndPort();
