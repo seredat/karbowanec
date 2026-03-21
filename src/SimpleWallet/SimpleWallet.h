@@ -1,7 +1,7 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2014-2016, XDN developers
 // Copyright (c) 2014-2017, The Monero Project
-// Copyright (c) 2016-2022, The Karbo developers
+// Copyright (c) 2016-2026, The Karbo developers
 //
 // All rights reserved.
 // 
@@ -41,7 +41,7 @@
 #include "android.h"
 #include "IWalletLegacy.h"
 #include "Common/PasswordContainer.h"
-#include "HTTP/httplib.h"
+#include <HTTP/HttpClient.h>
 #include "Common/ConsoleHandler.h"
 #include "CryptoNoteCore/CryptoNoteBasicImpl.h"
 #include "CryptoNoteCore/Currency.h"
@@ -135,6 +135,8 @@ namespace CryptoNote
 
     void printConnectionError() const;
 
+    std::unique_ptr<CryptoNote::HttpClient> createDaemonHttpClient();
+
     //---------------- IWalletLegacyObserver -------------------------
     virtual void initCompleted(std::error_code result) override;
     virtual void externalTransactionCreated(CryptoNote::TransactionId transactionId) override;
@@ -227,8 +229,6 @@ namespace CryptoNote
     std::unique_ptr<CryptoNote::NodeRpcProxy> m_node;
     std::unique_ptr<CryptoNote::IWalletLegacy> m_wallet;
     refresh_progress_reporter_t m_refresh_progress_reporter;
-
-    httplib::Headers m_requestHeaders;
 
     bool m_walletSynchronized;
     bool m_trackingWallet;

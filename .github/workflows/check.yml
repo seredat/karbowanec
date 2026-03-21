@@ -256,3 +256,90 @@ jobs:
           path: ${{ steps.build.outputs.artifact_path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-linux-static:
+    name: Linux universal static
+    runs-on: ubuntu-latest
+    container:
+      image: alpine:3.19
+      options: --platform linux/amd64
+
+    steps:
+      - name: Install dependencies
+        run: |
+          apk add --no-cache \
+            git \
+            build-base \
+            cmake \
+            boost-dev boost-static \
+            openssl-dev openssl-libs-static \
+            lmdb-dev \
+            linux-headers \
+            binutils \
+            file
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref }}
+
+      - name: Mark git repo as safe
+        run: git config --global --add safe.directory '*'
+
+      - name: Build static
+        id: build
+        run: |
+          build_folder="build/release"
+          krb_ver=$(echo $GITHUB_SHA | cut -c1-7)
+          release_name="Karbo-cli-linux-universal-$krb_ver"
+
+          mkdir -p "$build_folder"
+          cd "$build_folder"
+
+          export CFLAGS="-O3 -static"
+          export CXXFLAGS="-O3 -static -static-libstdc++ -static-libgcc"
+          export LDFLAGS="-static"
+
+          cmake ../.. \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DBoost_USE_STATIC_LIBS=ON \
+            -DOPENSSL_USE_STATIC_LIBS=ON \
+            -DCMAKE_EXE_LINKER_FLAGS="-static"
+
+          make -j$(nproc)
+
+          mkdir -p "$release_name"
+          for f in src/*; do
+            if [ -x "$f" ] && [ -f "$f" ]; then
+              strip "$f"
+              cp "$f" "$release_name/"
+            fi
+          done
+
+          echo "release_name=$release_name" >> $GITHUB_OUTPUT
+          echo "artifact_path=$build_folder/$release_name" >> $GITHUB_OUTPUT
+
+      - name: Verify static linkage
+        run: |
+          FAILED=0
+          for f in build/release/src/*; do
+            if [ -x "$f" ] && [ -f "$f" ]; then
+              echo "=== $f ==="
+              file "$f"
+              if readelf -d "$f" | grep NEEDED; then
+                echo "FAIL: dynamic dependency found"
+                FAILED=1
+              else
+                echo "OK: fully static"
+              fi
+            fi
+          done
+          if [ "$FAILED" = "1" ]; then
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.build.outputs.release_name }}
+          path: ${{ steps.build.outputs.artifact_path }}

@@ -280,7 +280,6 @@ namespace System {
         // Arm single long-lived dummy timer only once while there are no real timers.
         if (!wakeArmed) {
           using namespace std::chrono;
-          auto nowForExpiry = steady_clock::now();
           // set a long duration (effectively "never" under normal conditions)
           wakeTimer.expires_after(hours(1));
 

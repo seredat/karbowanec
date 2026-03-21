@@ -11,7 +11,14 @@ endif()
 add_subdirectory(miniupnpc)
 add_subdirectory(gtest)
 
-set_property(TARGET upnpc-static gtest gtest_main PROPERTY FOLDER "external")
+message(STATUS "Using ${ARCH_WIDTH}-bit LMDB from source tree")
+add_subdirectory(liblmdb)
+set(LMDB_INCLUDE "liblmdb" CACHE STRING "LMDB Include path")
+set(LMDB_LIBRARY "lmdb" CACHE STRING "LMDB Library name")
+
+include_directories(${LMDB_INCLUDE})
+
+set_property(TARGET lmdb upnpc-static gtest gtest_main PROPERTY FOLDER "external")
 
 if(MSVC)
   if (STATIC)
