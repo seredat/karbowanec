@@ -142,7 +142,7 @@ jobs:
           mkdir -p karbo-$ANDROID_ABI
           # FIX: use NDK's llvm-strip instead of host strip
           STRIP=$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip
-          for bin in karbowanecd simplewallet greenwallet walletd vanitygen; do
+          for bin in karbowanecd simplewallet greenwallet optimizer walletd vanitygen; do
             if [ -f "$bin" ]; then
               $STRIP "$bin" || true
               cp "$bin" karbo-$ANDROID_ABI/

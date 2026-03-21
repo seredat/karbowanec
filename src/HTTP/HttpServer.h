@@ -48,7 +48,7 @@ protected:
 
 private:
   void acceptLoop();
-  void connectionWorker(System::TcpConnection connection);
+  void connectionWorker(System::TcpConnection& connection);
   bool authenticate(const HttpRequest& request) const;
   
   System::Dispatcher& m_dispatcher;

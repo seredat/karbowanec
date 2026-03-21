@@ -416,6 +416,11 @@ else()
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mstackrealign")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mstackrealign")
   endif()
+  
+  if(ANDROID AND (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64"))
+    # Android clang for aarch64 doesn't like variable-length arrays allocated on stack
+    add_definitions("-DFORCE_USE_HEAP")
+  endif()
 
   if(APPLE)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DGTEST_HAS_TR1_TUPLE=0")
@@ -492,7 +497,7 @@ set(Boost_NO_BOOST_CMAKE ON)
 set(Boost_USE_STATIC_LIBS ON)
 set(Boost_USE_STATIC_RUNTIME ON)
 
-find_package(Boost REQUIRED COMPONENTS system filesystem thread date_time chrono regex serialization program_options coroutine context atomic)
+find_package(Boost REQUIRED COMPONENTS coroutine context system filesystem thread date_time chrono regex serialization program_options atomic)
 message(STATUS "Boost Found: ${Boost_INCLUDE_DIRS}")
 include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 
@@ -577,17 +582,6 @@ if(MINGW AND STATIC)
 endif()
 
 list(APPEND EXTRA_LIBRARIES ${CMAKE_DL_LIBS})
-
-if(ANDROID AND CMAKE_C_COMPILER_ID STREQUAL "Clang")
-  set(ATOMIC ${BOOST_LIBRARYDIR}/libboost_atomic.a)
-  set(THREAD ${BOOST_LIBRARYDIR}/libboost_thread.a)
-  find_library(THREAD thread)
-  list(APPEND EXTRA_LIBRARIES ${THREAD})
-  if(ARCH_WIDTH EQUAL "32")
-    find_library(ATOMIC atomic)
-    list(APPEND EXTRA_LIBRARIES ${ATOMIC})
-  endif()
-endif()
 
 if (MSVC)
   add_compile_options(

@@ -142,7 +142,7 @@ void HttpParser::receiveHeaders(std::istream& stream, HttpRequest::Headers& head
 void HttpParser::receiveBody(std::istream& stream, std::string& body, size_t bodyLength) {
   body.resize(bodyLength);
   stream.read(&body[0], bodyLength);
-  
+
   if (!stream || stream.gcount() != static_cast<std::streamsize>(bodyLength)) {
     throw std::runtime_error("Failed to read complete HTTP body");
   }
