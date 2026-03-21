@@ -19,14 +19,10 @@
 
 #include <boost/functional/hash.hpp>
 #include <map>
-#include <string>
 #include <unordered_map>
-#include <parallel_hashmap/phmap.h>
 
 #include "crypto/hash.h"
 #include "CryptoNoteBasic.h"
-
-using phmap::flat_hash_map;
 
 namespace CryptoNote {
 
@@ -57,25 +53,6 @@ private:
   bool enabled = false;
 };
 
-class TimestampBlocksIndex {
-public:
-  TimestampBlocksIndex(bool enabled);
-
-  bool add(uint64_t timestamp, const Crypto::Hash& hash);
-  bool remove(uint64_t timestamp, const Crypto::Hash& hash);
-  bool find(uint64_t timestampBegin, uint64_t timestampEnd, uint32_t hashesNumberLimit, std::vector<Crypto::Hash>& hashes, uint32_t& hashesNumberWithinTimestamps);
-  void clear();
-
-  void serialize(ISerializer& s);
-
-  template<class Archive> 
-  void serialize(Archive& archive, unsigned int version) {
-    archive & index;
-  }
-private:
-  std::multimap<uint64_t, Crypto::Hash> index;
-  bool enabled = false;
-};
 
 class TimestampTransactionsIndex {
 public:
@@ -97,40 +74,5 @@ private:
   bool enabled = false;
 };
 
-class GeneratedTransactionsIndex {
-public:
-  GeneratedTransactionsIndex(bool enabled);
-
-  bool add(const Block& block);
-  bool remove(const Block& block);
-  bool find(uint32_t height, uint64_t& generatedTransactions);
-  void clear();
-
-  void serialize(ISerializer& s);
-
-  template<class Archive> 
-  void serialize(Archive& archive, unsigned int version) {
-    archive & index;
-    archive & lastGeneratedTxNumber;
-  }
-private:
-  flat_hash_map<uint32_t, uint64_t> index;
-
-  uint64_t lastGeneratedTxNumber;
-  bool enabled = false;
-};
-
-class OrphanBlocksIndex {
-public:
-  OrphanBlocksIndex(bool enabled);
-
-  bool add(const Block& block);
-  bool remove(const Block& block);
-  bool find(uint32_t height, std::vector<Crypto::Hash>& blockHashes);
-  void clear();
-private:
-  std::unordered_multimap<uint32_t, Crypto::Hash> index;
-  bool enabled = false;
-};
 
 }
