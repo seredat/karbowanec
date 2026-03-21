@@ -72,7 +72,7 @@ namespace
   const command_line::arg_descriptor<std::string> arg_load_checkpoints          = { "load-checkpoints", "<filename> Load checkpoints from csv file", "" };
   const command_line::arg_descriptor<bool>        arg_disable_checkpoints       = { "without-checkpoints", "Synchronize without checkpoints" };
   const command_line::arg_descriptor<bool>        arg_no_blobs                  = { "without-blobs", "Don't use hashing blobs cache in PoW validation", false, false };
-  const command_line::arg_descriptor<bool>        arg_allow_deep_reorg          = { "allow-reorg", "Allow deep reorganization", false, false };
+  const command_line::arg_descriptor<bool>        arg_reject_deep_reorg         = { "reject-deep-reorg", "Reject deep reorganization for 51% attack protection", false, false };
   const command_line::arg_descriptor<std::string> arg_rollback                  = { "rollback", "Rollback blockchain to <height>", "", true };
 
   bool command_line_preprocessor(const boost::program_options::variables_map &vm, LoggerRef &logger) {
@@ -156,7 +156,7 @@ int main(int argc, char* argv[])
     command_line::add_arg(desc_cmd_sett, arg_load_checkpoints);
     command_line::add_arg(desc_cmd_sett, arg_disable_checkpoints);
     command_line::add_arg(desc_cmd_sett, arg_no_blobs);
-    command_line::add_arg(desc_cmd_sett, arg_allow_deep_reorg);
+    command_line::add_arg(desc_cmd_sett, arg_reject_deep_reorg);
     command_line::add_arg(desc_cmd_sett, arg_rollback);
 
     RpcServerConfig::initOptions(desc_cmd_sett);
@@ -270,10 +270,11 @@ int main(int argc, char* argv[])
     CryptoNote::Currency currency = currencyBuilder.currency();
     System::Dispatcher dispatcher;
 
-    bool allow_reorg = command_line::get_arg(vm, arg_allow_deep_reorg);
-    if (allow_reorg) {
-      logger(WARNING) << "Deep reorg allowed!";
+    bool reject_deep_reorg = command_line::get_arg(vm, arg_reject_deep_reorg);
+    if (reject_deep_reorg) {
+      logger(WARNING) << "Deep reorganization will be rejected";
     }
+    bool allow_reorg = !reject_deep_reorg;
 
     bool no_blobs = command_line::get_arg(vm, arg_no_blobs);
     if (no_blobs) {
