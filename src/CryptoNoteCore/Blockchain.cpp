@@ -840,6 +840,15 @@ static inline uint32_t load_u32_be(const uint8_t* data, size_t offset) {
          (uint32_t(data[offset + 3]));
 }
 
+// Little-endian load — matches memcpy on LE platforms (x86, ARM),
+// but produces a well-defined result on any architecture.
+static inline uint32_t load_u32_le(const uint8_t* data, size_t offset) {
+  return (uint32_t(data[offset + 3]) << 24) |
+         (uint32_t(data[offset + 2]) << 16) |
+         (uint32_t(data[offset + 1]) << 8)  |
+         (uint32_t(data[offset]));
+}
+
 /*
  * Computes the "long hash" of a block for Proof-of-Work.
  *
@@ -887,16 +896,15 @@ bool Blockchain::getBlockLongHash(Crypto::cn_context& context, const Block& b, C
 
   // v6 sequential state
   uint32_t seq = 0;
-  if (b.majorVersion >= CryptoNote::BLOCK_MAJOR_VERSION_6) {
-    // compute initial hash for seq derivation
-    cn_fast_hash(pot.data(), pot.size(), hash_1);
-    // initialize seq from 128 bits of hash entropy
-    const uint8_t* d = hash_1.data;
-    seq = load_u32_be(d, 0) ^ load_u32_be(d, 4) ^ load_u32_be(d, 8) ^ load_u32_be(d, 12);
-  }
 
   for (uint32_t i = 0; i < ITER; i++) {
     cn_fast_hash(pot.data(), pot.size(), hash_1);
+
+    // initialize seq from the first iteration's hash (same data, avoids redundant hash)
+    if (b.majorVersion >= CryptoNote::BLOCK_MAJOR_VERSION_6 && i == 0) {
+      const uint8_t* d = hash_1.data;
+      seq = load_u32_be(d, 0) ^ load_u32_be(d, 4) ^ load_u32_be(d, 8) ^ load_u32_be(d, 12);
+    }
 
     for (uint8_t j = 1; j <= 8; j++) {
 
@@ -933,9 +941,7 @@ bool Blockchain::getBlockLongHash(Crypto::cn_context& context, const Block& b, C
           found_alt = true;
           // v6: mix memory content into seq
           if (b.majorVersion >= CryptoNote::BLOCK_MAJOR_VERSION_6 && ba.size() >= 4) {
-            uint32_t w;
-            std::memcpy(&w, ba.data(), sizeof(w));
-            seq ^= w;
+            seq ^= load_u32_le(ba.data(), 0);
           }
           break;
         }
@@ -952,9 +958,7 @@ bool Blockchain::getBlockLongHash(Crypto::cn_context& context, const Block& b, C
           pot.insert(pot.end(), ba.begin(), ba.end());
           // v6: mix memory content into seq
           if (b.majorVersion >= CryptoNote::BLOCK_MAJOR_VERSION_6 && ba.size() >= 4) {
-            uint32_t w;
-            std::memcpy(&w, ba.data(), sizeof(w));
-            seq ^= w;
+            seq ^= load_u32_le(ba.data(), 0);
           }
         } else {
           if (height_j < m_blobs.size()) {
@@ -962,9 +966,7 @@ bool Blockchain::getBlockLongHash(Crypto::cn_context& context, const Block& b, C
             pot.insert(pot.end(), ba.begin(), ba.end());
             // v6: mix memory content into seq
             if (b.majorVersion >= CryptoNote::BLOCK_MAJOR_VERSION_6 && ba.size() >= 4) {
-              uint32_t w;
-              std::memcpy(&w, ba.data(), sizeof(w));
-              seq ^= w;
+              seq ^= load_u32_le(ba.data(), 0);
             }
           } else {
             std::vector<uint8_t> blobData;
@@ -972,9 +974,7 @@ bool Blockchain::getBlockLongHash(Crypto::cn_context& context, const Block& b, C
             pot.insert(pot.end(), blobData.begin(), blobData.end());
             // v6: mix memory content into seq
             if (b.majorVersion >= CryptoNote::BLOCK_MAJOR_VERSION_6 && blobData.size() >= 4) {
-              uint32_t w;
-              std::memcpy(&w, blobData.data(), sizeof(w));
-              seq ^= w;
+              seq ^= load_u32_le(blobData.data(), 0);
             }
           }
         }
