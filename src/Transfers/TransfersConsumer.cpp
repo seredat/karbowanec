@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2017, The CryptoNote developers, The Bytecoin developers. 
 // Copyright (c) 2018 BBSCoin developers
-// Copyright (c) 2018-2019, The Karbo Developers
+// Copyright (c) 2016-2026, The Karbo developers
 // 
 // This file is part of Karbo.
 //
@@ -23,6 +23,7 @@
 #include <future>
 
 #include "CommonTypes.h"
+#include "Common/BinaryArray.hpp"
 #include "Common/BlockingQueue.h"
 #include "CryptoNoteCore/CryptoNoteBasicImpl.h"
 #include "CryptoNoteCore/CryptoNoteFormatUtils.h"
@@ -102,17 +103,17 @@ void findMyOutputs(
       checkOutputKey(derivation, out.key, keyIndex, idx, spendKeys, outputs);
       ++keyIndex;
 
-    } else if (outType == TransactionTypes::OutputType::Multisignature) {
-
-      uint64_t amount;
-      MultisignatureOutput out;
-      tx.getOutput(idx, out, amount);
-      for (const auto& key : out.keys) {
-        checkOutputKey(derivation, key, idx, idx, spendKeys, outputs);
-        ++keyIndex;
-      }
     }
   }
+}
+
+// Detect whether WE sent a transaction by reconstructing the deterministic tx key.
+// r = Hs(viewSecretKey || inputsHash), R = r*G. If R == tx.publicKey then we are the sender.
+bool isOurOutgoingTransaction(const CryptoNote::ITransactionReader& tx, const Crypto::SecretKey& viewSecretKey) {
+  if (viewSecretKey == CryptoNote::NULL_SECRET_KEY) return false;
+  CryptoNote::KeyPair keys;
+  if (!CryptoNote::generateDeterministicTransactionKeys(tx.getTransactionInputsHash(), viewSecretKey, keys)) return false;
+  return keys.publicKey == tx.getTransactionPublicKey();
 }
 
 std::vector<Crypto::Hash> getBlockHashes(const CryptoNote::CompleteBlock* blocks, size_t count) {
@@ -130,7 +131,8 @@ std::vector<Crypto::Hash> getBlockHashes(const CryptoNote::CompleteBlock* blocks
 
 namespace CryptoNote {
 
-TransfersConsumer::TransfersConsumer(const CryptoNote::Currency& currency, INode& node, Logging::ILogger& logger, const SecretKey& viewSecret) :
+TransfersConsumer::TransfersConsumer(const CryptoNote::Currency& currency, INode& node, Logging::ILogger& logger,
+                                     const SecretKey& viewSecret) :
   m_node(node), m_viewSecret(viewSecret), m_currency(currency), m_logger(logger, "TransfersConsumer") {
   updateSyncStart();
 }
@@ -145,6 +147,9 @@ ITransfersSubscription& TransfersConsumer::addSubscription(const AccountSubscrip
   if (res.get() == nullptr) {
     res.reset(new TransfersSubscription(m_currency, m_logger.getLogger(), subscription));
     m_spendKeys.insert(subscription.keys.address.spendPublicKey);
+    if (subscription.keys.spendSecretKey != NULL_SECRET_KEY) {
+      m_hasSpendKeys = true;
+    }
 
     if (m_subscriptions.size() == 1) {
       m_syncStart = res->getSyncStart();
@@ -458,8 +463,7 @@ std::error_code createTransfers(
     auto outType = tx.getOutputType(size_t(idx));
 
     if (
-      outType != TransactionTypes::OutputType::Key &&
-      outType != TransactionTypes::OutputType::Multisignature) {
+      outType != TransactionTypes::OutputType::Key) {
       continue;
     }
 
@@ -502,28 +506,6 @@ std::error_code createTransfers(
       info.amount = amount;
       info.outputKey = out.key;
 
-    } else if (outType == TransactionTypes::OutputType::Multisignature) {
-      uint64_t amount;
-      MultisignatureOutput out;
-      tx.getOutput(idx, out, amount);
-
-      for (const auto& key : out.keys) {
-        std::unordered_set<Crypto::Hash>::iterator it = transactions_hash_seen.find(txHash);
-        if (it == transactions_hash_seen.end()) {
-          std::unordered_set<Crypto::PublicKey>::iterator key_it = public_keys_seen.find(key);
-          if (key_it != public_keys_seen.end()) {
-            throw std::runtime_error("duplicate multisignature output key is found");
-            return std::error_code();
-          }
-          if (std::find(temp_keys.begin(), temp_keys.end(), key) != temp_keys.end()) {
-            throw std::runtime_error("the same multisignature output key is present more than once");
-            return std::error_code();
-          }
-          temp_keys.push_back(key);
-        }
-      }
-      info.amount = amount;
-      info.requiredSignatures = out.requiredSignatureCount;
     }
     transfers.push_back(info);
   }
@@ -546,7 +528,16 @@ std::error_code TransfersConsumer::preprocessOutputs(const TransactionBlockInfo&
     return std::error_code();
   }
 
-  if (outputs.empty()) {
+  // Detect outgoing transaction via viewSecretKey (view-only wallets only).
+  // Skipped for full wallets (m_hasSpendKeys == true): they detect their own outgoing
+  // transactions via key-image matching in addTransactionInputs, so calling
+  // isOurOutgoingTransaction() on every blockchain transaction would be wasted work.
+  if (!m_hasSpendKeys && isOurOutgoingTransaction(tx, m_viewSecret)) {
+    info.isOutgoing = true;
+    m_logger(DEBUGGING) << "Detected outgoing transaction via viewSecretKey, hash " << Common::podToHex(tx.getTransactionHash());
+  }
+
+  if (outputs.empty() && !info.isOutgoing) {
     return std::error_code();
   }
 
@@ -602,7 +593,9 @@ void TransfersConsumer::processTransaction(const TransactionBlockInfo& blockInfo
 
     bool containerContainsTx;
     bool containerUpdated;
-    processOutputs(blockInfo, *kv.second, tx, subscriptionOutputs, info.globalIdxs, containerContainsTx, containerUpdated);
+    // Pass isOutgoing so subscriptions with no matching outputs still record the tx
+    // when detected as our outgoing tx (tracking wallet mode).
+    processOutputs(blockInfo, *kv.second, tx, subscriptionOutputs, info.globalIdxs, containerContainsTx, containerUpdated, info.isOutgoing);
     someContainerUpdated = someContainerUpdated || containerUpdated;
     if (containerContainsTx) {
       transactionContainers.emplace_back(&kv.second->getContainer());
@@ -618,7 +611,8 @@ void TransfersConsumer::processTransaction(const TransactionBlockInfo& blockInfo
 }
 
 void TransfersConsumer::processOutputs(const TransactionBlockInfo& blockInfo, TransfersSubscription& sub, const ITransactionReader& tx,
-  const std::vector<TransactionOutputInformationIn>& transfers, const std::vector<uint32_t>& globalIdxs, bool& contains, bool& updated) {
+  const std::vector<TransactionOutputInformationIn>& transfers, const std::vector<uint32_t>& globalIdxs, bool& contains, bool& updated,
+  bool isOutgoing) {
 
   TransactionInformation subscriptionTxInfo;
   contains = sub.getContainer().getTransactionInformation(tx.getTransactionHash(), subscriptionTxInfo);
@@ -638,7 +632,7 @@ void TransfersConsumer::processOutputs(const TransactionBlockInfo& blockInfo, Tr
       assert(subscriptionTxInfo.blockHeight == blockInfo.height);
     }
   } else {
-    updated = sub.addTransaction(blockInfo, tx, transfers);
+    updated = sub.addTransaction(blockInfo, tx, transfers, isOutgoing);
     contains = updated;
   }
 }

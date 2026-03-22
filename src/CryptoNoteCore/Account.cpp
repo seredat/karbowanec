@@ -43,11 +43,15 @@ void AccountBase::generate() {
 }
 
 //-----------------------------------------------------------------
-void AccountBase::generateDeterministic() { 
-  Crypto::SecretKey second;
+void AccountBase::generateDeterministic() {
   Crypto::generate_keys(m_keys.address.spendPublicKey, m_keys.spendSecretKey);
-  keccak((uint8_t *)&m_keys.spendSecretKey, sizeof(Crypto::SecretKey), (uint8_t *)&second, sizeof(Crypto::SecretKey));
-  Crypto::generate_deterministic_keys(m_keys.address.viewPublicKey, m_keys.viewSecretKey, second);
+
+  // Derive viewSecretKey: sc_reduce32(keccak(spendSecretKey)). Controls viewPublicKey / address.
+  Crypto::SecretKey viewKeySeed;
+  keccak((uint8_t *)&m_keys.spendSecretKey, sizeof(Crypto::SecretKey),
+         (uint8_t *)&viewKeySeed, sizeof(viewKeySeed));
+  Crypto::generate_deterministic_keys(m_keys.address.viewPublicKey, m_keys.viewSecretKey, viewKeySeed);
+
   m_creation_timestamp = time(NULL);
 }
 

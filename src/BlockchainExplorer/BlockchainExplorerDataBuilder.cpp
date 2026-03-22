@@ -314,17 +314,6 @@ bool BlockchainExplorerDataBuilder::fillTransactionDetails(const Transaction& tr
 		  txInToKeyDetails.outputs.push_back(d);
 	  }
 	  txInDetails = txInToKeyDetails;
-    } else if (txIn.type() == typeid(MultisignatureInput)) {
-      MultisignatureInputDetails txInMultisigDetails;
-      const MultisignatureInput& txInMultisig = boost::get<MultisignatureInput>(txIn);
-      txInMultisigDetails.input = txInMultisig;
-      std::pair<Crypto::Hash, size_t> outputReference;
-      if (!m_core.getMultisigOutputReference(txInMultisig, outputReference)) {
-        return false;
-      }
-      txInMultisigDetails.output.number = outputReference.second;
-      txInMultisigDetails.output.transactionHash = outputReference.first;
-	  txInDetails = txInMultisigDetails;
     } else {
       return false;
     }

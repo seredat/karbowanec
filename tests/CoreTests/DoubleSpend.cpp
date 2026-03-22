@@ -192,7 +192,7 @@ TransactionBuilder DoubleSpendBase::createBobToAliceTx() const {
 
   builder.
     addMultisignatureInput(createSource()).
-    addOutput(TransactionDestinationEntry(send_amount - m_currency.minimumFee(), m_alice_account.getAccountKeys().address));
+    addOutput(TxBuildOutput{m_alice_account.getAccountKeys().address, send_amount - m_currency.minimumFee()});
 
   return builder;
 }
@@ -217,7 +217,7 @@ bool MultiSigTx_DoubleSpendInTx::generate(std::vector<test_event_entry>& events)
   auto tx = builder.
     addMultisignatureInput(createSource()).
     addMultisignatureInput(createSource()).
-    addOutput(TransactionDestinationEntry(send_amount*2 - m_currency.minimumFee(), m_alice_account.getAccountKeys().address)).
+    addOutput(TxBuildOutput{m_alice_account.getAccountKeys().address, send_amount*2 - m_currency.minimumFee()}).
     build();
 
   SET_EVENT_VISITOR_SETT(events, event_visitor_settings::set_txs_keeped_by_block, m_txsKeepedByBlock);

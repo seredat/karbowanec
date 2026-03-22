@@ -25,6 +25,7 @@ public:
     size_t read(uint8_t* data, size_t size);
     size_t write(const uint8_t* data, size_t size);
     std::pair<Ipv4Address, uint16_t> getPeerAddressAndPort() const;
+	boost::asio::ip::tcp::socket& getSocket();
 
 private:
     friend class TcpConnector;

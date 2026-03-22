@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
-// Copyright (c) 2018, Karbo developers
+// Copyright (c) 2018-2026, Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -95,8 +95,6 @@ bool get_tx_fee(const Transaction& tx, uint64_t & fee) {
   for (const auto& in : tx.inputs) {
     if (in.type() == typeid(KeyInput)) {
       amount_in += boost::get<KeyInput>(in).amount;
-    } else if (in.type() == typeid(MultisignatureInput)) {
-      amount_in += boost::get<MultisignatureInput>(in).amount;
     }
   }
 
@@ -119,166 +117,6 @@ uint64_t get_tx_fee(const Transaction& tx) {
   return r;
 }
 
-bool generateDeterministicTransactionKeys(const Crypto::Hash& inputsHash, const Crypto::SecretKey& viewSecretKey, KeyPair& generatedKeys) {
-  BinaryArray ba;
-  Common::append(ba, std::begin(viewSecretKey.data), std::end(viewSecretKey.data));
-  Common::append(ba, std::begin(inputsHash.data), std::end(inputsHash.data));
-
-  hash_to_scalar(ba.data(), ba.size(), generatedKeys.secretKey);
-  return Crypto::secret_key_to_public_key(generatedKeys.secretKey, generatedKeys.publicKey);
-}
-
-bool generateDeterministicTransactionKeys(const Transaction& tx, const SecretKey& viewSecretKey, KeyPair& generatedKeys) {
-  Crypto::Hash inputsHash = getObjectHash(tx.inputs);
-  return generateDeterministicTransactionKeys(inputsHash, viewSecretKey, generatedKeys);
-}
-
-bool constructTransaction(
-  const AccountKeys& sender_account_keys,
-  const std::vector<TransactionSourceEntry>& sources,
-  const std::vector<TransactionDestinationEntry>& destinations,
-  std::vector<uint8_t> extra,
-  Transaction& tx,
-  uint64_t unlock_time,
-  Crypto::SecretKey &tx_key,
-  Logging::ILogger& log) {
-  LoggerRef logger(log, "construct_tx");
-
-  tx.inputs.clear();
-  tx.outputs.clear();
-  tx.signatures.clear();
-
-  tx.version = CURRENT_TRANSACTION_VERSION;
-  tx.unlockTime = unlock_time;
-
-  tx.extra = extra;
-
-  struct input_generation_context_data {
-    KeyPair in_ephemeral;
-  };
-
-  std::vector<input_generation_context_data> in_contexts;
-  uint64_t summary_inputs_money = 0;
-  //fill inputs
-  for (const TransactionSourceEntry& src_entr : sources) {
-    if (src_entr.realOutput >= src_entr.outputs.size()) {
-      logger(ERROR) << "real_output index (" << src_entr.realOutput << ")bigger than output_keys.size()=" << src_entr.outputs.size();
-      return false;
-    }
-    summary_inputs_money += src_entr.amount;
-
-    //KeyDerivation recv_derivation;
-    in_contexts.push_back(input_generation_context_data());
-    KeyPair& in_ephemeral = in_contexts.back().in_ephemeral;
-    KeyImage img;
-    if (!generate_key_image_helper(sender_account_keys, src_entr.realTransactionPublicKey, src_entr.realOutputIndexInTransaction, in_ephemeral, img))
-      return false;
-
-    //check that derived key is equal with real output key
-    if (!(in_ephemeral.publicKey == src_entr.outputs[src_entr.realOutput].second)) {
-      logger(ERROR) << "derived public key mismatch with output public key! " << ENDL << "derived_key:"
-        << Common::podToHex(in_ephemeral.publicKey) << ENDL << "real output_public_key:"
-        << Common::podToHex(src_entr.outputs[src_entr.realOutput].second);
-      return false;
-    }
-
-    //put key image into tx input
-    KeyInput input_to_key;
-    input_to_key.amount = src_entr.amount;
-    input_to_key.keyImage = img;
-
-    //fill outputs array and use relative offsets
-    for (const TransactionSourceEntry::OutputEntry& out_entry : src_entr.outputs) {
-      input_to_key.outputIndexes.push_back(out_entry.first);
-    }
-
-    input_to_key.outputIndexes = absolute_output_offsets_to_relative(input_to_key.outputIndexes);
-    tx.inputs.push_back(input_to_key);
-  }
-
-  KeyPair txkey;
-  if (!generateDeterministicTransactionKeys(getObjectHash(tx.inputs), sender_account_keys.viewSecretKey, txkey)) {
-    logger(ERROR) << "Couldn't generate deterministic transaction keys";
-    return false;
-  }
-
-  addTransactionPublicKeyToExtra(tx.extra, txkey.publicKey);
-
-  tx_key = txkey.secretKey;
-
-
-  // "Shuffle" outs
-  std::vector<TransactionDestinationEntry> shuffled_dsts(destinations);
-  std::sort(shuffled_dsts.begin(), shuffled_dsts.end(), [](const TransactionDestinationEntry& de1, const TransactionDestinationEntry& de2) { return de1.amount < de2.amount; });
-
-  uint64_t summary_outs_money = 0;
-  //fill outputs
-  size_t output_index = 0;
-  for (const TransactionDestinationEntry& dst_entr : shuffled_dsts) {
-    if (!(dst_entr.amount > 0)) {
-      logger(ERROR, BRIGHT_RED) << "Destination with wrong amount: " << dst_entr.amount;
-      return false;
-    }
-    KeyDerivation derivation;
-    PublicKey out_eph_public_key;
-    bool r = generate_key_derivation(dst_entr.addr.viewPublicKey, txkey.secretKey, derivation);
-
-    if (!(r)) {
-      logger(ERROR, BRIGHT_RED)
-        << "at creation outs: failed to generate_key_derivation("
-        << dst_entr.addr.viewPublicKey << ", " << txkey.secretKey << ")";
-      return false;
-    }
-
-    r = derive_public_key(derivation, output_index,
-      dst_entr.addr.spendPublicKey,
-      out_eph_public_key);
-    if (!(r)) {
-      logger(ERROR, BRIGHT_RED)
-        << "at creation outs: failed to derive_public_key(" << derivation
-        << ", " << output_index << ", " << dst_entr.addr.spendPublicKey
-        << ")";
-      return false;
-    }
-
-    TransactionOutput out;
-    out.amount = dst_entr.amount;
-    KeyOutput tk;
-    tk.key = out_eph_public_key;
-    out.target = tk;
-    tx.outputs.push_back(out);
-    output_index++;
-    summary_outs_money += dst_entr.amount;
-  }
-
-  //check money
-  if (summary_outs_money > summary_inputs_money) {
-    logger(ERROR) << "Transaction inputs money (" << summary_inputs_money << ") less than outputs money (" << summary_outs_money << ")";
-    return false;
-  }
-
-  //generate ring signatures
-  Hash tx_prefix_hash;
-  getObjectHash(*static_cast<TransactionPrefix*>(&tx), tx_prefix_hash);
-
-  size_t i = 0;
-  for (const TransactionSourceEntry& src_entr : sources) {
-    std::vector<const PublicKey*> keys_ptrs;
-    for (const TransactionSourceEntry::OutputEntry& o : src_entr.outputs) {
-      keys_ptrs.push_back(&o.second);
-    }
-
-    tx.signatures.push_back(std::vector<Signature>());
-    std::vector<Signature>& sigs = tx.signatures.back();
-    sigs.resize(src_entr.outputs.size());
-    generate_ring_signature(tx_prefix_hash, boost::get<KeyInput>(tx.inputs[i]).keyImage, keys_ptrs,
-      in_contexts[i].in_ephemeral.secretKey, src_entr.realOutput, sigs.data());
-    i++;
-  }
-
-  return true;
-}
-
 bool get_inputs_money_amount(const Transaction& tx, uint64_t& money) {
   money = 0;
 
@@ -287,8 +125,6 @@ bool get_inputs_money_amount(const Transaction& tx, uint64_t& money) {
 
     if (in.type() == typeid(KeyInput)) {
       amount = boost::get<KeyInput>(in).amount;
-    } else if (in.type() == typeid(MultisignatureInput)) {
-      amount = boost::get<MultisignatureInput>(in).amount;
     }
 
     money += amount;
@@ -309,7 +145,7 @@ uint32_t get_block_height(const Block& b) {
 
 bool check_inputs_types_supported(const TransactionPrefix& tx) {
   for (const auto& in : tx.inputs) {
-    if (in.type() != typeid(KeyInput) && in.type() != typeid(MultisignatureInput)) {
+    if (in.type() != typeid(KeyInput)) {
       return false;
     }
   }
@@ -343,31 +179,6 @@ bool check_outs_valid(const TransactionPrefix& tx, std::string* error) {
         return false;
       }
       keys_seen.insert(boost::get<KeyOutput>(out.target).key);
-    } else if (out.target.type() == typeid(MultisignatureOutput)) {
-      const MultisignatureOutput& multisignatureOutput = ::boost::get<MultisignatureOutput>(out.target);
-      if (multisignatureOutput.requiredSignatureCount > multisignatureOutput.keys.size()) {
-        if (error) {
-          *error = "Multisignature output with invalid required signature count";
-        }
-        return false;
-      }
-      for (const PublicKey& key : multisignatureOutput.keys) {
-        if (!check_key(key)) {
-          if (error) {
-            *error = "Multisignature output with invalid public key";
-          }
-          return false;
-        }
-
-        if (keys_seen.find(key) != keys_seen.end()) {
-          if (error) {
-            *error = "The same multisignature output target is present more than once";
-          }
-          return false;
-        }
-		keys_seen.insert(key);
-
-      }
     } else {
       if (error) {
         *error = "Output with invalid type";
@@ -376,19 +187,6 @@ bool check_outs_valid(const TransactionPrefix& tx, std::string* error) {
     }
   }
 
-  return true;
-}
-
-bool checkMultisignatureInputsDiff(const TransactionPrefix& tx) {
-  std::set<std::pair<uint64_t, uint32_t>> inputsUsage;
-  for (const auto& inv : tx.inputs) {
-    if (inv.type() == typeid(MultisignatureInput)) {
-      const MultisignatureInput& in = ::boost::get<MultisignatureInput>(inv);
-      if (!inputsUsage.insert(std::make_pair(in.amount, in.outputIndex)).second) {
-        return false;
-      }
-    }
-  }
   return true;
 }
 
@@ -404,8 +202,6 @@ bool check_inputs_overflow(const TransactionPrefix &tx) {
 
     if (in.type() == typeid(KeyInput)) {
       amount = boost::get<KeyInput>(in).amount;
-    } else if (in.type() == typeid(MultisignatureInput)) {
-      amount = boost::get<MultisignatureInput>(in).amount;
     }
 
     if (money > amount + money)
@@ -473,7 +269,7 @@ bool lookup_acc_outs(const AccountKeys& acc, const Transaction& tx, const Public
   generate_key_derivation(tx_pub_key, acc.viewSecretKey, derivation);
 
   for (const TransactionOutput& o : tx.outputs) {
-    assert(o.target.type() == typeid(KeyOutput) || o.target.type() == typeid(MultisignatureOutput));
+    assert(o.target.type() == typeid(KeyOutput));
     if (o.target.type() == typeid(KeyOutput)) {
       if (is_out_to_acc(acc, boost::get<KeyOutput>(o.target), derivation, keyIndex)) {
         outs.push_back(outputIndex);
@@ -481,8 +277,6 @@ bool lookup_acc_outs(const AccountKeys& acc, const Transaction& tx, const Public
       }
 
       ++keyIndex;
-    } else if (o.target.type() == typeid(MultisignatureOutput)) {
-      keyIndex += boost::get<MultisignatureOutput>(o.target).keys.size();
     }
 
     ++outputIndex;
@@ -771,6 +565,20 @@ bool verifyMessage(const std::string &data, const CryptoNote::AccountPublicAddre
 
   memcpy(&s, decoded.data(), sizeof(s));
   return Crypto::check_signature(hash, address.spendPublicKey, s);
+}
+
+bool generateDeterministicTransactionKeys(const Crypto::Hash& inputsHash,
+    const Crypto::SecretKey& secretKey, CryptoNote::KeyPair& keys) {
+  BinaryArray ba;
+  Common::append(ba, std::begin(secretKey.data), std::end(secretKey.data));
+  Common::append(ba, std::begin(inputsHash.data), std::end(inputsHash.data));
+  Crypto::hash_to_scalar(ba.data(), ba.size(), keys.secretKey);
+  return Crypto::secret_key_to_public_key(keys.secretKey, keys.publicKey);
+}
+
+bool generateDeterministicTransactionKeys(const Transaction& tx,
+    const Crypto::SecretKey& secretKey, CryptoNote::KeyPair& keys) {
+  return generateDeterministicTransactionKeys(getObjectHash(tx.inputs), secretKey, keys);
 }
 
 }

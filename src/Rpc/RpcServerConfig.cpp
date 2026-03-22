@@ -41,6 +41,8 @@ namespace CryptoNote {
     const command_line::arg_descriptor<uint16_t> arg_rpc_bind_ssl_port  = { "rpc-bind-ssl-port", "SSL port for RPC service", DEFAULT_RPC_SSL_PORT };
     const command_line::arg_descriptor<std::string> arg_chain_file      = { "rpc-chain-file", "SSL chain file", DEFAULT_RPC_CHAIN_FILE };
     const command_line::arg_descriptor<std::string> arg_key_file        = { "rpc-key-file", "SSL key file", DEFAULT_RPC_KEY_FILE };
+    const command_line::arg_descriptor<std::string> arg_rpc_user        = { "rpc-user", "Authentication user.", "" };
+    const command_line::arg_descriptor<std::string> arg_rpc_pwd         = { "rpc-password", "Authentication password.", "" };
     const command_line::arg_descriptor<bool>        arg_restricted_rpc  = { "restricted-rpc", "Restrict RPC to view only commands to prevent abuse", false };
     const command_line::arg_descriptor<std::string> arg_enable_cors     = { "enable-cors", "Adds header 'Access-Control-Allow-Origin' to the daemon's RPC responses. Uses the value as domain. Use * for all", "" };
     const command_line::arg_descriptor<std::string> arg_set_contact     = { "contact", "Sets node admin contact", "" };
@@ -61,6 +63,8 @@ namespace CryptoNote {
     nodeFeeAddress(""),
     nodeFeeAmountStr(""),
     nodeFeeViewKey(""),
+    rpcUser(""),
+    rpcPassword(""),
     bindPortSSL(RPC_DEFAULT_SSL_PORT)
   {
   }
@@ -79,7 +83,9 @@ namespace CryptoNote {
   uint64_t RpcServerConfig::getNodeFeeAmount() const { return nodeFeeAmount; }
   std::string RpcServerConfig::getNodeFeeViewKey() const { return nodeFeeViewKey; }
   std::string RpcServerConfig::getContactInfo() const { return contactInfo; }
-
+  std::string RpcServerConfig::getRpcUser() const { return rpcUser; }
+  std::string RpcServerConfig::getRpcPassword() const { return rpcPassword; }
+  
   void RpcServerConfig::initOptions(boost::program_options::options_description& desc) {
     command_line::add_arg(desc, arg_rpc_bind_ip);
     command_line::add_arg(desc, arg_rpc_bind_port);
@@ -93,6 +99,8 @@ namespace CryptoNote {
     command_line::add_arg(desc, arg_set_fee_address);
     command_line::add_arg(desc, arg_set_fee_amount);
     command_line::add_arg(desc, arg_set_view_key);
+    command_line::add_arg(desc, arg_rpc_user);
+    command_line::add_arg(desc, arg_rpc_pwd);
   }
 
   void RpcServerConfig::init(const boost::program_options::variables_map& vm)  {
@@ -102,6 +110,15 @@ namespace CryptoNote {
     if (command_line::has_arg(vm, arg_enable_cors)) {
       enableCors = command_line::get_arg(vm, arg_enable_cors);
     }
+
+    if (command_line::has_arg(vm, arg_rpc_user)) {
+      rpcUser = command_line::get_arg(vm, arg_rpc_user);
+    }
+    
+    if (command_line::has_arg(vm, arg_rpc_pwd)) {
+      rpcPassword = command_line::get_arg(vm, arg_rpc_pwd);
+    }
+
     if (command_line::has_arg(vm, arg_restricted_rpc)) {
       restrictedRPC = command_line::get_arg(vm, arg_restricted_rpc);
     }
@@ -147,14 +164,17 @@ namespace CryptoNote {
     if (command_line::has_arg(vm, arg_rpc_bind_ssl_enable)) {
       enableSSL = command_line::get_arg(vm, arg_rpc_bind_ssl_enable);
     }
+
     if (command_line::has_arg(vm, arg_rpc_bind_ssl_port)) {
       bindPortSSL = command_line::get_arg(vm, arg_rpc_bind_ssl_port);
     }
+    
     if (command_line::has_arg(vm, arg_chain_file)) {
       chainFile = command_line::get_arg(vm, arg_chain_file);
     }
+    
     if (command_line::has_arg(vm, arg_key_file)) {
-    keyFile = command_line::get_arg(vm, arg_key_file);
+      keyFile = command_line::get_arg(vm, arg_key_file);
     }
 
     boost::filesystem::path chain_file_path(chainFile);

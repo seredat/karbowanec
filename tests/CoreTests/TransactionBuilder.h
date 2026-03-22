@@ -20,6 +20,7 @@
 #include "CryptoNoteCore/Account.h"
 #include "CryptoNoteCore/CryptoNoteFormatUtils.h"
 #include "CryptoNoteCore/Currency.h"
+#include "Wallet/TransactionBuilder.h"
 
 class TransactionBuilder {
 public:
@@ -42,18 +43,18 @@ public:
   TransactionBuilder& setTxKeys(const CryptoNote::KeyPair& txKeys);
 
   // inputs
-  TransactionBuilder& setInput(const std::vector<CryptoNote::TransactionSourceEntry>& sources, const CryptoNote::AccountKeys& senderKeys);
+  TransactionBuilder& setInput(const std::vector<CryptoNote::TxBuildInput>& sources, const CryptoNote::AccountKeys& senderKeys);
   TransactionBuilder& addMultisignatureInput(const MultisignatureSource& source);
 
   // outputs
-  TransactionBuilder& setOutput(const std::vector<CryptoNote::TransactionDestinationEntry>& destinations);
-  TransactionBuilder& addOutput(const CryptoNote::TransactionDestinationEntry& dest);
+  TransactionBuilder& setOutput(const std::vector<CryptoNote::TxBuildOutput>& destinations);
+  TransactionBuilder& addOutput(const CryptoNote::TxBuildOutput& dest);
   TransactionBuilder& addMultisignatureOut(uint64_t amount, const KeysVector& keys, uint32_t required);
 
   CryptoNote::Transaction build() const;
 
-  std::vector<CryptoNote::TransactionSourceEntry> m_sources;
-  std::vector<CryptoNote::TransactionDestinationEntry> m_destinations;
+  std::vector<CryptoNote::TxBuildInput> m_sources;
+  std::vector<CryptoNote::TxBuildOutput> m_destinations;
 
 private:
 

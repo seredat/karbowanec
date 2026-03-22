@@ -32,6 +32,8 @@ public:
 
   void setPattern(const std::string& pattern);
 
+  virtual ~CommonLogger() = 0;
+
 protected:
   std::set<std::string> disabledCategories;
   Level logLevel;
