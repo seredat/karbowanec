@@ -1,5 +1,5 @@
 // Copyright (c) 2018, The TurtleCoin Developers
-// Copyright (c) 2018-2019, The Karbo Developers
+// Copyright (c) 2016-2026, The Karbo developers
 //
 // Please see the included LICENSE file for more information.
 
@@ -10,7 +10,6 @@
 #include <GreenWallet/AddressBook.h>
 #include <Common/ColouredMsg.h>
 #include <GreenWallet/CommandImplementations.h>
-#include <GreenWallet/Fusion.h>
 #include <GreenWallet/Open.h>
 #include <GreenWallet/Transfer.h>
 
@@ -76,10 +75,6 @@ bool handleCommand(const std::string command,
     else if (command == "list_transfers")
     {
         listTransfers(true, true, walletInfo->wallet, node);
-    }
-    else if (command == "optimize")
-    {
-        fullOptimize(walletInfo->wallet);
     }
     else if (command == "outgoing_transfers")
     {
@@ -153,6 +148,10 @@ std::shared_ptr<WalletInfo> handleLaunchCommand(CryptoNote::WalletGreen &wallet,
     else if (launchCommand == "key_restore")
     {
         return importWallet(wallet);
+    }
+    else if (launchCommand == "gui_restore")
+    {
+      return importGUIWallet(wallet);
     }
     else if (launchCommand == "view_wallet")
     {
