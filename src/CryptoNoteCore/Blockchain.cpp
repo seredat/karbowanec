@@ -1257,29 +1257,6 @@ bool Blockchain::switch_to_alternative_blockchain(const std::list<Crypto::Hash>&
     }
   }
 
-  // Compare transactions
-  std::vector<Crypto::Hash> mainChainTxHashes, altChainTxHashes;
-  for (int i = (int)chainHeight - 1; i >= (int)split_height; i--) {
-    std::vector<uint8_t> bdata;
-    m_db.getBlockData((uint32_t)i, bdata);
-    Block b;
-    fromBinaryArray(b, bdata);
-    std::copy(b.transactionHashes.begin(), b.transactionHashes.end(),
-              std::inserter(mainChainTxHashes, mainChainTxHashes.end()));
-  }
-  for (const auto& hash : alt_chain) {
-    const Block& b = m_alternative_chains[hash].bl;
-    std::copy(b.transactionHashes.begin(), b.transactionHashes.end(),
-              std::inserter(altChainTxHashes, altChainTxHashes.end()));
-  }
-  for (const auto& tx_hash : mainChainTxHashes) {
-    if (std::find(altChainTxHashes.begin(), altChainTxHashes.end(), tx_hash) == altChainTxHashes.end()) {
-      logger(ERROR, BRIGHT_RED) << "Attempting to switch to an alternate chain, but it lacks transaction "
-        << Common::podToHex(tx_hash) << " from main chain, rejected";
-      return false;
-    }
-  }
-
   // Disconnect old chain
   std::list<Block> disconnected_chain;
   chainHeight = m_db.getChainHeight();
