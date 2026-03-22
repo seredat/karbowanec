@@ -833,6 +833,8 @@ bool Blockchain::getBlockLongHash(Crypto::cn_context& context, const Block& b, C
   return getBlockLongHash(context, b, res, dummy_alt_chain, false);
 }
 
+// Big-endian load — interprets byte at offset as most significant.
+// Used for extracting indices from hash output (v5 convention).
 static inline uint32_t load_u32_be(const uint8_t* data, size_t offset) {
   return (uint32_t(data[offset])     << 24) |
          (uint32_t(data[offset + 1]) << 16) |
