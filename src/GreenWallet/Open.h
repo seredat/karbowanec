@@ -1,5 +1,5 @@
 // Copyright (c) 2018, The TurtleCoin Developers
-// Copyright (c) 2018-2019, The Karbo Developers
+// Copyright (c) 2016-2026, The Karbo developers
 // 
 // Please see the included LICENSE file for more information.
 

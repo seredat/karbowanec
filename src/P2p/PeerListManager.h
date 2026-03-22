@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2014-2017, The Monero project
-// Copyright (c) 2016-2025, The Karbo developers
+// Copyright (c) 2016-2026, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -20,8 +20,6 @@
 #pragma once
 
 #include <list>
-#include <mutex>
-
 #include <boost/multi_index_container.hpp>
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index/identity.hpp>
@@ -72,8 +70,7 @@ public:
 
   private:
     peers_indexed& m_peers;
-    const size_t m_maxSize;
-    mutable std::recursive_mutex mutex_;
+    const size_t m_maxSize;;
   };
 
   PeerlistManager();
@@ -112,7 +109,6 @@ private:
   anchor_peers_indexed m_peers_anchor;
   Peerlist m_whitePeerlist;
   Peerlist m_grayPeerlist;
-  mutable std::recursive_mutex mutex_;
 };
 
 }

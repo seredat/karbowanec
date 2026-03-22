@@ -1,4 +1,5 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2016-2026, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -53,8 +54,9 @@ const AccountKeys& TransfersSubscription::getKeys() const {
 }
 
 bool TransfersSubscription::addTransaction(const TransactionBlockInfo& blockInfo, const ITransactionReader& tx,
-                                           const std::vector<TransactionOutputInformationIn>& transfersList) {
-  bool added = transfers.addTransaction(blockInfo, tx, transfersList);
+                                           const std::vector<TransactionOutputInformationIn>& transfersList,
+                                           bool isOutgoing) {
+  bool added = transfers.addTransaction(blockInfo, tx, transfersList, isOutgoing);
   if (added) {
     m_observerManager.notify(&ITransfersObserver::onTransactionUpdated, this, tx.getTransactionHash());
   }

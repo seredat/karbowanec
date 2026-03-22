@@ -1,4 +1,5 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2016-2026, Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -20,8 +21,10 @@
 #include "TransactionUtils.h"
 
 #include "Account.h"
+#include "CryptoNoteCore/CryptoNoteFormatUtils.h"
 #include "CryptoNoteCore/CryptoNoteTools.h"
 #include "CryptoNoteConfig.h"
+#include "Common/BinaryArray.hpp"
 
 #include <boost/optional.hpp>
 #include <numeric>
@@ -110,6 +113,7 @@ namespace CryptoNote {
     // secret key
     virtual bool getTransactionSecretKey(SecretKey& key) const override;
     virtual void setTransactionSecretKey(const SecretKey& key) override;
+    virtual void generateDeterministicTransactionKeys(const SecretKey& viewSecretKey) override;
 
   private:
 
@@ -238,6 +242,26 @@ namespace CryptoNote {
     }
 
     secretKey = key;
+  }
+
+  void TransactionImpl::generateDeterministicTransactionKeys(const SecretKey& viewSecretKey) {
+    checkIfSigning();
+
+    if (viewSecretKey == NULL_SECRET_KEY) {
+      throw std::runtime_error("generateDeterministicTransactionKeys: viewSecretKey is null");
+    }
+
+    KeyPair keys;
+    if (!CryptoNote::generateDeterministicTransactionKeys(getObjectHash(transaction.inputs), viewSecretKey, keys)) {
+      throw std::runtime_error("Failed to generate deterministic transaction keys");
+    }
+
+    secretKey = keys.secretKey;
+
+    TransactionExtraPublicKey pk = { keys.publicKey };
+    extra.set(pk);
+    transaction.extra = extra.serialize();
+    invalidateHash();
   }
 
   size_t TransactionImpl::addInput(const KeyInput& input) {

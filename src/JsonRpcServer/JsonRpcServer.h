@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright(c) 2014 - 2017 XDN - project developers
-// Copyright(c) 2018 - 2023 The Karbo developers
+// Copyright(c) 2018 - 2026 The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -20,14 +20,15 @@
 #pragma once
 
 #include <system_error>
-#include <thread>
 
 #include "System/Dispatcher.h"
 #include "System/Event.h"
 #include "System/RemoteContext.h"
 #include "Logging/ILogger.h"
 #include "Logging/LoggerRef.h"
-#include "HTTP/httplib.h"
+#include <HTTP/HttpServer.h>
+#include <HTTP/HttpRequest.h>
+#include <HTTP/HttpResponse.h>
 
 
 namespace CryptoNote {
@@ -53,9 +54,7 @@ public:
   ~JsonRpcServer();
 
   void init(const std::string& chain_file, const std::string& key_file, bool server_ssl_enable = false);
-  void setAuth(const std::string& user, const std::string& password);
-
-  void start(const std::string& bindAddress, uint16_t bindPort, uint16_t bindPortSSL);
+  void start(const std::string& bindAddress, uint16_t bindPort, uint16_t bindPortSSL, const std::string& user = "", const std::string& password = "");
   void stop();
 
 protected:
@@ -69,23 +68,17 @@ protected:
   virtual void processJsonRpcRequest(const Common::JsonValue& req, Common::JsonValue& resp) = 0;
 
 private:
-  void processRequest(const httplib::Request& request, httplib::Response& response);
-
-  void listen(const std::string address, const uint16_t port);
-  void listen_ssl(const std::string address, const uint16_t port);
-  bool authenticate(const httplib::Request& request) const;
+  void processRequest(const CryptoNote::HttpRequest& req, CryptoNote::HttpResponse& resp);
 
   System::Dispatcher* m_dispatcher;
   System::Event* stopEvent;
   Logging::LoggerRef logger;
-  httplib::Server* http;
-  httplib::SSLServer* https;
-
-  std::list<std::thread> m_workers;
+ 
+  std::unique_ptr<CryptoNote::HttpServer> m_httpServer;
+  std::unique_ptr<CryptoNote::HttpServer> m_httpsServer;
 
   std::string m_chain_file;
   std::string m_key_file;
-  std::string m_credentials;
 
   bool m_enable_ssl;
 };

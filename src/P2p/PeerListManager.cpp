@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2014-2017, The Monero project
-// Copyright (c) 2016-2025, The Karbo developers
+// Copyright (c) 2016-2026, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -72,8 +72,6 @@ void PeerlistManager::serialize(ISerializer& s) {
     return;
   }
 
-  // protect serialization over live containers
-  std::lock_guard<std::recursive_mutex> lock(mutex_);
   s(m_peers_white, "whitelist");
   s(m_peers_gray, "graylist");
 }
@@ -116,20 +114,16 @@ bool PeerlistManager::init(bool allow_local_ip)
 
 //--------------------------------------------------------------------------------------------------
 void PeerlistManager::trim_white_peerlist() {
-  std::lock_guard<std::recursive_mutex> lock(mutex_);
   m_whitePeerlist.trim();
 }
 //--------------------------------------------------------------------------------------------------
 void PeerlistManager::trim_gray_peerlist() {
-  std::lock_guard<std::recursive_mutex> lock(mutex_);
   m_grayPeerlist.trim();
 }
 
 //--------------------------------------------------------------------------------------------------
 bool PeerlistManager::merge_peerlist(const std::vector<PeerlistEntry>& outer_bs)
 {
-  // We call append_with_peer_gray (which also locks). Use recursive mutex to avoid deadlock.
-  std::lock_guard<std::recursive_mutex> lock(mutex_);
   for (const PeerlistEntry& be : outer_bs) {
     append_with_peer_gray(be);
   }
@@ -141,14 +135,12 @@ bool PeerlistManager::merge_peerlist(const std::vector<PeerlistEntry>& outer_bs)
 //--------------------------------------------------------------------------------------------------
 
 bool PeerlistManager::get_white_peer_by_index(PeerlistEntry& p, size_t i) const {
-  std::lock_guard<std::recursive_mutex> lock(mutex_);
   return m_whitePeerlist.get(p, i);
 }
 
 //--------------------------------------------------------------------------------------------------
 
 bool PeerlistManager::get_gray_peer_by_index(PeerlistEntry& p, size_t i) const {
-  std::lock_guard<std::recursive_mutex> lock(mutex_);
   return m_grayPeerlist.get(p, i);
 }
 
@@ -173,8 +165,6 @@ bool PeerlistManager::is_ip_allowed(uint32_t ip) const
 
 bool PeerlistManager::get_peerlist_head(std::vector<PeerlistEntry>& bs_head, uint32_t depth) const
 {
-  std::lock_guard<std::recursive_mutex> lock(mutex_);
-
   const peers_indexed::index<by_time>::type& by_time_index = m_peers_white.get<by_time>();
   //uint32_t cnt = 0;
 
@@ -199,8 +189,6 @@ bool PeerlistManager::get_peerlist_head(std::vector<PeerlistEntry>& bs_head, uin
 
 bool PeerlistManager::get_peerlist_full(std::list<AnchorPeerlistEntry>& pl_anchor, std::vector<PeerlistEntry>& pl_gray, std::vector<PeerlistEntry>& pl_white) const
 {
-  std::lock_guard<std::recursive_mutex> lock(mutex_);
-
   const anchor_peers_indexed::index<by_time>::type& by_time_index_an = m_peers_anchor.get<by_time>();
   const peers_indexed::index<by_time>::type& by_time_index_gr = m_peers_gray.get<by_time>();
   const peers_indexed::index<by_time>::type& by_time_index_wt = m_peers_white.get<by_time>();
@@ -225,9 +213,7 @@ bool PeerlistManager::set_peer_just_seen(PeerIdType peer, uint32_t ip, uint32_t 
 bool PeerlistManager::set_peer_just_seen(PeerIdType peer, const NetworkAddress& addr)
 {
   try {
-    std::lock_guard<std::recursive_mutex> lock(mutex_);
-
-    //find in white list
+      //find in white list
     PeerlistEntry ple;
     ple.adr = addr;
     ple.id = peer;
@@ -244,9 +230,7 @@ bool PeerlistManager::set_peer_just_seen(PeerIdType peer, const NetworkAddress& 
 bool PeerlistManager::append_with_peer_anchor(const AnchorPeerlistEntry& ple)
 {
   try {
-    std::lock_guard<std::recursive_mutex> lock(mutex_);
-
-    if (!is_ip_allowed(ple.adr.ip))
+      if (!is_ip_allowed(ple.adr.ip))
       return true;
 
     auto by_addr_it_anchor = m_peers_anchor.get<by_addr>().find(ple.adr);
@@ -266,9 +250,7 @@ bool PeerlistManager::append_with_peer_anchor(const AnchorPeerlistEntry& ple)
 bool PeerlistManager::append_with_peer_white(const PeerlistEntry& ple)
 {
   try {
-    std::lock_guard<std::recursive_mutex> lock(mutex_);
-
-    if (!is_ip_allowed(ple.adr.ip))
+      if (!is_ip_allowed(ple.adr.ip))
       return true;
 
     //find in white list
@@ -298,9 +280,7 @@ bool PeerlistManager::append_with_peer_white(const PeerlistEntry& ple)
 bool PeerlistManager::append_with_peer_gray(const PeerlistEntry& ple)
 {
   try {
-    std::lock_guard<std::recursive_mutex> lock(mutex_);
-
-    if (!is_ip_allowed(ple.adr.ip))
+      if (!is_ip_allowed(ple.adr.ip))
       return true;
 
     //find in white list
@@ -332,8 +312,6 @@ bool PeerlistManager::append_with_peer_gray(const PeerlistEntry& ple)
 bool PeerlistManager::get_and_empty_anchor_peerlist(std::vector<AnchorPeerlistEntry>& apl)
 {
   try {
-    std::lock_guard<std::recursive_mutex> lock(mutex_);
-
     auto begin = m_peers_anchor.get<by_time>().begin();
     auto end = m_peers_anchor.get<by_time>().end();
 
@@ -353,8 +331,6 @@ bool PeerlistManager::get_and_empty_anchor_peerlist(std::vector<AnchorPeerlistEn
 bool PeerlistManager::remove_from_peer_anchor(const NetworkAddress& addr)
 {
   try {
-    std::lock_guard<std::recursive_mutex> lock(mutex_);
-
     anchor_peers_indexed::index_iterator<by_addr>::type iterator = m_peers_anchor.get<by_addr>().find(addr);
 
     if (iterator != m_peers_anchor.get<by_addr>().end()) {
@@ -373,8 +349,6 @@ bool PeerlistManager::remove_from_peer_anchor(const NetworkAddress& addr)
 bool PeerlistManager::remove_from_peer_gray(PeerlistEntry& p)
 {
   try {
-    std::lock_guard<std::recursive_mutex> lock(mutex_);
-
     auto iterator = m_peers_gray.get<by_addr>().find(p.adr);
     if (iterator != m_peers_gray.get<by_addr>().end()) {
       m_peers_gray.erase(iterator);

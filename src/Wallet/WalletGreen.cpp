@@ -1,7 +1,7 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2018, The BBSCoin Developers
 // Copyright (c) 2018-2019, The TurtleCoin Developers
-// Copyright (c) 2017-2018, Karbo developers
+// Copyright (c) 2016-2026, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -51,6 +51,7 @@
 #include "CryptoNoteCore/CryptoNoteBasicImpl.h"
 #include "CryptoNoteCore/CryptoNoteFormatUtils.h"
 #include "CryptoNoteCore/CryptoNoteSerialization.h"
+#include "Wallet/TransactionBuilder.h"
 #include "CryptoNoteCore/CryptoNoteTools.h"
 #include "CryptoNoteCore/TransactionApi.h"
 #include "CryptoNoteCore/TransactionExtra.h"
@@ -64,7 +65,6 @@
 
 extern "C"
 {
-#include "crypto/keccak.h"
 #include "crypto/crypto-ops.h"
 }
 
@@ -279,7 +279,6 @@ void WalletGreen::clearCaches(bool clearTransactions, bool clearCachedData) {
     m_unlockTransactionsJob.clear();
     m_actualBalance = 0;
     m_pendingBalance = 0;
-    m_fusionTxsCache.clear();
     m_blockchain.clear();
   }
 }
@@ -504,7 +503,13 @@ void WalletGreen::load(const std::string& path, const std::string& password, std
           deleteOrphanTransactions(deletedSpendKeys);
         }
 
-        if (!addedSpendKeys.empty() || !deletedSpendKeys.empty()) {
+        // Upgrade wallet file to current version if needed, or if key sets changed.
+        const uint8_t loadedVersion =
+          reinterpret_cast<const ContainerStoragePrefix*>(m_containerStorage.prefix())->version;
+        bool needUpgradeSave = !addedSpendKeys.empty() || !deletedSpendKeys.empty()
+          || loadedVersion < WalletSerializerV2::SERIALIZATION_VERSION;
+
+        if (needUpgradeSave) {
           saveWalletCache(m_containerStorage, m_key, WalletSaveLevel::SAVE_ALL, extra);
         }
       } catch (const std::exception& e) {
@@ -666,6 +671,14 @@ void WalletGreen::saveWalletCache(ContainerStorage& storage, const Crypto::chach
   );
 
   s.save(containerStream, saveLevel);
+
+  // Upgrade the prefix version if the storage was created/loaded with an older format.
+  ContainerStoragePrefix* pfx = reinterpret_cast<ContainerStoragePrefix*>(storage.prefix());
+  if (pfx->version < WalletSerializerV2::SERIALIZATION_VERSION) {
+    m_logger(INFO) << "Upgrading wallet file format from v" << static_cast<int>(pfx->version)
+                   << " to v" << static_cast<int>(WalletSerializerV2::SERIALIZATION_VERSION);
+    pfx->version = WalletSerializerV2::SERIALIZATION_VERSION;
+  }
 
   encryptAndSaveContainerData(storage, key, containerData.data(), containerData.size());
   storage.flush();
@@ -1001,6 +1014,7 @@ KeyPair WalletGreen::getViewKey() const {
 
   return {m_viewPublicKey, m_viewSecretKey};
 }
+
 
 std::string WalletGreen::createAddress() {
   KeyPair spendKey;
@@ -1751,25 +1765,25 @@ void WalletGreen::validateOrders(const std::vector<WalletOrder>& orders) const {
   }
 }
 
-void WalletGreen::validateChangeDestination(const std::vector<std::string>& sourceAddresses, const std::string& changeDestination, bool isFusion) const {
+void WalletGreen::validateChangeDestination(const std::vector<std::string>& sourceAddresses, const std::string& changeDestination) const {
   std::string message;
   if (changeDestination.empty()) {
     if (sourceAddresses.size() > 1 || (sourceAddresses.empty() && m_walletsContainer.size() > 1)) {
-      message = std::string(isFusion ? "Destination" : "Change destination") + " address is necessary";
+      message = std::string("Change destination") + " address is necessary";
       m_logger(ERROR, BRIGHT_RED) << message << ". Source addresses size=" << sourceAddresses.size() << ", wallets count=" << m_walletsContainer.size();
-      throw std::system_error(make_error_code(isFusion ? error::DESTINATION_ADDRESS_REQUIRED : error::CHANGE_ADDRESS_REQUIRED), message);
+      throw std::system_error(make_error_code(error::CHANGE_ADDRESS_REQUIRED), message);
     }
   } else {
     if (!CryptoNote::validateAddress(changeDestination, m_currency)) {
-      message = std::string("Bad ") + (isFusion ? "destination" : "change destination") + " address: " + changeDestination;
+      message = std::string("Bad change destination address: ") + changeDestination;
       m_logger(ERROR, BRIGHT_RED) << message;
       throw std::system_error(make_error_code(CryptoNote::error::BAD_ADDRESS), message);
     }
 
     if (!isMyAddress(changeDestination)) {
-      message = std::string(isFusion ? "Destination" : "Change destination") + " address is not found in current container: " + changeDestination;
+      message = std::string("Change destination") + " address is not found in current container: " + changeDestination;
       m_logger(ERROR, BRIGHT_RED) << message;
-      throw std::system_error(make_error_code(isFusion ? error::DESTINATION_ADDRESS_NOT_FOUND : error::CHANGE_ADDRESS_NOT_FOUND), message);
+      throw std::system_error(make_error_code(error::CHANGE_ADDRESS_NOT_FOUND), message);
     }
   }
 }
@@ -1795,7 +1809,7 @@ void WalletGreen::validateTransactionParameters(const TransactionParameters& tra
   }
 
   validateSourceAddresses(transactionParameters.sourceAddresses);
-  validateChangeDestination(transactionParameters.sourceAddresses, transactionParameters.changeDestination, false);
+  validateChangeDestination(transactionParameters.sourceAddresses, transactionParameters.changeDestination);
   validateOrders(transactionParameters.destinations);
 }
 
@@ -1823,7 +1837,7 @@ size_t WalletGreen::doTransfer(const TransactionParameters& transactionParameter
     preparedTransaction,
     txSecretKey);
 
-  return validateSaveAndSendTransaction(*preparedTransaction.transaction, preparedTransaction.destinations, false, true);
+  return validateSaveAndSendTransaction(*preparedTransaction.transaction, preparedTransaction.destinations, true);
 }
 
 size_t WalletGreen::makeTransaction(const TransactionParameters& sendingTransaction) {
@@ -1881,7 +1895,7 @@ size_t WalletGreen::makeTransaction(const TransactionParameters& sendingTransact
     preparedTransaction,
     txSecretKey);
 
-  id = validateSaveAndSendTransaction(*preparedTransaction.transaction, preparedTransaction.destinations, false, false);
+  id = validateSaveAndSendTransaction(*preparedTransaction.transaction, preparedTransaction.destinations, false);
   return id;
 }
 
@@ -2293,47 +2307,35 @@ bool WalletGreen::eraseForeignTransfers(size_t transactionId, size_t firstTransf
 std::unique_ptr<CryptoNote::ITransaction> WalletGreen::makeTransaction(const std::vector<ReceiverAmounts>& decomposedOutputs,
   std::vector<InputInfo>& keysInfo, const std::string& extra, uint64_t unlockTimestamp, Crypto::SecretKey& txSecretKey) {
 
-  std::unique_ptr<ITransaction> tx = createTransaction();
+  std::vector<TxBuildInput> inputs;
+  for (auto& input: keysInfo) {
+    TxBuildInput bi;
+    bi.keyInfo = input.keyInfo;
+    bi.senderKeys = makeAccountKeys(*input.walletRecord);
+    inputs.push_back(std::move(bi));
+  }
 
-  typedef std::pair<const AccountPublicAddress*, uint64_t> AmountToAddress;
-  std::vector<AmountToAddress> amountsToAddresses;
+  std::vector<TxBuildOutput> outputs;
   for (const auto& output: decomposedOutputs) {
     for (auto amount: output.amounts) {
-      amountsToAddresses.emplace_back(AmountToAddress{&output.receiver, amount});
+      outputs.push_back(TxBuildOutput{output.receiver, amount});
     }
   }
 
-  std::shuffle(amountsToAddresses.begin(), amountsToAddresses.end(), Random::generator());
-  std::sort(amountsToAddresses.begin(), amountsToAddresses.end(), [] (const AmountToAddress& left, const AmountToAddress& right) {
-    return left.second < right.second;
-  });
+  // Use viewSecretKey for deterministic tx key: r = Hs(viewSecretKey || inputsHash).
+  auto tx = buildTransaction(inputs, outputs, m_viewSecretKey, extra, unlockTimestamp, 0, txSecretKey);
 
-  for (const auto& amountToAddress: amountsToAddresses) {
-    tx->addOutput(amountToAddress.second, *amountToAddress.first);
+  // copy ephKeys back so callers still have them if needed
+  for (size_t i = 0; i < keysInfo.size(); ++i) {
+    keysInfo[i].ephKeys = inputs[i].ephKeys;
   }
 
-  tx->setUnlockTime(unlockTimestamp);
-  tx->appendExtra(Common::asBinaryArray(extra));
-
-  for (auto& input: keysInfo) {
-    tx->addInput(makeAccountKeys(*input.walletRecord), input.keyInfo, input.ephKeys);
-  }
-
-  size_t i = 0;
-  for(auto& input: keysInfo) {
-    tx->signInputKey(i++, input.keyInfo, input.ephKeys);
-  }
-
-  SecretKey txkey;
-  tx->getTransactionSecretKey(txkey);
-  txSecretKey = txkey;
-  
   m_logger(DEBUGGING) << "Transaction created, hash " << tx->getTransactionHash() <<
     ", inputs " << m_currency.formatAmount(tx->getInputTotalAmount()) <<
     ", outputs " << m_currency.formatAmount(tx->getOutputTotalAmount()) <<
     ", fee " << m_currency.formatAmount(tx->getInputTotalAmount() - tx->getOutputTotalAmount()) <<
-    ", key " << Common::podToHex(txkey);
-    return tx;
+    ", key " << Common::podToHex(txSecretKey);
+  return tx;
 }
 
 void WalletGreen::sendTransaction(const CryptoNote::Transaction& cryptoNoteTransaction) {
@@ -2361,7 +2363,7 @@ void WalletGreen::sendTransaction(const CryptoNote::Transaction& cryptoNoteTrans
   }
 }
 
-size_t WalletGreen::validateSaveAndSendTransaction(const ITransactionReader& transaction, const std::vector<WalletTransfer>& destinations, bool isFusion, bool send) {
+size_t WalletGreen::validateSaveAndSendTransaction(const ITransactionReader& transaction, const std::vector<WalletTransfer>& destinations, bool send) {
   BinaryArray transactionData = transaction.getTransactionData();
 
   if (transactionData.size() > getMaxTxSize()) {
@@ -2388,7 +2390,6 @@ size_t WalletGreen::validateSaveAndSendTransaction(const ITransactionReader& tra
     updateTransactionStateAndPushEvent(transactionId, WalletTransactionState::FAILED);
   });
 
-  m_fusionTxsCache.emplace(transactionId, isFusion);
   pushBackOutgoingTransfers(transactionId, destinations);
 
   addUnconfirmedTransaction(transaction);
@@ -2762,8 +2763,6 @@ Crypto::SecretKey WalletGreen::getTransactionDeterministicSecretKey(Crypto::Hash
   throwIfNotInitialized();
   throwIfStopped();
 
-  Crypto::SecretKey txKey = CryptoNote::NULL_SECRET_KEY;
-
   auto getTransactionCompleted = std::promise<std::error_code>();
   auto getTransactionWaitFuture = getTransactionCompleted.get_future();
   CryptoNote::Transaction tx;
@@ -2784,8 +2783,6 @@ Crypto::SecretKey WalletGreen::getTransactionDeterministicSecretKey(Crypto::Hash
     && deterministicTxKeys.publicKey == txPubKey;
 
   return ok ? deterministicTxKeys.secretKey : CryptoNote::NULL_SECRET_KEY;
-
-  return txKey;
 }
 
 Crypto::SecretKey WalletGreen::getTransactionSecretKey(size_t transactionIndex) const {
@@ -3116,7 +3113,6 @@ void WalletGreen::transactionUpdated(const TransactionInformation& transactionIn
   } else {
     isNew = true;
     transactionId = insertBlockchainTransaction(transactionInfo, totalAmount);
-    m_fusionTxsCache.emplace(transactionId, isFusionTransaction(*it));
   }
 
   if (transactionInfo.blockHeight != CryptoNote::WALLET_UNCONFIRMED_TRANSACTION_HEIGHT) {
@@ -3380,286 +3376,6 @@ WalletGreen::WalletTrackingMode WalletGreen::getTrackingMode() const {
 
   return m_walletsContainer.get<RandomAccessIndex>().begin()->spendSecretKey == NULL_SECRET_KEY ?
         WalletTrackingMode::TRACKING : WalletTrackingMode::NOT_TRACKING;
-}
-
-size_t WalletGreen::createFusionTransaction(uint64_t threshold, uint64_t mixin,
-  const std::vector<std::string>& sourceAddresses, const std::string& destinationAddress) {
-
-  size_t id = WALLET_INVALID_TRANSACTION_ID;
-  Tools::ScopeExit releaseContext([this, &id] {
-    //m_dispatcher.yield();
-
-    if (id != WALLET_INVALID_TRANSACTION_ID) {
-      auto& tx = m_transactions[id];
-      m_logger(INFO, BRIGHT_WHITE) << "Fusion transaction created and sent, ID " << id <<
-        ", hash " << m_transactions[id].hash <<
-        ", state " << tx.state <<
-        ", transfers: " << TransferListFormatter(m_currency, getTransactionTransfersRange(id));
-    }
-  });
-
-  System::EventLock lk(m_readyEvent);
-
-  m_logger(INFO, BRIGHT_WHITE) << "createFusionTransaction" <<
-    ", from " << Common::makeContainerFormatter(sourceAddresses) <<
-    ", to '" << destinationAddress << '\'' <<
-    ", threshold " << m_currency.formatAmount(threshold) <<
-    ", mixin " << mixin;
-
-  throwIfNotInitialized();
-  throwIfTrackingMode();
-  throwIfStopped();
-
-  validateSourceAddresses(sourceAddresses);
-  validateChangeDestination(sourceAddresses, destinationAddress, true);
-
-  const size_t MAX_FUSION_OUTPUT_COUNT = 4;
-
-  uint64_t fusionTreshold = m_currency.defaultDustThreshold();
-
-  if (threshold <= fusionTreshold) {
-    m_logger(ERROR, BRIGHT_RED) << "Fusion transaction threshold is too small. Threshold " << m_currency.formatAmount(threshold) <<
-      ", minimum threshold " << m_currency.formatAmount(fusionTreshold + 1);
-    throw std::runtime_error("Threshold must be greater than " + m_currency.formatAmount(fusionTreshold));
-  }
-
-  if (m_walletsContainer.get<RandomAccessIndex>().size() == 0) {
-    m_logger(ERROR, BRIGHT_RED) << "The container doesn't have any wallets";
-    throw std::runtime_error("You must have at least one address");
-  }
-
-  size_t estimatedFusionInputsCount = m_currency.getApproximateMaximumInputCount(m_currency.fusionTxMaxSize(), MAX_FUSION_OUTPUT_COUNT, mixin);
-  if (estimatedFusionInputsCount < m_currency.fusionTxMinInputCount()) {
-    m_logger(ERROR, BRIGHT_RED) << "Fusion transaction mixin is too big " << mixin;
-    throw std::system_error(make_error_code(error::MIXIN_COUNT_TOO_BIG));
-  }
-
-  auto fusionInputs = pickRandomFusionInputs(sourceAddresses, threshold, m_currency.fusionTxMinInputCount(), estimatedFusionInputsCount);
-  if (fusionInputs.size() < m_currency.fusionTxMinInputCount()) {
-    //nothing to optimize
-    m_logger(WARNING, BRIGHT_YELLOW) << "Fusion transaction not created: nothing to optimize, threshold " << m_currency.formatAmount(threshold);
-    return WALLET_INVALID_TRANSACTION_ID;
-  }
-
-  typedef CryptoNote::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount outs_for_amount;
-  std::vector<outs_for_amount> mixinResult;
-  if (mixin != 0) {
-    requestMixinOuts(fusionInputs, mixin, mixinResult);
-  }
-
-  std::vector<InputInfo> keysInfo;
-  prepareInputs(fusionInputs, mixinResult, mixin, keysInfo);
-
-  AccountPublicAddress destination = getChangeDestination(destinationAddress, sourceAddresses);
-  m_logger(DEBUGGING) << "Destination address " << m_currency.accountAddressAsString(destination);
-
-  std::unique_ptr<ITransaction> fusionTransaction;
-  size_t transactionSize;
-  int round = 0;
-  do {
-    if (round != 0) {
-      fusionInputs.pop_back();
-      keysInfo.pop_back();
-    }
-
-    uint64_t inputsAmount = std::accumulate(fusionInputs.begin(), fusionInputs.end(), static_cast<uint64_t>(0), [] (uint64_t amount, const OutputToTransfer& input) {
-      return amount + input.out.amount;
-    });
-
-    ReceiverAmounts decomposedOutputs = decomposeFusionOutputs(destination, inputsAmount);
-    assert(decomposedOutputs.amounts.size() <= MAX_FUSION_OUTPUT_COUNT);
-
-	Crypto::SecretKey txkey;
-    fusionTransaction = makeTransaction(std::vector<ReceiverAmounts>{decomposedOutputs}, keysInfo, "", 0, txkey);
-
-    transactionSize = getTransactionSize(*fusionTransaction);
-
-    ++round;
-  } while (transactionSize > m_currency.fusionTxMaxSize() && fusionInputs.size() >= m_currency.fusionTxMinInputCount());
-
-  if (fusionInputs.size() < m_currency.fusionTxMinInputCount()) {
-    m_logger(ERROR, BRIGHT_RED) << "Unable to create fusion transaction";
-    throw std::runtime_error("Unable to create fusion transaction");
-  }
-
-  id = validateSaveAndSendTransaction(*fusionTransaction, {}, true, true);
-  return id;
-}
-
-WalletGreen::ReceiverAmounts WalletGreen::decomposeFusionOutputs(const AccountPublicAddress& address, uint64_t inputsAmount) {
-  WalletGreen::ReceiverAmounts outputs;
-  outputs.receiver = address;
-
-  decomposeAmount(inputsAmount, 0, outputs.amounts);
-  std::sort(outputs.amounts.begin(), outputs.amounts.end());
-
-  return outputs;
-}
-
-bool WalletGreen::isFusionTransaction(size_t transactionId) const {
-  throwIfNotInitialized();
-  throwIfStopped();
-
-  if (m_transactions.size() <= transactionId) {
-    m_logger(ERROR, BRIGHT_RED) << "Failed to check transaction: invalid index " << transactionId << ". Number of transactions: " << m_transactions.size();
-    throw std::system_error(make_error_code(CryptoNote::error::INDEX_OUT_OF_RANGE));
-  }
-
-  auto isFusionIter = m_fusionTxsCache.find(transactionId);
-  if (isFusionIter != m_fusionTxsCache.end()) {
-    return isFusionIter->second;
-  }
-
-  bool result = isFusionTransaction(m_transactions.get<RandomAccessIndex>()[transactionId]);
-  m_fusionTxsCache.emplace(transactionId, result);
-  return result;
-}
-
-bool WalletGreen::isFusionTransaction(const WalletTransaction& walletTx) const {
-  if (walletTx.fee != 0) {
-    return false;
-  }
-
-  uint64_t inputsSum = 0;
-  uint64_t outputsSum = 0;
-  std::vector<uint64_t> outputsAmounts;
-  std::vector<uint64_t> inputsAmounts;
-  TransactionInformation txInfo;
-  bool gotTx = false;
-  const auto& walletsIndex = m_walletsContainer.get<RandomAccessIndex>();
-  for (const WalletRecord& wallet : walletsIndex) {
-    for (const TransactionOutputInformation& output : wallet.container->getTransactionOutputs(walletTx.hash, ITransfersContainer::IncludeTypeKey | ITransfersContainer::IncludeStateAll)) {
-      if (outputsAmounts.size() <= output.outputInTransaction) {
-        outputsAmounts.resize(output.outputInTransaction + 1, 0);
-      }
-
-      assert(output.amount != 0);
-      assert(outputsAmounts[output.outputInTransaction] == 0);
-      outputsAmounts[output.outputInTransaction] = output.amount;
-      outputsSum += output.amount;
-    }
-
-    for (const TransactionOutputInformation& input : wallet.container->getTransactionInputs(walletTx.hash, ITransfersContainer::IncludeTypeKey)) {
-      inputsSum += input.amount;
-      inputsAmounts.push_back(input.amount);
-    }
-
-    if (!gotTx) {
-      gotTx = wallet.container->getTransactionInformation(walletTx.hash, txInfo);
-    }
-  }
-
-  if (!gotTx) {
-    return false;
-  }
-
-  if (outputsSum != inputsSum || outputsSum != txInfo.totalAmountOut || inputsSum != txInfo.totalAmountIn) {
-    return false;
-  } else {
-    return m_currency.isFusionTransaction(inputsAmounts, outputsAmounts, 0, txInfo.blockHeight); //size = 0 here because can't get real size of tx in wallet.
-  }
-}
-
-IFusionManager::EstimateResult WalletGreen::estimate(uint64_t threshold, const std::vector<std::string>& sourceAddresses) const {
-  System::EventLock lk(m_readyEvent);
-
-  throwIfNotInitialized();
-  throwIfStopped();
-
-  validateSourceAddresses(sourceAddresses);
-
-  IFusionManager::EstimateResult result{0, 0};
-  auto walletOuts = sourceAddresses.empty() ? pickWalletsWithMoney() : pickWallets(sourceAddresses);
-  std::array<size_t, std::numeric_limits<uint64_t>::digits10 + 1> bucketSizes;
-  bucketSizes.fill(0);
-  for (size_t walletIndex = 0; walletIndex < walletOuts.size(); ++walletIndex) {
-    for (auto& out : walletOuts[walletIndex].outs) {
-      uint8_t powerOfTen = 0;
-      if (m_currency.isAmountApplicableInFusionTransactionInput(out.amount, threshold, powerOfTen, m_node.getLastKnownBlockHeight())) {
-        assert(powerOfTen < std::numeric_limits<uint64_t>::digits10 + 1);
-        bucketSizes[powerOfTen]++;
-      }
-    }
-
-    result.totalOutputCount += walletOuts[walletIndex].outs.size();
-  }
-
-  for (auto bucketSize : bucketSizes) {
-    if (bucketSize >= m_currency.fusionTxMinInputCount()) {
-      result.fusionReadyCount += bucketSize;
-    }
-  }
-
-  return result;
-}
-
-std::vector<WalletGreen::OutputToTransfer> WalletGreen::pickRandomFusionInputs(const std::vector<std::string>& addresses,
-  uint64_t threshold, size_t minInputCount, size_t maxInputCount) {
-
-  std::vector<WalletGreen::OutputToTransfer> allFusionReadyOuts;
-  auto walletOuts = addresses.empty() ? pickWalletsWithMoney() : pickWallets(addresses);
-  std::array<size_t, std::numeric_limits<uint64_t>::digits10 + 1> bucketSizes;
-  bucketSizes.fill(0);
-  for (size_t walletIndex = 0; walletIndex < walletOuts.size(); ++walletIndex) {
-    for (auto& out : walletOuts[walletIndex].outs) {
-      uint8_t powerOfTen = 0;
-      if (m_currency.isAmountApplicableInFusionTransactionInput(out.amount, threshold, powerOfTen, m_node.getLastKnownBlockHeight())) {
-        allFusionReadyOuts.push_back({std::move(out), walletOuts[walletIndex].wallet});
-        assert(powerOfTen < std::numeric_limits<uint64_t>::digits10 + 1);
-        bucketSizes[powerOfTen]++;
-      }
-    }
-  }
-
-  //now, pick the bucket
-  std::vector<uint8_t> bucketNumbers(bucketSizes.size());
-  std::iota(bucketNumbers.begin(), bucketNumbers.end(), 0);
-  std::shuffle(bucketNumbers.begin(), bucketNumbers.end(), Random::generator());
-  size_t bucketNumberIndex = 0;
-  for (; bucketNumberIndex < bucketNumbers.size(); ++bucketNumberIndex) {
-    if (bucketSizes[bucketNumbers[bucketNumberIndex]] >= minInputCount) {
-      break;
-    }
-  }
-  
-  if (bucketNumberIndex == bucketNumbers.size()) {
-    return {};
-  }
-
-  size_t selectedBucket = bucketNumbers[bucketNumberIndex];
-  assert(selectedBucket < std::numeric_limits<uint64_t>::digits10 + 1);
-  assert(bucketSizes[selectedBucket] >= minInputCount);
-  uint64_t lowerBound = 1;
-  for (size_t i = 0; i < selectedBucket; ++i) {
-    lowerBound *= 10;
-  }
-   
-  uint64_t upperBound = selectedBucket == std::numeric_limits<uint64_t>::digits10 ? UINT64_MAX : lowerBound * 10;
-  std::vector<WalletGreen::OutputToTransfer> selectedOuts;
-  selectedOuts.reserve(bucketSizes[selectedBucket]);
-  for (size_t outIndex = 0; outIndex < allFusionReadyOuts.size(); ++outIndex) {
-    if (allFusionReadyOuts[outIndex].out.amount >= lowerBound && allFusionReadyOuts[outIndex].out.amount < upperBound) {
-      selectedOuts.push_back(std::move(allFusionReadyOuts[outIndex]));
-    }
-  }
-
-  assert(selectedOuts.size() >= minInputCount);
-
-  auto outputsSortingFunction = [](const OutputToTransfer& l, const OutputToTransfer& r) { return l.out.amount < r.out.amount; };
-  if (selectedOuts.size() <= maxInputCount) {
-    std::sort(selectedOuts.begin(), selectedOuts.end(), outputsSortingFunction);
-    return selectedOuts;
-  }
-
-  ShuffleGenerator<size_t> generator(selectedOuts.size());
-  std::vector<WalletGreen::OutputToTransfer> trimmedSelectedOuts;
-  trimmedSelectedOuts.reserve(maxInputCount);
-  for (size_t i = 0; i < maxInputCount; ++i) {
-    trimmedSelectedOuts.push_back(std::move(selectedOuts[generator()]));
-  }
-
-  std::sort(trimmedSelectedOuts.begin(), trimmedSelectedOuts.end(), outputsSortingFunction);
-  return trimmedSelectedOuts;  
 }
 
 std::vector<TransactionsInBlockInfo> WalletGreen::getTransactionsInBlocks(uint32_t blockIndex, size_t count) const {

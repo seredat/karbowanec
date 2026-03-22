@@ -1,4 +1,5 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2016-2026, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -35,7 +36,8 @@ public:
   bool advanceHeight(uint32_t height);
   const AccountKeys& getKeys() const;
   bool addTransaction(const TransactionBlockInfo& blockInfo, const ITransactionReader& tx,
-                      const std::vector<TransactionOutputInformationIn>& transfers);
+                      const std::vector<TransactionOutputInformationIn>& transfers,
+                      bool isOutgoing = false);
 
   void deleteUnconfirmedTransaction(const Crypto::Hash& transactionHash);
   void markTransactionConfirmed(const TransactionBlockInfo& block, const Crypto::Hash& transactionHash, const std::vector<uint32_t>& globalIndices);

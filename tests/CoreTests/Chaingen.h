@@ -30,6 +30,8 @@
 
 #include "../TestGenerator/TestGenerator.h"
 #include "CryptoNoteCore/CryptoNoteTools.h"
+#include "CryptoNoteCore/CryptoNoteSerialization.h"
+#include "Wallet/TransactionBuilder.h"
 
 #include "BoostSerializationHelper.h"
 #include "AccountBoostSerialization.h"
@@ -200,8 +202,8 @@ bool find_block_chain(const std::vector<test_event_entry>& events, std::vector<C
 void fill_tx_sources_and_destinations(const std::vector<test_event_entry>& events, const CryptoNote::Block& blk_head,
                                       const CryptoNote::AccountBase& from, const CryptoNote::AccountBase& to,
                                       uint64_t amount, uint64_t fee, size_t nmix,
-                                      std::vector<CryptoNote::TransactionSourceEntry>& sources,
-                                      std::vector<CryptoNote::TransactionDestinationEntry>& destinations);
+                                      std::vector<CryptoNote::TxBuildInput>& sources,
+                                      std::vector<CryptoNote::TxBuildOutput>& destinations);
 uint64_t get_balance(const CryptoNote::AccountBase& addr, const std::vector<CryptoNote::Block>& blockchain, const map_hash2tx_t& mtx);
 
 //--------------------------------------------------------------------------
