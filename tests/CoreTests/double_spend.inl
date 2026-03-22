@@ -112,26 +112,30 @@ bool gen_double_spend_in_tx<txs_keeped_by_block>::generate(std::vector<test_even
   INIT_DOUBLE_SPEND_TEST();
   DO_CALLBACK(events, "mark_last_valid_block");
 
-  std::vector<CryptoNote::TransactionSourceEntry> sources;
-  CryptoNote::TransactionSourceEntry se;
-  se.amount = tx_0.outputs[0].amount;
-  se.outputs.push_back(std::make_pair(0, boost::get<CryptoNote::KeyOutput>(tx_0.outputs[0].target).key));
-  se.realOutput = 0;
-  se.realTransactionPublicKey = CryptoNote::getTransactionPublicKeyFromExtra(tx_0.extra);
-  se.realOutputIndexInTransaction = 0;
+  std::vector<CryptoNote::TxBuildInput> sources;
+  CryptoNote::TxBuildInput se;
+  se.keyInfo.amount = tx_0.outputs[0].amount;
+  { CryptoNote::TransactionTypes::GlobalOutput go; go.outputIndex = 0; go.targetKey = boost::get<CryptoNote::KeyOutput>(tx_0.outputs[0].target).key; se.keyInfo.outputs.push_back(go); }
+  se.keyInfo.realOutput.transactionIndex = 0;
+  se.keyInfo.realOutput.transactionPublicKey = CryptoNote::getTransactionPublicKeyFromExtra(tx_0.extra);
+  se.keyInfo.realOutput.outputInTransaction = 0;
+  se.senderKeys = bob_account.getAccountKeys();
   sources.push_back(se);
   // Double spend!
   sources.push_back(se);
 
-  CryptoNote::TransactionDestinationEntry de;
-  de.addr = alice_account.getAccountKeys().address;
-  de.amount = 2 * se.amount - this->m_currency.minimumFee();
-  std::vector<CryptoNote::TransactionDestinationEntry> destinations;
+  CryptoNote::TxBuildOutput de;
+  de.destination = alice_account.getAccountKeys().address;
+  de.amount = 2 * se.keyInfo.amount - this->m_currency.minimumFee();
+  std::vector<CryptoNote::TxBuildOutput> destinations;
   destinations.push_back(de);
 
   CryptoNote::Transaction tx_1;
-  if (!constructTransaction(bob_account.getAccountKeys(), sources, destinations, std::vector<uint8_t>(), tx_1, 0, this->m_logger))
-    return false;
+  try {
+    Crypto::SecretKey txkey;
+    auto itx = CryptoNote::buildTransaction(sources, destinations, bob_account.getAccountKeys().viewSecretKey, {}, 0, 0, txkey);
+    CryptoNote::fromBinaryArray(tx_1, itx->getTransactionData());
+  } catch (...) { return false; }
 
   SET_EVENT_VISITOR_SETT(events, event_visitor_settings::set_txs_keeped_by_block, txs_keeped_by_block);
   DO_CALLBACK(events, "mark_invalid_tx");

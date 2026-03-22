@@ -37,7 +37,6 @@
 #include "CryptoNoteCore/MinerConfig.h"
 #include "CryptoNoteProtocol/CryptoNoteProtocolHandler.h"
 #include "CryptoNoteProtocol/ICryptoNoteProtocolQuery.h"
-#include "HTTP/httplib.h"
 #include "Logging/LoggerManager.h"
 #include "Rpc/RpcServer.h"
 #include "Rpc/RpcServerConfig.h"
@@ -137,9 +136,6 @@ int main(int argc, char* argv[])
 
     po::options_description desc_cmd_only("Command line options");
     po::options_description desc_cmd_sett("Command line options and settings options");
-
-    desc_cmd_sett.add_options()
-      ("enable-blockchain-indexes,i", po::bool_switch()->default_value(false), "Enable blockchain indexes");
 
     command_line::add_arg(desc_cmd_only, command_line::arg_help);
     command_line::add_arg(desc_cmd_only, command_line::arg_version);
@@ -280,7 +276,7 @@ int main(int argc, char* argv[])
       logger(INFO) << "Enabled full Proof of Work validation without hashing blobs cache";
     }
 
-    CryptoNote::Core m_core(currency, nullptr, logManager, dispatcher, vm["enable-blockchain-indexes"].as<bool>(), allow_reorg, no_blobs);
+    CryptoNote::Core m_core(currency, nullptr, logManager, dispatcher, allow_reorg, no_blobs);
 
     bool disable_checkpoints = command_line::get_arg(vm, arg_disable_checkpoints);
     if (!disable_checkpoints) {

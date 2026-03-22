@@ -20,6 +20,7 @@
 #include "CryptoNoteCore/Account.h"
 #include "CryptoNoteCore/CryptoNoteBasic.h"
 #include "CryptoNoteCore/CryptoNoteFormatUtils.h"
+#include "CryptoNoteCore/CryptoNoteSerialization.h"
 
 #include "MultiTransactionTestBase.h"
 
@@ -47,7 +48,7 @@ public:
 
     for (size_t i = 0; i < out_count; ++i)
     {
-      m_destinations.push_back(TransactionDestinationEntry(this->m_source_amount / out_count, m_alice.getAccountKeys().address));
+      m_destinations.push_back(TxBuildOutput{m_alice.getAccountKeys().address, this->m_source_amount / out_count});
     }
 
     return true;
@@ -55,11 +56,18 @@ public:
 
   bool test()
   {
-    return CryptoNote::constructTransaction(this->m_miners[this->real_source_idx].getAccountKeys(), this->m_sources, m_destinations, std::vector<uint8_t>(), m_tx, 0, this->m_logger);
+    Crypto::SecretKey txkey;
+    try {
+      auto itx = CryptoNote::buildTransaction(this->m_sources, m_destinations,
+          this->m_miners[this->real_source_idx].getAccountKeys().viewSecretKey, "", 0, 0, txkey);
+      return CryptoNote::fromBinaryArray(m_tx, itx->getTransactionData());
+    } catch (...) {
+      return false;
+    }
   }
 
 private:
   CryptoNote::AccountBase m_alice;
-  std::vector<CryptoNote::TransactionDestinationEntry> m_destinations;
+  std::vector<CryptoNote::TxBuildOutput> m_destinations;
   CryptoNote::Transaction m_tx;
 };

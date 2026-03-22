@@ -307,7 +307,7 @@ void PaymentGateService::runWalletService(const CryptoNote::Currency& currency, 
 
   std::unique_ptr<CryptoNote::WalletGreen> wallet(new CryptoNote::WalletGreen(*dispatcher, currency, node, logger));
 
-  service = new PaymentService::WalletService(currency, *dispatcher, node, *wallet, *wallet, walletConfiguration, logger);
+  service = new PaymentService::WalletService(currency, *dispatcher, node, *wallet, walletConfiguration, logger);
   std::unique_ptr<PaymentService::WalletService> serviceGuard(service);
   try {
     service->init();
@@ -339,13 +339,12 @@ void PaymentGateService::runWalletService(const CryptoNote::Currency& currency, 
         rpc_key_file)){
         rpc_run_ssl = true;
       } else {
-        Logging::LoggerRef(logger, "PaymentGateService")(Logging::ERROR, Logging::BRIGHT_RED) << "Start JSON-RPC SSL server was canceled because certificate file(s) could not be found" << std::endl;
+        Logging::LoggerRef(logger, "PaymentGateService")(Logging::ERROR, Logging::BRIGHT_RED) 
+          << "Start JSON-RPC SSL server was canceled because certificate file(s) could not be found" << std::endl;
       }
     }
 
     rpcServer.init(rpc_chain_file, rpc_key_file, rpc_run_ssl);
-
-    rpcServer.setAuth(config.gateConfiguration.m_rpcUser, config.gateConfiguration.m_rpcPassword);
 
     Tools::SignalHandler::install([&] {
       rpcServer.stop();
@@ -361,7 +360,9 @@ void PaymentGateService::runWalletService(const CryptoNote::Currency& currency, 
 
     rpcServer.start(config.gateConfiguration.m_bind_address,
                     config.gateConfiguration.m_bind_port,
-                    config.gateConfiguration.m_bind_port_ssl);
+                    config.gateConfiguration.m_bind_port_ssl,
+                    config.gateConfiguration.m_rpcUser,
+                    config.gateConfiguration.m_rpcPassword);
 
     stopEvent->wait();
 

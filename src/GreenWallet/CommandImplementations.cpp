@@ -12,7 +12,6 @@
 #include "Common/Base58.h"
 #include "Common/StringTools.h"
 #include "Common/FormatTools.h"
-#include "Tools.h"
 #include "CryptoNoteCore/Account.h"
 #include "CryptoNoteCore/CryptoNoteBasicImpl.h"
 
@@ -25,7 +24,6 @@
 #include <GreenWallet/AddressBook.h>
 #include <Common/ColouredMsg.h>
 #include <GreenWallet/Commands.h>
-#include <GreenWallet/Fusion.h>
 #include <GreenWallet/Menu.h>
 #include <GreenWallet/Open.h>
 #include <GreenWallet/Sync.h>
@@ -458,7 +456,7 @@ void saveCSV(CryptoNote::WalletGreen &wallet, CryptoNote::INode &node)
     {
         const CryptoNote::WalletTransaction t = wallet.getTransaction(i);
 
-        /* Ignore fusion transactions */
+        /* Ignore zero-amount transactions */
         if (t.totalAmount == 0)
         {
             continue;

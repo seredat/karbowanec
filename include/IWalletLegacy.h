@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2014-2016, The Monero Project
-// Copyright (c) 2016-2020, Karbo developers
+// Copyright (c) 2016-2026, Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -146,20 +146,15 @@ public:
   virtual TransactionId sendTransaction(const WalletLegacyTransfer& transfer, uint64_t fee, const std::string& extra = "", uint64_t mixIn = 0, uint64_t unlockTimestamp = 0) = 0;
   virtual TransactionId sendTransaction(const std::vector<WalletLegacyTransfer>& transfers, uint64_t fee, const std::string& extra = "", uint64_t mixIn = 0, uint64_t unlockTimestamp = 0) = 0;
   virtual TransactionId sendTransaction(const std::vector<WalletLegacyTransfer>& transfers, const std::list<TransactionOutputInformation>& selectedOuts, uint64_t fee, const std::string& extra = "", uint64_t mixIn = 0, uint64_t unlockTimestamp = 0) = 0;
-  virtual TransactionId sendFusionTransaction(const std::list<TransactionOutputInformation>& fusionInputs, uint64_t fee, const std::string& extra = "", uint64_t mixIn = 0, uint64_t unlockTimestamp = 0) = 0;
   virtual std::string prepareRawTransaction(TransactionId& transactionId, const std::vector<WalletLegacyTransfer>& transfers, uint64_t fee, const std::string& extra, uint64_t mixIn, uint64_t unlockTimestamp) = 0;
   virtual std::string prepareRawTransaction(TransactionId& transactionId, const std::vector<WalletLegacyTransfer>& transfers, const std::list<TransactionOutputInformation>& selectedOuts, uint64_t fee, const std::string& extra, uint64_t mixIn, uint64_t unlockTimestamp) = 0;
   virtual std::string prepareRawTransaction(TransactionId& transactionId, const WalletLegacyTransfer& transfer, uint64_t fee, const std::string& extra, uint64_t mixIn, uint64_t unlockTimestamp) = 0;
   virtual std::error_code cancelTransaction(size_t transferId) = 0;
 
-  virtual size_t estimateFusion(const uint64_t& threshold) = 0;
-  virtual std::list<TransactionOutputInformation> selectFusionTransfersToSend(uint64_t threshold, size_t minInputCount, size_t maxInputCount) = 0;
-
   virtual bool getTransactionInformation(const Crypto::Hash& transactionHash, TransactionInformation& info,
       uint64_t* amountIn = nullptr, uint64_t* amountOut = nullptr) const = 0;
   virtual std::vector<TransactionOutputInformation> getTransactionOutputs(const Crypto::Hash& transactionHash, uint32_t flags = ITransfersContainer::IncludeDefault) const = 0;
   virtual std::vector<TransactionOutputInformation> getTransactionInputs(const Crypto::Hash& transactionHash, uint32_t flags) const = 0;
-  virtual bool isFusionTransaction(const WalletLegacyTransaction& walletTx) const = 0;
 
   virtual std::string sign_message(const std::string &message) = 0;
   virtual bool verify_message(const std::string &message, const CryptoNote::AccountPublicAddress &address, const std::string &signature) = 0;
