@@ -887,16 +887,15 @@ bool Blockchain::getBlockLongHash(Crypto::cn_context& context, const Block& b, C
 
   // v6 sequential state
   uint32_t seq = 0;
-  if (b.majorVersion >= CryptoNote::BLOCK_MAJOR_VERSION_6) {
-    // compute initial hash for seq derivation
-    cn_fast_hash(pot.data(), pot.size(), hash_1);
-    // initialize seq from 128 bits of hash entropy
-    const uint8_t* d = hash_1.data;
-    seq = load_u32_be(d, 0) ^ load_u32_be(d, 4) ^ load_u32_be(d, 8) ^ load_u32_be(d, 12);
-  }
 
   for (uint32_t i = 0; i < ITER; i++) {
     cn_fast_hash(pot.data(), pot.size(), hash_1);
+
+    // initialize seq from the first iteration's hash (same data, avoids redundant hash)
+    if (b.majorVersion >= CryptoNote::BLOCK_MAJOR_VERSION_6 && i == 0) {
+      const uint8_t* d = hash_1.data;
+      seq = load_u32_be(d, 0) ^ load_u32_be(d, 4) ^ load_u32_be(d, 8) ^ load_u32_be(d, 12);
+    }
 
     for (uint8_t j = 1; j <= 8; j++) {
 
