@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <ctime>
+#include <set>
 #include <vector>
 #include <unordered_set>
 #include <unordered_map>
@@ -58,11 +59,6 @@ namespace CryptoNote {
           auto r = m_keyImages.insert(boost::get<KeyInput>(in).keyImage);
           (void)r; //just to make compiler to shut up
           assert(r.second);
-        } else if (in.type() == typeid(MultisignatureInput)) {
-          const auto& msig = boost::get<MultisignatureInput>(in);
-          auto r = m_usedOutputs.insert(std::make_pair(msig.amount, msig.outputIndex));
-          (void)r; //just to make compiler to shut up
-          assert(r.second);
         }
       }
 
@@ -82,11 +78,6 @@ namespace CryptoNote {
           if (m_keyImages.count(boost::get<KeyInput>(in).keyImage)) {
             return false;
           }
-        } else if (in.type() == typeid(MultisignatureInput)) {
-          const auto& msig = boost::get<MultisignatureInput>(in);
-          if (m_usedOutputs.count(std::make_pair(msig.amount, msig.outputIndex))) {
-            return false;
-          }
         }
       }
       return true;
@@ -104,20 +95,19 @@ namespace CryptoNote {
   //---------------------------------------------------------------------------------
   tx_memory_pool::tx_memory_pool(
     const CryptoNote::Currency& currency,
-    CryptoNote::ITransactionValidator& validator, 
+    CryptoNote::ITransactionValidator& validator,
     CryptoNote::ICore& core,
     CryptoNote::ITimeProvider& timeProvider,
-    Logging::ILogger& log,
-    bool blockchainIndexesEnabled) :
+    Logging::ILogger& log) :
     m_currency(currency),
     m_validator(validator),
     m_core(core),
-    m_timeProvider(timeProvider), 
+    m_timeProvider(timeProvider),
     m_txCheckInterval(60, timeProvider),
     m_fee_index(boost::get<1>(m_transactions)),
     logger(log, "txpool"),
-    m_paymentIdIndex(blockchainIndexesEnabled),
-    m_timestampIndex(blockchainIndexesEnabled) {
+    m_paymentIdIndex(true),
+    m_timestampIndex(true) {
   }
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::add_tx(const Transaction &tx, /*const Crypto::Hash& tx_prefix_hash,*/ const Crypto::Hash &id, size_t blobSize, tx_verification_context& tvc, bool keptByBlock) {
@@ -475,8 +465,6 @@ namespace CryptoNote {
 
       m_transactions.clear();
       m_spent_key_images.clear();
-      m_spentOutputs.clear();
-
       m_paymentIdIndex.clear();
       m_timestampIndex.clear();
     } else {
@@ -507,7 +495,7 @@ namespace CryptoNote {
     return true;
   }
 
-#define CURRENT_MEMPOOL_ARCHIVE_VER 1
+#define CURRENT_MEMPOOL_ARCHIVE_VER 2
 
   void serialize(CryptoNote::tx_memory_pool::TransactionDetails& td, ISerializer& s) {
     s(td.id, "id");
@@ -543,7 +531,6 @@ namespace CryptoNote {
     }
 
     KV_MEMBER(m_spent_key_images);
-    KV_MEMBER(m_spentOutputs);
     KV_MEMBER(m_recentlyDeletedTransactions);
   }
 
@@ -621,13 +608,6 @@ namespace CryptoNote {
           //it is now empty hash container for this key_image
           m_spent_key_images.erase(it);
         }
-      } else if (in.type() == typeid(MultisignatureInput)) {
-        if (!keptByBlock) {
-          const auto& msig = boost::get<MultisignatureInput>(in);
-          auto output = GlobalOutput(msig.amount, msig.outputIndex);
-          assert(m_spentOutputs.count(output));
-          m_spentOutputs.erase(output);
-        }
       }
     }
 
@@ -653,13 +633,6 @@ namespace CryptoNote {
           logger(ERROR, BRIGHT_RED) << "internal error: try to insert duplicate iterator in key_image set";
           return false;
         }
-      } else if (in.type() == typeid(MultisignatureInput)) {
-        if (!keptByBlock) {
-          const auto& msig = boost::get<MultisignatureInput>(in);
-          auto r = m_spentOutputs.insert(GlobalOutput(msig.amount, msig.outputIndex));
-          (void)r;
-          assert(r.second);
-        }
       }
     }
 
@@ -672,11 +645,6 @@ namespace CryptoNote {
       if (in.type() == typeid(KeyInput)) {
         const auto& tokey_in = boost::get<KeyInput>(in);
         if (m_spent_key_images.count(tokey_in.keyImage)) {
-          return true;
-        }
-      } else if (in.type() == typeid(MultisignatureInput)) {
-        const auto& msig = boost::get<MultisignatureInput>(in);
-        if (m_spentOutputs.count(GlobalOutput(msig.amount, msig.outputIndex))) {
           return true;
         }
       }

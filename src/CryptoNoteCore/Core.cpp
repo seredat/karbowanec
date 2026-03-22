@@ -69,12 +69,12 @@ private:
   friend class Core;
 };
 
-Core::Core(const Currency& currency, i_cryptonote_protocol* pprotocol, Logging::ILogger& logger, System::Dispatcher& dispatcher, bool blockchainIndexesEnabled, bool allowDeepReorg, bool noBlobs) :
+Core::Core(const Currency& currency, i_cryptonote_protocol* pprotocol, Logging::ILogger& logger, System::Dispatcher& dispatcher, bool allowDeepReorg, bool noBlobs) :
   m_dispatcher(dispatcher),
   m_currency(currency),
   logger(logger, "Core"),
-  m_mempool(currency, m_blockchain, *this, m_timeProvider, logger, blockchainIndexesEnabled),
-  m_blockchain(currency, m_mempool, logger, blockchainIndexesEnabled, allowDeepReorg, noBlobs),
+  m_mempool(currency, m_blockchain, *this, m_timeProvider, logger),
+  m_blockchain(currency, m_mempool, logger, allowDeepReorg, noBlobs),
   m_miner(new miner(currency, *this, logger)),
   m_checkpoints(logger, allowDeepReorg) {
     set_cryptonote_protocol(pprotocol);
@@ -439,11 +439,6 @@ bool Core::check_tx_semantic(const Transaction& tx, const Crypto::Hash& txHash, 
     return false;
   }
 
-  if (!checkMultisignatureInputsDiff(tx)) {
-    logger(ERROR) << "tx has a few multisignature inputs with identical output indexes";
-    return false;
-  }
-
   return true;
 }
 
@@ -646,10 +641,6 @@ bool Core::get_random_outs_for_amounts(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_
 
 bool Core::get_tx_outputs_gindexs(const Crypto::Hash& tx_id, std::vector<uint32_t>& indexs) {
   return m_blockchain.getTransactionOutputGlobalIndexes(tx_id, indexs);
-}
-
-bool Core::getOutByMSigGIndex(uint64_t amount, uint64_t gindex, MultisignatureOutput& out) {
-  return m_blockchain.get_out_by_msig_gindex(amount, gindex, out);
 }
 
 void Core::pause_mining() {
@@ -1112,10 +1103,6 @@ bool Core::getBlockContainingTx(const Crypto::Hash& txId, Crypto::Hash& blockId,
   return m_blockchain.getBlockContainingTransaction(txId, blockId, blockHeight);
 }
 
-bool Core::getMultisigOutputReference(const MultisignatureInput& txInMultisig, std::pair<Crypto::Hash, size_t>& outputReference) {
-  return m_blockchain.getMultisigOutputReference(txInMultisig, outputReference);
-}
-
 bool Core::getGeneratedTransactionsNumber(uint32_t height, uint64_t& generatedTransactions) {
   return m_blockchain.getGeneratedTransactionsNumber(height, generatedTransactions);
 }
@@ -1373,10 +1360,6 @@ bool Core::removeMessageQueue(MessageQueue<BlockchainMessage>& messageQueue) {
 void Core::rollbackBlockchain(const uint32_t height) {
   logger(INFO, BRIGHT_YELLOW) << "Rewinding blockchain to height: " << height;
   m_blockchain.rollbackBlockchainTo(height);
-}
-
-bool Core::saveBlockchain() {
-  return m_blockchain.storeCache();
 }
 
 }

@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2017, The CryptoNote developers, The Bytecoin developers
-// Copyright (c) 2016-2020, The Karbo developers
+// Copyright (c) 2016-2026, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -112,9 +112,6 @@ SpentOutputDescriptor::SpentOutputDescriptor(const TransactionOutputInformationI
     m_globalOutputIndex(0) {
   if (m_type == TransactionTypes::OutputType::Key) {
     m_keyImage = &transactionInfo.keyImage;
-  } else if (m_type == TransactionTypes::OutputType::Multisignature) {
-    m_amount = transactionInfo.amount;
-    m_globalOutputIndex = transactionInfo.globalOutputIndex;
   } else {
     assert(false);
   }
@@ -124,19 +121,9 @@ SpentOutputDescriptor::SpentOutputDescriptor(const KeyImage* keyImage) {
   assign(keyImage);
 }
 
-SpentOutputDescriptor::SpentOutputDescriptor(uint64_t amount, uint32_t globalOutputIndex) {
-  assign(amount, globalOutputIndex);
-}
-
 void SpentOutputDescriptor::assign(const KeyImage* keyImage) {
   m_type = TransactionTypes::OutputType::Key;
   m_keyImage = keyImage;
-}
-
-void SpentOutputDescriptor::assign(uint64_t amount, uint32_t globalOutputIndex) {
-  m_type = TransactionTypes::OutputType::Multisignature;
-  m_amount = amount;
-  m_globalOutputIndex = globalOutputIndex;
 }
 
 bool SpentOutputDescriptor::isValid() const {
@@ -146,8 +133,6 @@ bool SpentOutputDescriptor::isValid() const {
 bool SpentOutputDescriptor::operator==(const SpentOutputDescriptor& other) const {
   if (m_type == TransactionTypes::OutputType::Key) {
     return other.m_type == m_type && *other.m_keyImage == *m_keyImage;
-  } else if (m_type == TransactionTypes::OutputType::Multisignature) {
-    return other.m_type == m_type && other.m_amount == m_amount && other.m_globalOutputIndex == m_globalOutputIndex;
   } else {
     assert(false);
     return false;
@@ -158,10 +143,6 @@ size_t SpentOutputDescriptor::hash() const {
   if (m_type == TransactionTypes::OutputType::Key) {
     static_assert(sizeof(size_t) < sizeof(*m_keyImage), "sizeof(size_t) < sizeof(*m_keyImage)");
     return *reinterpret_cast<const size_t*>(m_keyImage->data);
-  } else if (m_type == TransactionTypes::OutputType::Multisignature) {
-    size_t hashValue = boost::hash_value(m_amount);
-    boost::hash_combine(hashValue, m_globalOutputIndex);
-    return hashValue;
   } else {
     assert(false);
     return 0;
@@ -177,7 +158,7 @@ TransfersContainer::TransfersContainer(const Currency& currency, Logging::ILogge
 }
 
 bool TransfersContainer::addTransaction(const TransactionBlockInfo& block, const ITransactionReader& tx,
-  const std::vector<TransactionOutputInformationIn>& transfers) {
+  const std::vector<TransactionOutputInformationIn>& transfers, bool isOutgoing) {
 
   try {
     std::unique_lock<std::mutex> lock(m_mutex);
@@ -195,9 +176,13 @@ bool TransfersContainer::addTransaction(const TransactionBlockInfo& block, const
     }
 
     bool added = addTransactionOutputs(block, tx, transfers);
-    added |= addTransactionInputs(block, tx);
+    added |= addTransactionInputs(block, tx, isOutgoing);
 
-    if (added) {
+    // For view-only wallets, the sender detection via viewSecretKey may find an outgoing tx
+    // that has no change outputs and no trackable inputs.
+    // Force-record it so the wallet can report the transaction as outgoing.
+    bool forceAdded = isOutgoing && !added;
+    if (added || forceAdded) {
       addTransaction(block, tx);
     }
 
@@ -205,7 +190,7 @@ bool TransfersContainer::addTransaction(const TransactionBlockInfo& block, const
       m_currentHeight = block.height;
     }
 
-    return added;
+    return added || forceAdded;
   } catch (...) {
     if (m_transactions.count(tx.getTransactionHash()) == 0) {
       m_logger(ERROR, BRIGHT_RED) << "Failed to add transaction, remove transaction transfers, block " << block.height <<
@@ -300,14 +285,6 @@ bool TransfersContainer::addTransactionOutputs(const TransactionBlockInfo& block
             ", key image " << info.keyImage;
           throw std::runtime_error(message);
         }
-      } else if (info.type == TransactionTypes::OutputType::Multisignature) {
-        SpentOutputDescriptor descriptor(transfer);
-        if (m_availableTransfers.get<SpentOutputDescriptorIndex>().count(descriptor) > 0 ||
-            m_spentTransfers.get<SpentOutputDescriptorIndex>().count(descriptor) > 0) {
-          auto message = "Failed to add transaction output: multisignature output already exists";
-          m_logger(ERROR, BRIGHT_RED) << message << ", amount " << m_currency.formatAmount(info.amount) << ", global index " << info.globalOutputIndex;
-          throw std::runtime_error(message);
-        }
       }
 
       auto result = m_availableTransfers.emplace(std::move(info));
@@ -328,7 +305,7 @@ bool TransfersContainer::addTransactionOutputs(const TransactionBlockInfo& block
 /**
  * \pre m_mutex is locked.
  */
-bool TransfersContainer::addTransactionInputs(const TransactionBlockInfo& block, const ITransactionReader& tx) {
+bool TransfersContainer::addTransactionInputs(const TransactionBlockInfo& block, const ITransactionReader& tx, bool isOutgoing) {
   bool inputsAdded = false;
 
   for (size_t i = 0; i < tx.getInputCount(); ++i) {
@@ -373,10 +350,51 @@ bool TransfersContainer::addTransactionInputs(const TransactionBlockInfo& block,
           auto message = "Failed to add key input: spend output of unconfirmed transaction";
           m_logger(ERROR, BRIGHT_RED) << message << ", key image " << input.keyImage;
           throw std::runtime_error(message);
-        } else {
-          // This input doesn't spend any transfer from this container
-          continue;
         }
+
+        // Fallback for view-only wallets: generate_key_image_helper() with a null spendSecretKey
+        // produces a partial key image ki_partial = Hs(a·R,i)·Hp(P) rather than the real
+        // ki = (Hs(a·R,i)+b)·Hp(P), so the key-image lookup above finds nothing.
+        // When isOutgoing is true (confirmed by viewSecretKey match in TransfersConsumer),
+        // identify the spent output by ring membership: decode the input's ring-member global
+        // output indices and find which of our available outputs is one of them.
+        // This is RingCT-compatible — global output indices are always visible even when
+        // amounts are committed, unlike amount-based matching.
+        if (isOutgoing) {
+          // Decode relative offsets -- absolute global output indices.
+          // outputIndexes[0] is the first absolute index; subsequent entries are differences.
+          std::vector<uint32_t> ringAbsoluteIdxs;
+          ringAbsoluteIdxs.reserve(input.outputIndexes.size());
+          uint32_t accum = 0;
+          for (uint32_t rel : input.outputIndexes) {
+            accum += rel;
+            ringAbsoluteIdxs.push_back(accum);
+          }
+
+          bool ringMatched = false;
+          for (auto it = m_availableTransfers.begin(); it != m_availableTransfers.end(); ++it) {
+            if (it->globalOutputIndex == UNCONFIRMED_TRANSACTION_GLOBAL_OUTPUT_INDEX) continue;
+            if (std::find(ringAbsoluteIdxs.begin(), ringAbsoluteIdxs.end(),
+                          it->globalOutputIndex) == ringAbsoluteIdxs.end()) continue;
+            // Our output's global index appears in this input's ring -- it is the spent one.
+            // Correct the stored partial key image to the real one from the input.
+            TransactionOutputInformationEx corrected = *it;
+            corrected.keyImage = input.keyImage;
+            m_availableTransfers.erase(it);   // iterator invalid after erase
+            copyToSpent(block, tx, i, corrected);
+            updateTransfersVisibility(input.keyImage);
+            inputsAdded = true;
+            ringMatched = true;
+            break;
+          }
+          if (!ringMatched) {
+            m_logger(DEBUGGING) << "Audit wallet: outgoing input key image " << input.keyImage
+              << " has no ring member matching any available output"
+              << " (may have been received before sync start)";
+          }
+        }
+        // Whether we matched or not, move on to the next input.
+        continue;
       }
 
       auto& outputDescriptorIndex = m_availableTransfers.get<SpentOutputDescriptorIndex>();
@@ -399,19 +417,6 @@ bool TransfersContainer::addTransactionInputs(const TransactionBlockInfo& block,
       updateTransfersVisibility(input.keyImage);
 
       inputsAdded = true;
-    } else if (inputType == TransactionTypes::InputType::Multisignature) {
-      MultisignatureInput input;
-      tx.getInput(i, input);
-
-      auto& outputDescriptorIndex = m_availableTransfers.get<SpentOutputDescriptorIndex>();
-      auto availableOutputIt = outputDescriptorIndex.find(SpentOutputDescriptor(input.amount, input.outputIndex));
-      if (availableOutputIt != outputDescriptorIndex.end()) {
-        copyToSpent(block, tx, i, *availableOutputIt);
-        // erase from available outputs
-        outputDescriptorIndex.erase(availableOutputIt);
-
-        inputsAdded = true;
-      }
     } else {
       assert(inputType == TransactionTypes::InputType::Generating);
     }
@@ -474,17 +479,6 @@ bool TransfersContainer::markTransactionConfirmed(const TransactionBlockInfo& bl
       transfer.blockHeight = block.height;
       transfer.transactionIndex = block.transactionIndex;
       transfer.globalOutputIndex = globalIndices[transfer.outputInTransaction];
-
-      if (transfer.type == TransactionTypes::OutputType::Multisignature) {
-        SpentOutputDescriptor descriptor(transfer);
-        if (m_availableTransfers.get<SpentOutputDescriptorIndex>().count(descriptor) > 0 ||
-            m_spentTransfers.get<SpentOutputDescriptorIndex>().count(descriptor) > 0) {
-          // This exception breaks TransfersContainer consistency
-          auto message = "Failed to confirm transaction: multisignature output already exists";
-          m_logger(ERROR, BRIGHT_RED) << message << ", amount " << m_currency.formatAmount(transfer.amount) << ", global index " << transfer.globalOutputIndex;
-          throw std::runtime_error(message);
-        }
-      }
 
       auto result = m_availableTransfers.emplace(std::move(transfer));
       (void)result; // Disable unused warning
@@ -1064,8 +1058,7 @@ bool TransfersContainer::isIncluded(TransactionTypes::OutputType type, uint32_t 
   return
     // filter by type
     (
-    ((flags & IncludeTypeKey) != 0            && type == TransactionTypes::OutputType::Key) ||
-    ((flags & IncludeTypeMultisignature) != 0 && type == TransactionTypes::OutputType::Multisignature)
+    ((flags & IncludeTypeKey) != 0            && type == TransactionTypes::OutputType::Key)
     )
     &&
     // filter by state

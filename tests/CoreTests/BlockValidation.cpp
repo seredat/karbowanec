@@ -18,7 +18,9 @@
 #include "BlockValidation.h"
 #include "TestGenerator.h"
 #include "CryptoNoteCore/CryptoNoteTools.h"
+#include "CryptoNoteCore/CryptoNoteSerialization.h"
 #include "Common/StringTools.h"
+#include "Wallet/TransactionBuilder.h"
 
 using namespace Common;
 using namespace Crypto;
@@ -425,24 +427,28 @@ bool gen_block_miner_tx_has_2_in::generate(std::vector<test_event_entry>& events
 
   GENERATE_ACCOUNT(alice);
 
-  TransactionSourceEntry se;
-  se.amount = blk_0.baseTransaction.outputs[0].amount;
-  se.outputs.push_back(std::make_pair(0, boost::get<KeyOutput>(blk_0.baseTransaction.outputs[0].target).key));
-  se.realOutput = 0;
-  se.realTransactionPublicKey = getTransactionPublicKeyFromExtra(blk_0.baseTransaction.extra);
-  se.realOutputIndexInTransaction = 0;
-  std::vector<TransactionSourceEntry> sources;
+  TxBuildInput se;
+  se.keyInfo.amount = blk_0.baseTransaction.outputs[0].amount;
+  { TransactionTypes::GlobalOutput go; go.outputIndex = 0; go.targetKey = boost::get<KeyOutput>(blk_0.baseTransaction.outputs[0].target).key; se.keyInfo.outputs.push_back(go); }
+  se.keyInfo.realOutput.transactionIndex = 0;
+  se.keyInfo.realOutput.transactionPublicKey = getTransactionPublicKeyFromExtra(blk_0.baseTransaction.extra);
+  se.keyInfo.realOutput.outputInTransaction = 0;
+  se.senderKeys = miner_account.getAccountKeys();
+  std::vector<TxBuildInput> sources;
   sources.push_back(se);
 
-  TransactionDestinationEntry de;
-  de.addr = miner_account.getAccountKeys().address;
-  de.amount = se.amount;
-  std::vector<TransactionDestinationEntry> destinations;
+  TxBuildOutput de;
+  de.destination = miner_account.getAccountKeys().address;
+  de.amount = se.keyInfo.amount;
+  std::vector<TxBuildOutput> destinations;
   destinations.push_back(de);
 
   Transaction tmp_tx;
-  if (!constructTransaction(miner_account.getAccountKeys(), sources, destinations, std::vector<uint8_t>(), tmp_tx, 0, m_logger))
-    return false;
+  try {
+    Crypto::SecretKey txkey;
+    auto itx = buildTransaction(sources, destinations, miner_account.getAccountKeys().viewSecretKey, {}, 0, 0, txkey);
+    if (!fromBinaryArray(tmp_tx, itx->getTransactionData())) return false;
+  } catch (...) { return false; }
 
   MAKE_MINER_TX_MANUALLY(miner_tx, blk_0);
   miner_tx.inputs.push_back(tmp_tx.inputs[0]);
@@ -470,24 +476,28 @@ bool gen_block_miner_tx_with_txin_to_key::generate(std::vector<test_event_entry>
 
   REWIND_BLOCKS(events, blk_1r, blk_1, miner_account);
 
-  TransactionSourceEntry se;
-  se.amount = blk_1.baseTransaction.outputs[0].amount;
-  se.outputs.push_back(std::make_pair(0, boost::get<KeyOutput>(blk_1.baseTransaction.outputs[0].target).key));
-  se.realOutput = 0;
-  se.realTransactionPublicKey = getTransactionPublicKeyFromExtra(blk_1.baseTransaction.extra);
-  se.realOutputIndexInTransaction = 0;
-  std::vector<TransactionSourceEntry> sources;
+  TxBuildInput se;
+  se.keyInfo.amount = blk_1.baseTransaction.outputs[0].amount;
+  { TransactionTypes::GlobalOutput go; go.outputIndex = 0; go.targetKey = boost::get<KeyOutput>(blk_1.baseTransaction.outputs[0].target).key; se.keyInfo.outputs.push_back(go); }
+  se.keyInfo.realOutput.transactionIndex = 0;
+  se.keyInfo.realOutput.transactionPublicKey = getTransactionPublicKeyFromExtra(blk_1.baseTransaction.extra);
+  se.keyInfo.realOutput.outputInTransaction = 0;
+  se.senderKeys = miner_account.getAccountKeys();
+  std::vector<TxBuildInput> sources;
   sources.push_back(se);
 
-  TransactionDestinationEntry de;
-  de.addr = miner_account.getAccountKeys().address;
-  de.amount = se.amount;
-  std::vector<TransactionDestinationEntry> destinations;
+  TxBuildOutput de;
+  de.destination = miner_account.getAccountKeys().address;
+  de.amount = se.keyInfo.amount;
+  std::vector<TxBuildOutput> destinations;
   destinations.push_back(de);
 
   Transaction tmp_tx;
-  if (!constructTransaction(miner_account.getAccountKeys(), sources, destinations, std::vector<uint8_t>(), tmp_tx, 0, m_logger))
-    return false;
+  try {
+    Crypto::SecretKey txkey;
+    auto itx = buildTransaction(sources, destinations, miner_account.getAccountKeys().viewSecretKey, {}, 0, 0, txkey);
+    if (!fromBinaryArray(tmp_tx, itx->getTransactionData())) return false;
+  } catch (...) { return false; }
 
   MAKE_MINER_TX_MANUALLY(miner_tx, blk_1);
   miner_tx.inputs[0] = tmp_tx.inputs[0];

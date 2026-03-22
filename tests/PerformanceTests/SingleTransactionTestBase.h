@@ -33,7 +33,8 @@ public:
     Currency currency = CurrencyBuilder(m_nullLog).currency();
     m_bob.generate();
 
-    if (!currency.constructMinerTx(BLOCK_MAJOR_VERSION_1, 0, 0, 0, 2, 0, m_bob.getAccountKeys().address, m_tx))
+    Crypto::SecretKey minerTxKey;
+    if (!currency.constructMinerTx(BLOCK_MAJOR_VERSION_1, 0, 0, 0, 2, 0, m_bob.getAccountKeys().address, m_tx, minerTxKey))
       return false;
 
     m_tx_pub_key = getTransactionPublicKeyFromExtra(m_tx.extra);

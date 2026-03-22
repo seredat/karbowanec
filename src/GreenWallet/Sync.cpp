@@ -36,7 +36,7 @@ void checkForNewTransactions(std::shared_ptr<WalletInfo> walletInfo)
             const CryptoNote::WalletTransaction t
                 = walletInfo->wallet.getTransaction(i);
 
-            /* Don't print outgoing or fusion transfers */
+            /* Don't print outgoing transfers */
             if (t.totalAmount > 0)
             {
                 std::cout << std::endl
@@ -188,7 +188,7 @@ void syncWallet(CryptoNote::INode &node,
                     CryptoNote::WalletTransaction t
                         = walletInfo->wallet.getTransaction(i);
 
-                    /* Don't print out fusion transactions */
+                    /* Don't print out zero-amount transactions */
                     if (t.totalAmount != 0)
                     {
                         std::cout << std::endl

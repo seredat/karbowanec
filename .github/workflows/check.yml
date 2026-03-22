@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - '**'
+      - '!android'     # excludes android
     tags-ignore:
       - '*'            # We don't want this to run on release
   pull_request:
@@ -93,7 +94,7 @@ jobs:
       - name: Install dependencies
         shell: msys2 {0}
         run: |
-          pacman -U --noconfirm https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-boost-1.84.0-2-any.pkg.tar.zst
+          pacman -U --noconfirm https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-boost-1.85.0-4-any.pkg.tar.zst
 
       - uses: actions/checkout@master
         with:
@@ -125,7 +126,6 @@ jobs:
           mv build/src/karbowanecd.exe build/karbo
           mv build/src/simplewallet.exe build/karbo
           mv build/src/greenwallet.exe build/karbo
-          mv build/src/optimizer.exe build/karbo
           mv build/src/walletd.exe build/karbo
           mv build/src/vanitygen.exe build/karbo
 
@@ -186,7 +186,7 @@ jobs:
             -DBoost_INCLUDE_DIR="$Boost_INCLUDE_DIR" \
             -DBoost_LIBRARY_DIR="$Boost_LIBRARY_DIR" \
             -DBoost_NO_SYSTEM_PATHS=ON \
-            -DBoost_USE_STATIC_LIBS=OFF \
+            -DBoost_USE_STATIC_LIBS=ON \
             -DBoost_COMPILER=-clang \
             -DBoost_ARCHITECTURE=-a64 \
             -DBoost_THREADAPI=pthread
@@ -256,3 +256,90 @@ jobs:
           path: ${{ steps.build.outputs.artifact_path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-linux-static:
+    name: Linux universal static
+    runs-on: ubuntu-latest
+    container:
+      image: alpine:3.19
+      options: --platform linux/amd64
+
+    steps:
+      - name: Install dependencies
+        run: |
+          apk add --no-cache \
+            git \
+            build-base \
+            cmake \
+            boost-dev boost-static \
+            openssl-dev openssl-libs-static \
+            lmdb-dev \
+            linux-headers \
+            binutils \
+            file
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref }}
+
+      - name: Mark git repo as safe
+        run: git config --global --add safe.directory '*'
+
+      - name: Build static
+        id: build
+        run: |
+          build_folder="build/release"
+          krb_ver=$(echo $GITHUB_SHA | cut -c1-7)
+          release_name="Karbo-cli-linux-universal-$krb_ver"
+
+          mkdir -p "$build_folder"
+          cd "$build_folder"
+
+          export CFLAGS="-O3 -static"
+          export CXXFLAGS="-O3 -static -static-libstdc++ -static-libgcc"
+          export LDFLAGS="-static"
+
+          cmake ../.. \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DBoost_USE_STATIC_LIBS=ON \
+            -DOPENSSL_USE_STATIC_LIBS=ON \
+            -DCMAKE_EXE_LINKER_FLAGS="-static"
+
+          make -j$(nproc)
+
+          mkdir -p "$release_name"
+          for f in src/*; do
+            if [ -x "$f" ] && [ -f "$f" ]; then
+              strip "$f"
+              cp "$f" "$release_name/"
+            fi
+          done
+
+          echo "release_name=$release_name" >> $GITHUB_OUTPUT
+          echo "artifact_path=$build_folder/$release_name" >> $GITHUB_OUTPUT
+
+      - name: Verify static linkage
+        run: |
+          FAILED=0
+          for f in build/release/src/*; do
+            if [ -x "$f" ] && [ -f "$f" ]; then
+              echo "=== $f ==="
+              file "$f"
+              if readelf -d "$f" | grep NEEDED; then
+                echo "FAIL: dynamic dependency found"
+                FAILED=1
+              else
+                echo "OK: fully static"
+              fi
+            fi
+          done
+          if [ "$FAILED" = "1" ]; then
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.build.outputs.release_name }}
+          path: ${{ steps.build.outputs.artifact_path }}

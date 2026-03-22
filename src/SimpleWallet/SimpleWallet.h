@@ -1,7 +1,7 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2014-2016, XDN developers
 // Copyright (c) 2014-2017, The Monero Project
-// Copyright (c) 2016-2022, The Karbo developers
+// Copyright (c) 2016-2026, The Karbo developers
 //
 // All rights reserved.
 // 
@@ -41,7 +41,7 @@
 #include "android.h"
 #include "IWalletLegacy.h"
 #include "Common/PasswordContainer.h"
-#include "HTTP/httplib.h"
+#include <HTTP/HttpClient.h>
 #include "Common/ConsoleHandler.h"
 #include "CryptoNoteCore/CryptoNoteBasicImpl.h"
 #include "CryptoNoteCore/Currency.h"
@@ -109,6 +109,7 @@ namespace CryptoNote
     bool show_keys(const std::vector<std::string> &args = std::vector<std::string>());
     bool export_keys_to_file(const std::vector<std::string>& args = std::vector<std::string>());
     bool show_tracking_key(const std::vector<std::string> &args = std::vector<std::string>());
+    bool restore_seed(const std::vector<std::string> &args = std::vector<std::string>());
     bool show_incoming_transfers(const std::vector<std::string> &args);
     bool show_outgoing_transfers(const std::vector<std::string> &args);
     bool show_payments(const std::vector<std::string> &args);
@@ -124,8 +125,6 @@ namespace CryptoNote
     bool set_log(const std::vector<std::string> &args);
     bool payment_id(const std::vector<std::string> &args);
     bool change_password(const std::vector<std::string> &args);
-    bool estimate_fusion(const std::vector<std::string> &args);
-    bool optimize(const std::vector<std::string> &args);
     bool get_tx_key(const std::vector<std::string> &args);
     bool get_tx_proof(const std::vector<std::string> &args);
     bool get_reserve_proof(const std::vector<std::string> &args);
@@ -135,6 +134,8 @@ namespace CryptoNote
     std::string get_formatted_wallet_keys();
 
     void printConnectionError() const;
+
+    std::unique_ptr<CryptoNote::HttpClient> createDaemonHttpClient();
 
     //---------------- IWalletLegacyObserver -------------------------
     virtual void initCompleted(std::error_code result) override;
@@ -195,6 +196,7 @@ namespace CryptoNote
     std::string m_generate_new;
     std::string m_import_new;
     std::string m_restore_new;
+    std::string m_mnemonic_new;
     std::string m_track_new;
     std::string m_import_path;
     std::string m_daemon_address;
@@ -227,8 +229,6 @@ namespace CryptoNote
     std::unique_ptr<CryptoNote::NodeRpcProxy> m_node;
     std::unique_ptr<CryptoNote::IWalletLegacy> m_wallet;
     refresh_progress_reporter_t m_refresh_progress_reporter;
-
-    httplib::Headers m_requestHeaders;
 
     bool m_walletSynchronized;
     bool m_trackingWallet;
