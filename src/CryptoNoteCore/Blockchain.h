@@ -57,7 +57,7 @@ namespace CryptoNote {
   class Blockchain : public CryptoNote::ITransactionValidator {
   public:
     Blockchain(const Currency& currency, tx_memory_pool& tx_pool, Logging::ILogger& logger,
-               bool allowDeepReorg, bool noBlobs);
+               uint32_t rejectDeepReorgDepth, bool noBlobs);
 
     bool addObserver(IBlockchainStorageObserver* observer);
     bool removeObserver(IBlockchainStorageObserver* observer);
@@ -303,7 +303,6 @@ namespace CryptoNote {
     UpgradeDetector m_upgradeDetectorV5;
     UpgradeDetector m_upgradeDetectorV6;
 
-    bool m_allowDeepReorg;
     bool m_no_blobs;
 
     // ── Batch-commit state (Monero-style) ──────────────────────────────────

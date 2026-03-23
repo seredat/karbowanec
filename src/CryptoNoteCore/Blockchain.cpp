@@ -68,7 +68,7 @@ namespace CryptoNote {
 // ─── Constructor ─────────────────────────────────────────────────────────────
 
 Blockchain::Blockchain(const Currency& currency, tx_memory_pool& tx_pool,
-                       ILogger& logger, bool allowDeepReorg, bool noBlobs)
+                       ILogger& logger, uint32_t rejectDeepReorgDepth, bool noBlobs)
   : logger(logger, "Blockchain"),
     m_currency(currency),
     m_tx_pool(tx_pool),
@@ -78,8 +78,7 @@ Blockchain::Blockchain(const Currency& currency, tx_memory_pool& tx_pool,
     m_upgradeDetectorV4(currency, m_blockView, BLOCK_MAJOR_VERSION_4, logger),
     m_upgradeDetectorV5(currency, m_blockView, BLOCK_MAJOR_VERSION_5, logger),
     m_upgradeDetectorV6(currency, m_blockView, BLOCK_MAJOR_VERSION_6, logger),
-    m_checkpoints(logger, allowDeepReorg),
-    m_allowDeepReorg(allowDeepReorg),
+    m_checkpoints(logger, rejectDeepReorgDepth),
     m_no_blobs(noBlobs)
 {
 }
@@ -879,7 +878,7 @@ bool Blockchain::getBlockLongHash(Crypto::cn_context& context, const Block& b, C
       }
 
       if (!found_alt) {
-        if (no_blobs || m_allowDeepReorg) {
+        if (no_blobs) {
           std::vector<uint8_t> blockData;
           if (!m_db.getBlockData(height_j, blockData)) return false;
           Block bj;
