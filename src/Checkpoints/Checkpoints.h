@@ -30,7 +30,7 @@ namespace CryptoNote
   class Checkpoints
   {
   public:
-    Checkpoints(Logging::ILogger& log, bool is_deep_reorg_allowed = false);
+    Checkpoints(Logging::ILogger& log, uint32_t reject_deep_reorg_depth = 0);
 
     Checkpoints& operator=(Checkpoints const& other)
     {
@@ -61,6 +61,6 @@ namespace CryptoNote
     Logging::LoggerRef logger;
     mutable std::mutex m_mutex;
 
-    bool m_is_deep_reorg_allowed;
+    uint32_t m_reject_deep_reorg_depth;
   };
 }

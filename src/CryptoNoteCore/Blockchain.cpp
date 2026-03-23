@@ -1,5 +1,4 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers, The Monero developers
-// Copyright (c) 2018, Ryo Currency Project
 // Copyright (c) 2016-2026, The Karbo developers
 //
 // This file is part of Karbo.
@@ -69,7 +68,7 @@ namespace CryptoNote {
 // ─── Constructor ─────────────────────────────────────────────────────────────
 
 Blockchain::Blockchain(const Currency& currency, tx_memory_pool& tx_pool,
-                       ILogger& logger, bool allowDeepReorg, bool noBlobs)
+                       ILogger& logger, uint32_t rejectDeepReorgDepth, bool noBlobs)
   : logger(logger, "Blockchain"),
     m_currency(currency),
     m_tx_pool(tx_pool),
@@ -79,8 +78,7 @@ Blockchain::Blockchain(const Currency& currency, tx_memory_pool& tx_pool,
     m_upgradeDetectorV4(currency, m_blockView, BLOCK_MAJOR_VERSION_4, logger),
     m_upgradeDetectorV5(currency, m_blockView, BLOCK_MAJOR_VERSION_5, logger),
     m_upgradeDetectorV6(currency, m_blockView, BLOCK_MAJOR_VERSION_6, logger),
-    m_checkpoints(logger, allowDeepReorg),
-    m_allowDeepReorg(allowDeepReorg),
+    m_checkpoints(logger, rejectDeepReorgDepth),
     m_no_blobs(noBlobs)
 {
 }
@@ -950,7 +948,7 @@ bool Blockchain::getBlockLongHash(Crypto::cn_context& context, const Block& b, C
       }
 
       if (!found_alt) {
-        if (no_blobs || m_allowDeepReorg) {
+        if (no_blobs) {
           std::vector<uint8_t> blockData;
           if (!m_db.getBlockData(height_j, blockData)) return false;
           Block bj;
@@ -1287,77 +1285,6 @@ bool Blockchain::switch_to_alternative_blockchain(const std::list<Crypto::Hash>&
     const Block& b = m_alternative_chains[hash].bl;
     if (!checkBlockVersion(b)) {
       logger(ERROR, BRIGHT_RED) << "switch_to_alternative_blockchain: wrong major version of block " << hash;
-      return false;
-    }
-  }
-
-  // Poisson check
-  if (alt_chain.size() >= CryptoNote::parameters::POISSON_CHECK_TRIGGER) {
-    uint64_t alt_chain_size = alt_chain.size();
-    uint64_t high_timestamp = m_alternative_chains[alt_chain.back()].bl.timestamp;
-    Crypto::Hash low_block = m_alternative_chains[alt_chain.front()].bl.previousBlockHash;
-
-    for (const auto& hash : alt_chain) {
-      if (high_timestamp < m_alternative_chains[hash].bl.timestamp)
-        high_timestamp = m_alternative_chains[hash].bl.timestamp;
-    }
-
-    uint64_t block_ftl = CryptoNote::parameters::CRYPTONOTE_BLOCK_FUTURE_TIME_LIMIT_V1;
-    if (high_timestamp > get_adjusted_time() + block_ftl) {
-      logger(ERROR, BRIGHT_RED) << "Attempting to move to an alternate chain, but it failed FTL check! "
-        "Timestamp: " << high_timestamp << ", limit: " << get_adjusted_time() + block_ftl;
-      return false;
-    }
-
-    logger(WARNING) << "Poisson check triggered by reorg size of " << alt_chain_size;
-
-    uint64_t failed_checks = 0, i = 1;
-    for (; i <= CryptoNote::parameters::POISSON_CHECK_DEPTH; i++) {
-      if (low_block == NULL_HASH) break;
-      Block blk;
-      getBlockByHash(low_block, blk);
-      uint64_t low_timestamp = blk.timestamp;
-      low_block = blk.previousBlockHash;
-      if (low_timestamp >= high_timestamp) {
-        logger(INFO) << "Skipping check at depth " << i << " due to tampered timestamp on main chain.";
-        failed_checks++;
-        continue;
-      }
-      double lam = double(high_timestamp - low_timestamp) / double(CryptoNote::parameters::DIFFICULTY_TARGET);
-      if (calc_poisson_ln(lam, alt_chain_size + i) < CryptoNote::parameters::POISSON_LOG_P_REJECT) {
-        logger(INFO) << "Poisson check at depth " << i << " failed! delta_t: "
-          << (high_timestamp - low_timestamp) << " size: " << alt_chain_size + i;
-        failed_checks++;
-      }
-    }
-    i--;
-    logger(INFO) << "Poisson check result " << failed_checks << " fails out of " << i;
-    if (failed_checks > i / 2) {
-      logger(ERROR, BRIGHT_RED) << "Attempting to move to an alternate chain, but it failed Poisson check! "
-        << failed_checks << " fails out of " << i << " alt_chain_size: " << alt_chain_size;
-      return false;
-    }
-  }
-
-  // Compare transactions
-  std::vector<Crypto::Hash> mainChainTxHashes, altChainTxHashes;
-  for (int i = (int)chainHeight - 1; i >= (int)split_height; i--) {
-    std::vector<uint8_t> bdata;
-    m_db.getBlockData((uint32_t)i, bdata);
-    Block b;
-    fromBinaryArray(b, bdata);
-    std::copy(b.transactionHashes.begin(), b.transactionHashes.end(),
-              std::inserter(mainChainTxHashes, mainChainTxHashes.end()));
-  }
-  for (const auto& hash : alt_chain) {
-    const Block& b = m_alternative_chains[hash].bl;
-    std::copy(b.transactionHashes.begin(), b.transactionHashes.end(),
-              std::inserter(altChainTxHashes, altChainTxHashes.end()));
-  }
-  for (const auto& tx_hash : mainChainTxHashes) {
-    if (std::find(altChainTxHashes.begin(), altChainTxHashes.end(), tx_hash) == altChainTxHashes.end()) {
-      logger(ERROR, BRIGHT_RED) << "Attempting to switch to an alternate chain, but it lacks transaction "
-        << Common::podToHex(tx_hash) << " from main chain, rejected";
       return false;
     }
   }

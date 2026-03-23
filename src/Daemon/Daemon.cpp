@@ -71,7 +71,7 @@ namespace
   const command_line::arg_descriptor<std::string> arg_load_checkpoints          = { "load-checkpoints", "<filename> Load checkpoints from csv file", "" };
   const command_line::arg_descriptor<bool>        arg_disable_checkpoints       = { "without-checkpoints", "Synchronize without checkpoints" };
   const command_line::arg_descriptor<bool>        arg_no_blobs                  = { "without-blobs", "Don't use hashing blobs cache in PoW validation", false, false };
-  const command_line::arg_descriptor<bool>        arg_allow_deep_reorg          = { "allow-reorg", "Allow deep reorganization", false, false };
+  const command_line::arg_descriptor<uint32_t>    arg_reject_deep_reorg         = { "reject-deep-reorg", "Reject reorganization deeper than given number of blocks (default: 10 if used without value, 0 = allow all reorgs)", 0 };
   const command_line::arg_descriptor<std::string> arg_rollback                  = { "rollback", "Rollback blockchain to <height>", "", true };
 
   bool command_line_preprocessor(const boost::program_options::variables_map &vm, LoggerRef &logger) {
@@ -152,7 +152,9 @@ int main(int argc, char* argv[])
     command_line::add_arg(desc_cmd_sett, arg_load_checkpoints);
     command_line::add_arg(desc_cmd_sett, arg_disable_checkpoints);
     command_line::add_arg(desc_cmd_sett, arg_no_blobs);
-    command_line::add_arg(desc_cmd_sett, arg_allow_deep_reorg);
+    desc_cmd_sett.add_options()(arg_reject_deep_reorg.name,
+      boost::program_options::value<uint32_t>()->default_value(0)->implicit_value(CryptoNote::parameters::CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW),
+      arg_reject_deep_reorg.description);
     command_line::add_arg(desc_cmd_sett, arg_rollback);
 
     RpcServerConfig::initOptions(desc_cmd_sett);
@@ -266,9 +268,9 @@ int main(int argc, char* argv[])
     CryptoNote::Currency currency = currencyBuilder.currency();
     System::Dispatcher dispatcher;
 
-    bool allow_reorg = command_line::get_arg(vm, arg_allow_deep_reorg);
-    if (allow_reorg) {
-      logger(WARNING) << "Deep reorg allowed!";
+    uint32_t reject_deep_reorg = command_line::get_arg(vm, arg_reject_deep_reorg);
+    if (reject_deep_reorg > 0) {
+      logger(WARNING) << "Reorganization deeper than " << reject_deep_reorg << " blocks will be rejected";
     }
 
     bool no_blobs = command_line::get_arg(vm, arg_no_blobs);
@@ -276,11 +278,11 @@ int main(int argc, char* argv[])
       logger(INFO) << "Enabled full Proof of Work validation without hashing blobs cache";
     }
 
-    CryptoNote::Core m_core(currency, nullptr, logManager, dispatcher, allow_reorg, no_blobs);
+    CryptoNote::Core m_core(currency, nullptr, logManager, dispatcher, reject_deep_reorg, no_blobs);
 
     bool disable_checkpoints = command_line::get_arg(vm, arg_disable_checkpoints);
     if (!disable_checkpoints) {
-      CryptoNote::Checkpoints checkpoints(logManager, allow_reorg);
+      CryptoNote::Checkpoints checkpoints(logManager, reject_deep_reorg);
       for (const auto& cp : CryptoNote::CHECKPOINTS) {
         checkpoints.add_checkpoint(cp.height, cp.blockId);
       }
