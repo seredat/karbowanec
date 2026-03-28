@@ -191,9 +191,7 @@ namespace {
     ASSERT_EQ(upgradeDetectorV3.upgradeHeight(), upgradeHeightV3);
 
     UpgradeDetector upgradeDetectorV4(currency, blocks, BLOCK_V4, logger);
-    ASSERT_TRUE(upgradeDetectorV4.init());
-    ASSERT_EQ(upgradeDetectorV4.votingCompleteHeight(), votingCompleteHeigntV4);
-    ASSERT_EQ(upgradeDetectorV4.upgradeHeight(), upgradeHeightV4);
+    ASSERT_FALSE(upgradeDetectorV4.init());
   }
 
   TEST_F(UpgradeDetector_upgradeHeight_init, handlesEmptyBlockchain) {

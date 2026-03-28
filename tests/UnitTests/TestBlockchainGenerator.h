@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <map>
 #include <vector>
 #include <unordered_map>
 
@@ -85,8 +86,8 @@ private:
 
   CryptoNote::PaymentIdIndex m_paymentIdIndex;
   CryptoNote::TimestampTransactionsIndex m_timestampIndex;
-  CryptoNote::GeneratedTransactionsIndex m_generatedTransactionsIndex;
-  CryptoNote::OrphanBlocksIndex m_orthanBlocksIndex;
+  std::map<uint32_t, uint64_t> m_generatedTransactionsByHeight;
+  std::map<uint32_t, std::vector<Crypto::Hash>> m_orphanBlockIdsByHeight;
 
   void addToBlockchain(const CryptoNote::Transaction& tx);
   void addToBlockchain(const std::vector<CryptoNote::Transaction>& txs);

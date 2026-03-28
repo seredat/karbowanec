@@ -37,6 +37,13 @@ bool ICryptoNoteProtocolQueryStub::isSynchronized() const {
   return synchronized;
 }
 
+bool ICryptoNoteProtocolQueryStub::getConnections(std::vector<CryptoNote::CryptoNoteConnectionContext>& /*connections*/) const {
+  return false;
+}
+
+void ICryptoNoteProtocolQueryStub::printDandelions() const {
+}
+
 void ICryptoNoteProtocolQueryStub::setPeerCount(uint32_t count) {
   peers = count;
 }

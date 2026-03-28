@@ -463,9 +463,11 @@ TEST_F(TransfersConsumerTest, onNewBlocks_updateHeight) {
   std::unique_ptr<CompleteBlock[]> blocks(new CompleteBlock[subscription.transactionSpendableAge]);
   for (uint32_t i = 0; i < subscription.transactionSpendableAge; ++i) {
     blocks[i].block = CryptoNote::Block();
+    blocks[i].block->timestamp = subscription.syncStart.timestamp + i + 1;
     auto tr = createTransaction();
     addTestInput(*tr, 1000);
     addTestKeyOutput(*tr, 100, i + 1, generateAccountKeys());
+    blocks[i].transactions.push_back(std::shared_ptr<ITransactionReader>(tr.release()));
   }
 
   ASSERT_TRUE(m_consumer.onNewBlocks(blocks.get(), static_cast<uint32_t>(subscription.syncStart.height + 1), static_cast<uint32_t>(subscription.transactionSpendableAge)));
@@ -705,6 +707,11 @@ TEST_F(TransfersConsumerTest, onNewBlocks_manyBlocks) {
  for (auto& b : blocks) {
    b.block = Block();
    b.block->timestamp = timestamp++;
+
+   auto fillerTx = createTransaction();
+   addTestInput(*fillerTx, 10000);
+   addTestKeyOutput(*fillerTx, 100, ++globalOut, generateAccountKeys());
+   b.transactions.push_back(std::shared_ptr<ITransactionReader>(fillerTx.release()));
    
    if (++blockIdx % 10 == 0) {
      for (size_t i = 0; i < txPerBlock; ++i) {

@@ -158,15 +158,15 @@ TEST(parse_and_validate_tx_extra, fails_on_wrong_size_in_extra_nonce)
 TEST(validate_parse_amount_case, validate_parse_amount)
 {
   Logging::LoggerGroup logger;
-  CryptoNote::Currency currency = CryptoNote::CurrencyBuilder(logger).numberOfDecimalPlaces(8).currency();
+  CryptoNote::Currency currency = CryptoNote::CurrencyBuilder(logger).currency();
   uint64_t res = 0;
   bool r = currency.parseAmount("0.0001", res);
   ASSERT_TRUE(r);
-  ASSERT_EQ(res, 10000);
+  ASSERT_EQ(res, 100000000);
 
   r = currency.parseAmount("100.0001", res);
   ASSERT_TRUE(r);
-  ASSERT_EQ(res, 10000010000);
+  ASSERT_EQ(res, 100000100000000);
 
   r = currency.parseAmount("000.0000", res);
   ASSERT_TRUE(r);
@@ -179,11 +179,11 @@ TEST(validate_parse_amount_case, validate_parse_amount)
 
   r = currency.parseAmount("   100.0001    ", res);
   ASSERT_TRUE(r);
-  ASSERT_EQ(res, 10000010000);
+  ASSERT_EQ(res, 100000100000000);
 
   r = currency.parseAmount("   100.0000    ", res);
   ASSERT_TRUE(r);
-  ASSERT_EQ(res, 10000000000);
+  ASSERT_EQ(res, 100000000000000);
 
   r = currency.parseAmount("   100. 0000    ", res);
   ASSERT_FALSE(r);

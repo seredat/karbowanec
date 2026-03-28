@@ -18,6 +18,7 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
 
 #include "CryptoNoteProtocol/ICryptoNoteProtocolObserver.h"
 #include "CryptoNoteProtocol/ICryptoNoteProtocolQuery.h"
@@ -31,6 +32,8 @@ public:
   virtual uint32_t getObservedHeight() const override;
   virtual size_t getPeerCount() const override;
   virtual bool isSynchronized() const override;
+  virtual bool getConnections(std::vector<CryptoNote::CryptoNoteConnectionContext>& connections) const override;
+  virtual void printDandelions() const override;
 
   void setPeerCount(uint32_t count);
   void setObservedHeight(uint32_t height);
