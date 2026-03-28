@@ -149,8 +149,16 @@ public:
 
   bool constructMinerTx(uint8_t blockMajorVersion, uint32_t height, size_t medianSize, uint64_t alreadyGeneratedCoins, size_t currentBlockSize,
     uint64_t fee, const AccountPublicAddress& minerAddress, Transaction& tx, Crypto::SecretKey& txKey, const BinaryArray& extraNonce = BinaryArray(), size_t maxOuts = 1) const;
+  bool constructMinerTx(uint8_t blockMajorVersion, uint32_t height, size_t medianSize, uint64_t alreadyGeneratedCoins, size_t currentBlockSize,
+    uint64_t fee, const AccountPublicAddress& minerAddress, Transaction& tx, const BinaryArray& extraNonce = BinaryArray(), size_t maxOuts = 1) const {
+    Crypto::SecretKey txKey;
+    return constructMinerTx(blockMajorVersion, height, medianSize, alreadyGeneratedCoins, currentBlockSize, fee, minerAddress, tx, txKey, extraNonce, maxOuts);
+  }
 
   bool isFusionTransaction(const Transaction& transaction, uint32_t height) const;
+  bool isFusionTransaction(const Transaction& transaction) const {
+    return isFusionTransaction(transaction, 0);
+  }
   bool isFusionTransaction(const Transaction& transaction, size_t size, uint32_t height) const;
   bool isFusionTransaction(const std::vector<uint64_t>& inputsAmounts, const std::vector<uint64_t>& outputsAmounts, size_t size, uint32_t height) const;
   bool isAmountApplicableInFusionTransactionInput(uint64_t amount, uint64_t threshold, uint32_t height) const;

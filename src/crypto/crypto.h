@@ -243,6 +243,14 @@ namespace Crypto {
     return check_ring_signature(prefix_hash, image, pubs.data(), pubs.size(), sig);
   }
 
+  // Backward-compatible helper used by legacy tests.
+  template<typename T>
+  inline T rand() {
+    T result;
+    Random::randomBytes(sizeof(result), reinterpret_cast<uint8_t*>(&result));
+    return result;
+  }
+
   static inline const KeyImage &EllipticCurveScalar2KeyImage(const EllipticCurveScalar &k) { return (const KeyImage&)k; }
   static inline const PublicKey &EllipticCurveScalar2PublicKey(const EllipticCurveScalar &k) { return (const PublicKey&)k; }
   static inline const SecretKey &EllipticCurveScalar2SecretKey(const EllipticCurveScalar &k) { return (const SecretKey&)k; }

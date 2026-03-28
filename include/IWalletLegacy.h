@@ -105,6 +105,7 @@ public:
 
   virtual void initAndGenerateNonDeterministic(const std::string& password) = 0;
   virtual void initAndGenerateDeterministic(const std::string& password) = 0;
+  void initAndGenerate(const std::string& password) { initAndGenerateDeterministic(password); }
   virtual void initAndLoad(std::istream& source, const std::string& password) = 0;
   virtual void initWithKeys(const AccountKeys& accountKeys, const std::string& password) = 0;
   virtual void initWithKeys(const AccountKeys& accountKeys, const std::string& password, const uint32_t scanHeight) = 0;
