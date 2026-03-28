@@ -285,10 +285,6 @@ bool ICoreStub::getBlockContainingTx(const Crypto::Hash& txId, Crypto::Hash& blo
   return true;
 }
 
-bool ICoreStub::getMultisigOutputReference(const CryptoNote::MultisignatureInput& txInMultisig, std::pair<Crypto::Hash, size_t>& outputReference) {
-  return true;
-}
-
 void ICoreStub::addBlock(const CryptoNote::Block& block) {
   uint32_t height = boost::get<CryptoNote::BaseInput>(block.baseTransaction.inputs.front()).blockIndex;
   Crypto::Hash hash = CryptoNote::get_block_hash(block);
