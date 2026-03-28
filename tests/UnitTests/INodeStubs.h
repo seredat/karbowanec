@@ -45,7 +45,25 @@ public:
   virtual uint64_t getLastLocalBlockTimestamp() const override { return 0; }
   virtual CryptoNote::BlockHeaderInfo getLastLocalBlockHeaderInfo() const override { return CryptoNote::BlockHeaderInfo(); }
   virtual uint64_t getMinimalFee() const override { return 0; };
-  
+  virtual uint64_t getNextDifficulty() const override { return 0; };
+  virtual uint64_t getNextReward() const override { return 0; };
+  virtual uint64_t getAlreadyGeneratedCoins() const override { return 0; };
+  virtual uint64_t getTransactionsCount() const override { return 0; };
+  virtual uint64_t getTransactionsPoolSize() const override { return 0; };
+  virtual uint64_t getAltBlocksCount() const override { return 0; };
+  virtual uint64_t getOutConnectionsCount() const override { return 0; };
+  virtual uint64_t getIncConnectionsCount() const override { return 0; };
+  virtual uint64_t getRpcConnectionsCount() const override { return 0; };
+  virtual uint64_t getWhitePeerlistSize() const override { return 0; };
+  virtual uint64_t getGreyPeerlistSize() const override { return 0; };
+  virtual std::string getNodeVersion() const override { return ""; };
+  virtual std::string feeAddress() const override { return ""; };
+  virtual uint64_t feeAmount() const override { return 0; };
+  virtual uint32_t getNodeHeight() const override { return 0; };
+
+  virtual void setRootCert(const std::string &path) override {};
+  virtual void disableVerify() override {};
+
   virtual void getNewBlocks(std::vector<Crypto::Hash>&& knownBlockIds, std::vector<CryptoNote::block_complete_entry>& newBlocks, uint32_t& height, const Callback& callback) override { callback(std::error_code()); };
 
   virtual void relayTransaction(const CryptoNote::Transaction& transaction, const Callback& callback) override { callback(std::error_code()); };
@@ -64,6 +82,10 @@ public:
   virtual void getTransactions(const std::vector<Crypto::Hash>& transactionHashes, std::vector<CryptoNote::TransactionDetails>& transactions, const Callback& callback) override { callback(std::error_code()); };
   virtual void getTransactionsByPaymentId(const Crypto::Hash& paymentId, std::vector<CryptoNote::TransactionDetails>& transactions, const Callback& callback) override { callback(std::error_code()); };
   virtual void getPoolTransactions(uint64_t timestampBegin, uint64_t timestampEnd, uint32_t transactionsNumberLimit, std::vector<CryptoNote::TransactionDetails>& transactions, uint64_t& transactionsNumberWithinTimestamps, const Callback& callback) override { callback(std::error_code()); };
+  virtual void getBlock(const uint32_t blockHeight, CryptoNote::BlockDetails &block, const Callback& callback) override { callback(std::error_code()); };
+  virtual void getTransaction(const Crypto::Hash& transactionHash, CryptoNote::Transaction& transaction, const Callback& callback) override { callback(std::error_code()); };
+  virtual void getBlockTimestamp(uint32_t height, uint64_t& timestamp, const Callback& callback) override { callback(std::error_code()); };
+  virtual void getConnections(std::vector<CryptoNote::p2pConnection>& connections, const Callback& callback) override { callback(std::error_code()); };
   virtual void isSynchronized(bool& syncStatus, const Callback& callback) override { callback(std::error_code()); };
 
   void updateObservers();

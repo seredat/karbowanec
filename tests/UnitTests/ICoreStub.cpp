@@ -364,15 +364,101 @@ void ICoreStub::setPoolChangesResult(bool result) {
   poolChangesResult = result;
 }
 
-uint64_t ICoreStub::getMinimalFeeForHeight(uint32_t height) {
-	return 10000000000ULL;
-};
+bool ICoreStub::haveTransaction(const Crypto::Hash& id) {
+  return false;
+}
+
+bool ICoreStub::handle_incoming_block(const CryptoNote::Block& b, CryptoNote::block_verification_context& bvc, bool control_miner, bool relay_block) {
+  return false;
+}
+
+bool ICoreStub::getPoolTransaction(const Crypto::Hash& tx_hash, CryptoNote::Transaction& transaction) {
+  return false;
+}
+
+bool ICoreStub::getTransactionHeight(const Crypto::Hash &txId, uint32_t& blockHeight) {
+  return false;
+}
+
+bool ICoreStub::getTransactionsWithOutputGlobalIndexes(const std::vector<Crypto::Hash>& txs_ids, std::list<Crypto::Hash>& missed_txs, std::vector<std::pair<CryptoNote::Transaction, std::vector<uint32_t>>>& txs) {
+  return false;
+}
+
+bool ICoreStub::getTransaction(const Crypto::Hash& id, CryptoNote::Transaction& tx, bool checkTxPool) {
+  return false;
+}
+
+bool ICoreStub::getBlockCumulativeDifficulty(uint32_t height, CryptoNote::difficulty_type& difficulty) {
+  return false;
+}
+
+bool ICoreStub::getBlockTimestamp(uint32_t height, uint64_t& timestamp) {
+  return false;
+}
+
+std::vector<Crypto::Hash> ICoreStub::getTransactionHashesByPaymentId(const Crypto::Hash& paymentId) {
+  return std::vector<Crypto::Hash>();
+}
+
+uint64_t ICoreStub::getMinimalFee(uint32_t height) {
+  return 10000000000ULL;
+}
+
 uint64_t ICoreStub::getMinimalFee() {
-	return 10000000000ULL;
-};
+  return 10000000000ULL;
+}
+
+uint64_t ICoreStub::getNextBlockDifficulty() {
+  return 0;
+}
+
+uint64_t ICoreStub::getTotalGeneratedAmount() {
+  return 0;
+}
+
+bool ICoreStub::check_tx_fee(const CryptoNote::Transaction& tx, const Crypto::Hash& txHash, size_t blobSize, CryptoNote::tx_verification_context& tvc, uint32_t height) {
+  return true;
+}
+
+size_t ICoreStub::getPoolTransactionsCount() {
+  return 0;
+}
+
+size_t ICoreStub::getBlockchainTotalTransactions() {
+  return 0;
+}
+
+uint32_t ICoreStub::getCurrentBlockchainHeight() {
+  return topHeight;
+}
+
 uint8_t ICoreStub::getBlockMajorVersionForHeight(uint32_t height) {
-	return (uint8_t)4;
-};
+  return (uint8_t)4;
+}
+
 uint8_t ICoreStub::getCurrentBlockMajorVersion() {
-	return (uint8_t)4;
-};
+  return (uint8_t)4;
+}
+
+size_t ICoreStub::getAlternativeBlocksCount() {
+  return 0;
+}
+
+bool ICoreStub::getblockEntry(uint32_t height, uint64_t& block_cumulative_size, CryptoNote::difficulty_type& difficulty, uint64_t& already_generated_coins, uint64_t& reward, uint64_t& transactions_count, uint64_t& timestamp) {
+  return false;
+}
+
+void ICoreStub::rollbackBlockchain(const uint32_t height) {
+}
+
+bool ICoreStub::getBlockLongHash(Crypto::cn_context &context, const CryptoNote::Block& b, Crypto::Hash& res) {
+  return false;
+}
+
+bool ICoreStub::getMixin(const CryptoNote::Transaction& transaction, uint64_t& mixin) {
+  return false;
+}
+
+bool ICoreStub::isInCheckpointZone(uint32_t height) const {
+  return false;
+}

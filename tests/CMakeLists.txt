@@ -32,7 +32,6 @@ add_executable(SystemTests ${SystemTests})
 add_executable(TransfersTests ${TransfersTests})
 add_executable(UnitTests ${UnitTests})
 add_executable(LMDBReorgTests test_lmdb_reorg.cpp)
-
 add_executable(DifficultyTests Difficulty/Difficulty.cpp)
 add_executable(HashTargetTests HashTarget.cpp)
 add_executable(HashTests Hash/main.cpp)
@@ -41,24 +40,25 @@ target_link_libraries(CoreTests TestGenerator Wallet CryptoNoteCore Serializatio
 target_link_libraries(IntegrationTests IntegrationTestLibrary Wallet NodeRpcProxy InProcessNode P2P Rpc Http Transfers Serialization System CryptoNoteCore Logging Common Crypto BlockchainExplorer gtest Mnemonics upnpc-static ${Boost_LIBRARIES})
 target_link_libraries(NodeRpcProxyTests NodeRpcProxy CryptoNoteCore Rpc Http Serialization System Logging Common Crypto ${Boost_LIBRARIES})
 target_link_libraries(PerformanceTests Wallet CryptoNoteCore Serialization Logging Common Crypto ${Boost_LIBRARIES})
-target_link_libraries(SystemTests System gtest_main)
-if (MSVC)
-  target_link_libraries(SystemTests ws2_32)
-  target_link_libraries(NodeRpcProxyTests ws2_32)
-  target_link_libraries(CoreTests ws2_32)
-  target_link_libraries(LMDBReorgTests ws2_32)
-  target_link_libraries(LMDBReorgTests legacy_stdio_definitions.lib)
-endif ()
-
+target_link_libraries(SystemTests System gtest_main ${Boost_LIBRARIES})
 target_link_libraries(TransfersTests IntegrationTestLibrary Wallet gtest_main InProcessNode NodeRpcProxy P2P Rpc Http BlockchainExplorer CryptoNoteCore Serialization System Logging Transfers Common Crypto Mnemonics upnpc-static ${Boost_LIBRARIES})
 target_link_libraries(UnitTests gtest_main PaymentGate Wallet TestGenerator InProcessNode NodeRpcProxy Rpc Http Transfers Serialization System Logging BlockchainExplorer CryptoNoteCore Common Crypto Mnemonics ${Boost_LIBRARIES})
 target_link_libraries(LMDBReorgTests TestGenerator Wallet CryptoNoteCore Serialization System Logging Common Crypto BlockchainExplorer Checkpoints ${Boost_LIBRARIES})
-
 target_link_libraries(DifficultyTests CryptoNoteCore Serialization Crypto Logging Common ${Boost_LIBRARIES})
 target_link_libraries(HashTargetTests CryptoNoteCore Crypto)
 target_link_libraries(HashTests Crypto)
 
-if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux" OR APPLE AND NOT ANDROID)
+if(MSVC)
+  target_link_libraries(SystemTests ws2_32)
+  target_link_libraries(NodeRpcProxyTests ws2_32)
+  target_link_libraries(CoreTests ws2_32)
+  target_link_libraries(DifficultyTests legacy_stdio_definitions.lib)
+  target_link_libraries(HashTests legacy_stdio_definitions.lib)
+  target_link_libraries(LMDBReorgTests ws2_32)
+  target_link_libraries(LMDBReorgTests legacy_stdio_definitions.lib)
+endif()
+
+if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux" OR APPLE AND NOT ANDROID)
   target_link_libraries(CoreTests -lresolv)
   target_link_libraries(IntegrationTests -lresolv)
   target_link_libraries(NodeRpcProxyTests -lresolv)
@@ -66,20 +66,18 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux" OR APPLE AND NOT ANDROID)
   target_link_libraries(TransfersTests -lresolv)
   target_link_libraries(UnitTests -lresolv)
   target_link_libraries(DifficultyTests -lresolv)
-endif ()
+endif()
 
 if(NOT MSVC)
   set_property(TARGET gtest gtest_main IntegrationTestLibrary IntegrationTests TestGenerator UnitTests SystemTests HashTargetTests TransfersTests APPEND_STRING PROPERTY COMPILE_FLAGS " -Wno-undef -Wno-sign-compare")
 endif()
 
-add_custom_target(tests DEPENDS CoreTests IntegrationTests NodeRpcProxyTests PerformanceTests SystemTests TransfersTests UnitTests DifficultyTests HashTargetTests)
+add_custom_target(tests DEPENDS CoreTests IntegrationTests NodeRpcProxyTests PerformanceTests SystemTests TransfersTests UnitTests LMDBReorgTests DifficultyTests HashTargetTests HashTests)
 
 set_property(TARGET
   tests
-
   IntegrationTestLibrary
   TestGenerator
-
   LMDBReorgTests
   CoreTests
   CryptoTests
@@ -89,7 +87,6 @@ set_property(TARGET
   SystemTests
   TransfersTests
   UnitTests
-
   DifficultyTests
   HashTargetTests
   HashTests
@@ -115,7 +112,7 @@ add_test(CryptoTests crypto_tests ${CMAKE_CURRENT_SOURCE_DIR}/crypto/tests.txt)
 add_test(DifficultyTests difficulty_tests ${CMAKE_CURRENT_SOURCE_DIR}/Difficulty/data.txt)
 foreach(hash IN ITEMS fast slow tree extra-blake extra-groestl extra-jh extra-skein)
   add_test(hash-${hash} hash_tests ${hash} ${CMAKE_CURRENT_SOURCE_DIR}/Hash/tests-${hash}.txt)
-endforeach(hash)
+endforeach()
 add_test(HashTargetTests hash_target_tests)
 add_test(SystemTests system_tests)
 add_test(UnitTests unit_tests)

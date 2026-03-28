@@ -25,6 +25,8 @@
 #include "CryptoNoteCore/ICore.h"
 #include "CryptoNoteCore/ICoreObserver.h"
 #include "CryptoNoteProtocol/CryptoNoteProtocolDefinitions.h"
+#include "crypto/hash.h"
+#include "CryptoNoteCore/Difficulty.h"
 #include "Rpc/CoreRpcServerCommandsDefinitions.h"
 
 class ICoreStub: public CryptoNote::ICore {
@@ -90,10 +92,31 @@ public:
   virtual bool addMessageQueue(CryptoNote::MessageQueue<CryptoNote::BlockchainMessage>& messageQueuePtr) override;
   virtual bool removeMessageQueue(CryptoNote::MessageQueue<CryptoNote::BlockchainMessage>& messageQueuePtr) override;
   
-  virtual uint64_t getMinimalFeeForHeight(uint32_t height) override;
+  virtual bool haveTransaction(const Crypto::Hash& id) override;
+  virtual bool handle_incoming_block(const CryptoNote::Block& b, CryptoNote::block_verification_context& bvc, bool control_miner, bool relay_block) override;
+  virtual bool getPoolTransaction(const Crypto::Hash& tx_hash, CryptoNote::Transaction& transaction) override;
+  virtual bool getTransactionHeight(const Crypto::Hash &txId, uint32_t& blockHeight) override;
+  virtual bool getTransactionsWithOutputGlobalIndexes(const std::vector<Crypto::Hash>& txs_ids, std::list<Crypto::Hash>& missed_txs, std::vector<std::pair<CryptoNote::Transaction, std::vector<uint32_t>>>& txs) override;
+  virtual bool getTransaction(const Crypto::Hash& id, CryptoNote::Transaction& tx, bool checkTxPool = false) override;
+  virtual bool getBlockCumulativeDifficulty(uint32_t height, CryptoNote::difficulty_type& difficulty) override;
+  virtual bool getBlockTimestamp(uint32_t height, uint64_t& timestamp) override;
+  virtual std::vector<Crypto::Hash> getTransactionHashesByPaymentId(const Crypto::Hash& paymentId) override;
+  virtual uint64_t getMinimalFee(uint32_t height) override;
   virtual uint64_t getMinimalFee() override;
+  virtual uint64_t getNextBlockDifficulty() override;
+  virtual uint64_t getTotalGeneratedAmount() override;
+  virtual bool check_tx_fee(const CryptoNote::Transaction& tx, const Crypto::Hash& txHash, size_t blobSize, CryptoNote::tx_verification_context& tvc, uint32_t height) override;
+  virtual size_t getPoolTransactionsCount() override;
+  virtual size_t getBlockchainTotalTransactions() override;
+  virtual uint32_t getCurrentBlockchainHeight() override;
   virtual uint8_t getBlockMajorVersionForHeight(uint32_t height) override;
   virtual uint8_t getCurrentBlockMajorVersion() override;
+  virtual size_t getAlternativeBlocksCount() override;
+  virtual bool getblockEntry(uint32_t height, uint64_t& block_cumulative_size, CryptoNote::difficulty_type& difficulty, uint64_t& already_generated_coins, uint64_t& reward, uint64_t& transactions_count, uint64_t& timestamp) override;
+  virtual void rollbackBlockchain(const uint32_t height) override;
+  virtual bool getBlockLongHash(Crypto::cn_context &context, const CryptoNote::Block& b, Crypto::Hash& res) override;
+  virtual bool getMixin(const CryptoNote::Transaction& transaction, uint64_t& mixin) override;
+  virtual bool isInCheckpointZone(uint32_t height) const override;
 
   void set_blockchain_top(uint32_t height, const Crypto::Hash& top_id);
   void set_outputs_gindexs(const std::vector<uint32_t>& indexs, bool result);
