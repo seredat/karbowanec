@@ -717,7 +717,7 @@ difficulty_type Blockchain::getDifficultyForNextBlock(const Crypto::Hash& prevHa
   // Walk backwards through the alt-chain then the main chain by hash links.
   uint32_t processed = 0;
   Crypto::Hash h = prevHash;
-  do {
+  while (processed < difficultyBlocksCount && h != NULL_HASH) {
     uint64_t       ts      = 0;
     difficulty_type cumDiff = 0;
     Crypto::Hash   prevH{};
@@ -745,8 +745,7 @@ difficulty_type Blockchain::getDifficultyForNextBlock(const Crypto::Hash& prevHa
     cumulative_difficulties.push_back(cumDiff);
     ++processed;
     h = prevH;
-
-  } while (processed < difficultyBlocksCount);
+  }
 
   std::reverse(timestamps.begin(), timestamps.end());
   std::reverse(cumulative_difficulties.begin(), cumulative_difficulties.end());

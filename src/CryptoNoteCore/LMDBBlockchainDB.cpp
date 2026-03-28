@@ -91,10 +91,20 @@ bool LMDBBlockchainDB::open(const std::string& path) {
   int rc = mdb_env_create(&m_env);
   if (rc) return false;
 
-  mdb_env_set_maxdbs(m_env, 16);
+  rc = mdb_env_set_maxdbs(m_env, 16);
+  if (rc) {
+    mdb_env_close(m_env);
+    m_env = nullptr;
+    return false;
+  }
 
   // Start at 1 GB; grows as needed via resizeMap()
-  mdb_env_set_mapsize(m_env, size_t(1) << 30);
+  rc = mdb_env_set_mapsize(m_env, size_t(1) << 30);
+  if (rc) {
+    mdb_env_close(m_env);
+    m_env = nullptr;
+    return false;
+  }
 
   // MDB_NORDAHEAD: no read-ahead (saves RAM on large chains).
   // MDB_WRITEMAP and MDB_MAPASYNC are intentionally absent: WRITEMAP writes
@@ -334,9 +344,10 @@ bool LMDBBlockchainDB::getBlockMetaRange(uint32_t fromHeight, uint32_t toHeight,
 bool LMDBBlockchainDB::removeLastBlockMeta() {
   assert(m_writeTxn);
   MDB_cursor* cur = nullptr;
-  mdb_cursor_open(m_writeTxn, m_dbiBlockMeta, &cur);
+  int rc = mdb_cursor_open(m_writeTxn, m_dbiBlockMeta, &cur);
+  checkRc(rc, "removeLastBlockMeta:cursor_open");
   MDB_val k{}, v{};
-  int rc = mdb_cursor_get(cur, &k, &v, MDB_LAST);
+  rc = mdb_cursor_get(cur, &k, &v, MDB_LAST);
   if (rc == MDB_NOTFOUND) { mdb_cursor_close(cur); return false; }
   checkRc(rc, "removeLastBlockMeta:get");
   rc = mdb_cursor_del(cur, 0);
