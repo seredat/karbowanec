@@ -16,6 +16,7 @@
 // along with Karbo.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <cstddef>
+#include <cstring>
 #include <fstream>
 #include <iomanip>
 #include <ios>
@@ -26,6 +27,10 @@
 
 using namespace std;
 typedef Crypto::Hash chash;
+
+bool operator !=(const chash &a, const chash &b) {
+  return 0 != std::memcmp(&a, &b, sizeof(chash));
+}
 
 Crypto::cn_context *context;
 

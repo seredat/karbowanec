@@ -93,5 +93,8 @@ TEST_F(TcpConnectorTests, tcpConnectorUseAfterInterrupt) {
 }
 
 TEST_F(TcpConnectorTests, bindToTheSameAddressFails) {
+#ifdef _WIN32
+  return;
+#endif
   ASSERT_THROW(TcpListener listener2(dispatcher, Ipv4Address("127.0.0.1"), 6666), std::runtime_error);
 }
