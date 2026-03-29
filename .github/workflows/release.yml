@@ -255,14 +255,16 @@ jobs:
 
           make -j$(nproc)
 
-          cd src
-          exeFiles=()
-          for f in ./*; do [[ -x $f && -f $f ]] && exeFiles+=( "$f" ); done
-          strip "${exeFiles[@]}"
-          tar -czf "$release_name".tar.gz "${exeFiles[@]}"
-          mv "$release_name".tar.gz ../
-          cd ..
-          sha256=$(shasum -a 256 "$release_name.tar.gz" | awk '{print toupper($1)}')
+          mkdir -p "$release_name"
+          for f in src/*; do
+            if [ -x "$f" ] && [ -f "$f" ]; then
+              strip "$f"
+              cp "$f" "$release_name/"
+            fi
+          done
+
+          tar -czf "$release_name".tar.gz -C "$release_name" .
+          sha256=$(sha256sum "$release_name.tar.gz" | awk '{print toupper($1)}')
           asset_path="./$build_folder/$release_name.tar.gz"
 
           echo "sha256=${sha256}" >> $GITHUB_OUTPUT
