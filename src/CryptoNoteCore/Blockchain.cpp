@@ -193,6 +193,16 @@ bool Blockchain::init(const std::string& config_folder, bool load_existing) {
   if (!m_db.open(lmdbPath)) {
     namespace fs = std::filesystem;
 
+    // Check if another process already holds the exclusive lock
+    if (LMDBBlockchainDB::isLocked(lmdbPath)) {
+      logger(ERROR, BRIGHT_RED)
+          << "The blockchain database at " << lmdbPath
+          << " is already in use by another process. "
+          << "Only one process can access the database at a time. "
+          << "Please close the other instance and try again.";
+      return false;
+    }
+
     logger(WARNING, BRIGHT_YELLOW)
         << "Failed to open LMDB database at " << lmdbPath
         << ", attempting recovery...";
