@@ -3117,6 +3117,16 @@ bool Blockchain::migrateFromSwappedVector(const std::string& config_folder) {
             m_db.resizeMap();
             // batchStart unchanged - retry same batch from the beginning
           }
+          catch (const std::exception& e) {
+            // Any non-map-full LMDB/storage error (e.g. EIO during commit):
+            // abort the batch transaction and return a recoverable migration
+            // failure instead of crashing daemon startup.
+            m_db.abortTxn();
+            logger(ERROR, BRIGHT_RED)
+              << "Migration: batch [" << batchStart << ", " << (batchEnd - 1)
+              << "] failed: " << e.what();
+            return false;
+          }
         }
       }
 
