@@ -113,10 +113,10 @@ void HttpServer::stop() {
   if (m_stopping.exchange(true)) {
     return;  // Already stopped
   }
-  
+
   logger(INFO) << "Stopping HTTP server...";
 
-  // Close listener
+  // Close listener to stop accepting new connections
   try {
     m_listener.close();
     logger(INFO) << "Listener closed";
@@ -124,10 +124,20 @@ void HttpServer::stop() {
   catch (const std::exception& e) {
     logger(INFO) << "Error closing listener: " << e.what();
   }
-  
+
+  // Close all active connections to unblock pending reads
+  for (auto* conn : m_connections) {
+    try {
+      boost::system::error_code ec;
+      conn->getSocket().shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
+      conn->getSocket().close(ec);
+    } catch (...) {
+    }
+  }
+
   workingContextGroup.interrupt();
   workingContextGroup.wait();
-  
+
   logger(INFO) << "HTTP server stopped";
 }
 
