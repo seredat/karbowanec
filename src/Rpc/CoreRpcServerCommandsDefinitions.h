@@ -1502,36 +1502,4 @@ struct COMMAND_RPC_GET_ACCOUNT_NUMBER {
   };
 };
 
-struct account_number_entry {
-  uint32_t block_height;
-  uint32_t tx_index;
-  std::string account_number;
-
-  void serialize(ISerializer& s) {
-    KV_MEMBER(block_height)
-    KV_MEMBER(tx_index)
-    KV_MEMBER(account_number)
-  }
-};
-
-struct COMMAND_RPC_GET_ALL_ACCOUNT_NUMBERS {
-  struct request {
-    std::string address;
-
-    void serialize(ISerializer& s) {
-      KV_MEMBER(address)
-    }
-  };
-
-  struct response {
-    std::vector<account_number_entry> entries;
-    std::string status;
-
-    void serialize(ISerializer& s) {
-      KV_MEMBER(entries)
-      KV_MEMBER(status)
-    }
-  };
-};
-
 }

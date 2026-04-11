@@ -710,7 +710,6 @@ bool RpcServer::processJsonRpcRequest(const CryptoNote::HttpRequest& request, Cr
       { "search", { makeMemberMethod(&RpcServer::on_explorer_search), true } },
       { "resolve_account_number", { makeMemberMethod(&RpcServer::on_resolve_account_number), true } },
       { "get_account_number", { makeMemberMethod(&RpcServer::on_get_account_number), true } },
-      { "get_all_account_numbers", { makeMemberMethod(&RpcServer::on_get_all_account_numbers), true } },
 
     };
 
@@ -2244,32 +2243,19 @@ bool RpcServer::on_get_explorer_address(const COMMAND_EXPLORER_GET_ADDRESS::requ
        + (validView ? " &#10004;" : " &#10008; <b>INVALID</b>") + "</li>\n";
   body += "</ul>\n";
 
-  // Look up registered account numbers
-  std::vector<std::pair<uint32_t, uint32_t>> results;
-  m_core.getAllAccountNumbers(address, results);
-
-  if (!results.empty()) {
-    body += "<h3>Registered Account Numbers</h3>\n";
-    body += "<table class=\"counter\" cellpadding=\"10px\">\n";
-    body += "  <thead>\n";
-    body += "  <tr>\n";
-    body += "    <th>Account Number</th><th>Block Height</th><th>TX Index</th>\n";
-    body += "  </tr>\n";
-    body += "  </thead>\n";
-    body += "  <tbody>\n";
-    for (const auto& r : results) {
-      AccountNumber an{r.first, r.second};
+  // Look up registered account number
+  {
+    uint32_t blockHeight, txIndex;
+    if (m_core.getAccountNumber(address, blockHeight, txIndex)) {
+      AccountNumber an{blockHeight, txIndex};
       std::string anStr = an.toString();
-      body += "  <tr>\n";
-      body += "    <td><a href=\"/explorer/account/" + anStr + "\">" + anStr + "</a></td>";
-      body += "    <td><a href=\"/explorer/block/" + std::to_string(r.first) + "\">" + std::to_string(r.first) + "</a></td>";
-      body += "    <td>" + std::to_string(r.second) + "</td>\n";
-      body += "  </tr>\n";
+      body += "<h3>Account Number</h3>\n";
+      body += "<p><a href=\"/explorer/account/" + anStr + "\">" + anStr + "</a>"
+              " (block <a href=\"/explorer/block/" + std::to_string(blockHeight) + "\">"
+              + std::to_string(blockHeight) + "</a>)</p>\n";
+    } else {
+      body += "<p>No account number registered for this address.</p>\n";
     }
-    body += "  </tbody>\n";
-    body += "</table>\n";
-  } else {
-    body += "<p>No account numbers registered for this address.</p>\n";
   }
 
   body += index_finish;
@@ -3508,30 +3494,6 @@ bool RpcServer::on_get_account_number(const COMMAND_RPC_GET_ACCOUNT_NUMBER::requ
 
   AccountNumber acctNum{blockHeight, txIndex};
   res.account_number = acctNum.toString();
-  res.status = CORE_RPC_STATUS_OK;
-  return true;
-}
-
-bool RpcServer::on_get_all_account_numbers(const COMMAND_RPC_GET_ALL_ACCOUNT_NUMBERS::request& req,
-                                           COMMAND_RPC_GET_ALL_ACCOUNT_NUMBERS::response& res) {
-  AccountPublicAddress address;
-  uint64_t prefix;
-  if (!parseAccountAddressString(prefix, address, req.address)) {
-    throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_WRONG_PARAM, "Invalid address" };
-  }
-
-  std::vector<std::pair<uint32_t, uint32_t>> results;
-  m_core.getAllAccountNumbers(address, results);
-
-  for (const auto& r : results) {
-    AccountNumber acctNum{r.first, r.second};
-    account_number_entry entry;
-    entry.block_height = r.first;
-    entry.tx_index = r.second;
-    entry.account_number = acctNum.toString();
-    res.entries.push_back(entry);
-  }
-
   res.status = CORE_RPC_STATUS_OK;
   return true;
 }

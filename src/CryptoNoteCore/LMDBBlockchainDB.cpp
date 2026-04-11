@@ -925,49 +925,30 @@ bool LMDBBlockchainDB::removeAccountRegistration(uint32_t blockHeight, uint32_t 
   return true;
 }
 
-bool LMDBBlockchainDB::findAccountRegistrationsByKeys(const uint8_t* spendKey, const uint8_t* viewKey,
-                                                      bool findFirst,
-                                                      std::vector<std::pair<uint32_t, uint32_t>>& results) const {
-  results.clear();
+bool LMDBBlockchainDB::findAccountRegistrationByKeys(const uint8_t* spendKey, const uint8_t* viewKey,
+                                                     uint32_t& blockHeight, uint32_t& txIndex) const {
   auto guard = readTxn();
   MDB_cursor* cursor = nullptr;
   int rc = mdb_cursor_open(guard.txn, m_dbiAccountRegistrations, &cursor);
-  checkRc(rc, "findAccountRegistrationsByKeys:open");
+  checkRc(rc, "findAccountRegistrationByKeys:open");
 
   MDB_val k{}, v{};
-  // Walk forward from the beginning — canonical account number is the first registration
-  if (findFirst) {
-    rc = mdb_cursor_get(cursor, &k, &v, MDB_FIRST);
-    while (rc == 0) {
-      if (v.mv_size == 64) {
-        const uint8_t* data = static_cast<const uint8_t*>(v.mv_data);
-        if (memcmp(data, spendKey, 32) == 0 && memcmp(data + 32, viewKey, 32) == 0) {
-          uint32_t h, i;
-          unpackAcctRegKey(static_cast<const uint8_t*>(k.mv_data), h, i);
-          results.push_back({h, i});
-          break;
-        }
+  // Walk forward — canonical account number is the first registration
+  rc = mdb_cursor_get(cursor, &k, &v, MDB_FIRST);
+  while (rc == 0) {
+    if (v.mv_size == 64) {
+      const uint8_t* data = static_cast<const uint8_t*>(v.mv_data);
+      if (memcmp(data, spendKey, 32) == 0 && memcmp(data + 32, viewKey, 32) == 0) {
+        unpackAcctRegKey(static_cast<const uint8_t*>(k.mv_data), blockHeight, txIndex);
+        mdb_cursor_close(cursor);
+        return true;
       }
-      rc = mdb_cursor_get(cursor, &k, &v, MDB_NEXT);
     }
-  } else {
-    // Full scan from beginning
-    rc = mdb_cursor_get(cursor, &k, &v, MDB_FIRST);
-    while (rc == 0) {
-      if (v.mv_size == 64) {
-        const uint8_t* data = static_cast<const uint8_t*>(v.mv_data);
-        if (memcmp(data, spendKey, 32) == 0 && memcmp(data + 32, viewKey, 32) == 0) {
-          uint32_t h, i;
-          unpackAcctRegKey(static_cast<const uint8_t*>(k.mv_data), h, i);
-          results.push_back({h, i});
-        }
-      }
-      rc = mdb_cursor_get(cursor, &k, &v, MDB_NEXT);
-    }
+    rc = mdb_cursor_get(cursor, &k, &v, MDB_NEXT);
   }
 
   mdb_cursor_close(cursor);
-  return !results.empty();
+  return false;
 }
 
 } // namespace CryptoNote

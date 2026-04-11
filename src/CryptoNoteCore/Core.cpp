@@ -1350,11 +1350,6 @@ bool Core::getAccountNumber(const AccountPublicAddress& address,
   return m_blockchain.getAccountNumber(address, blockHeight, txIndex);
 }
 
-bool Core::getAllAccountNumbers(const AccountPublicAddress& address,
-                                std::vector<std::pair<uint32_t, uint32_t>>& results) {
-  return m_blockchain.getAllAccountNumbers(address, results);
-}
-
 bool Core::is_key_image_spent(const Crypto::KeyImage& key_im) {
   return m_blockchain.have_tx_keyimg_as_spent(key_im);
 }

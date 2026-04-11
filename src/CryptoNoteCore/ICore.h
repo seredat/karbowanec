@@ -148,8 +148,6 @@ public:
                                     AccountPublicAddress& address) = 0;
   virtual bool getAccountNumber(const AccountPublicAddress& address,
                                 uint32_t& blockHeight, uint32_t& txIndex) = 0;
-  virtual bool getAllAccountNumbers(const AccountPublicAddress& address,
-                                   std::vector<std::pair<uint32_t, uint32_t>>& results) = 0;
 };
 
 } //namespace CryptoNote

@@ -161,12 +161,9 @@ public:
                               uint8_t* spendKey, uint8_t* viewKey) const;
   bool removeAccountRegistration(uint32_t blockHeight, uint32_t txIndex);
 
-  // Reverse lookup: find registrations matching given spend+view keys.
-  // If findFirst is true, walks cursor backwards and stops at first match (canonical).
-  // If findFirst is false, scans entire table collecting all matches.
-  bool findAccountRegistrationsByKeys(const uint8_t* spendKey, const uint8_t* viewKey,
-                                      bool findFirst,
-                                      std::vector<std::pair<uint32_t, uint32_t>>& results) const;
+  // Reverse lookup: find the first (canonical) registration matching given spend+view keys.
+  bool findAccountRegistrationByKeys(const uint8_t* spendKey, const uint8_t* viewKey,
+                                     uint32_t& blockHeight, uint32_t& txIndex) const;
 
   // ── Resize when map is full ───────────────────────────────────────────────
   // Call this when no write txn is active, then re-begin the txn.

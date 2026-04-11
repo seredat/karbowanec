@@ -2907,23 +2907,9 @@ bool Blockchain::resolveAccountNumber(uint32_t blockHeight, uint32_t txIndex,
 bool Blockchain::getAccountNumber(const AccountPublicAddress& address,
                                   uint32_t& blockHeight, uint32_t& txIndex) {
   std::lock_guard<std::recursive_mutex> lk(m_blockchain_lock);
-  std::vector<std::pair<uint32_t, uint32_t>> results;
-  if (!m_db.findAccountRegistrationsByKeys(address.spendPublicKey.data,
+  return m_db.findAccountRegistrationByKeys(address.spendPublicKey.data,
                                             address.viewPublicKey.data,
-                                            true, results)) {
-    return false;
-  }
-  blockHeight = results[0].first;
-  txIndex = results[0].second;
-  return true;
-}
-
-bool Blockchain::getAllAccountNumbers(const AccountPublicAddress& address,
-                                     std::vector<std::pair<uint32_t, uint32_t>>& results) {
-  std::lock_guard<std::recursive_mutex> lk(m_blockchain_lock);
-  return m_db.findAccountRegistrationsByKeys(address.spendPublicKey.data,
-                                              address.viewPublicKey.data,
-                                              false, results);
+                                            blockHeight, txIndex);
 }
 
 // ─── blockDifficulty / blockCumulativeDifficulty / getblockEntry ─────────────
