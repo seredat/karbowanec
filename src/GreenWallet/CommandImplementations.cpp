@@ -1077,32 +1077,20 @@ void registerAccountNumber(std::shared_ptr<WalletInfo> walletInfo, CryptoNote::I
     {
         std::cout << WarningMsg("This address already has account number: ")
                   << SuccessMsg(existingNumber) << std::endl;
-        std::cout << WarningMsg("Re-registering will create a new account number. "
-                                "The new number will become canonical.") << std::endl;
-        std::cout << "Proceed with re-registration? (y/N): ";
-
-        std::string confirm;
-        std::getline(std::cin, confirm);
-        if (confirm.empty() || (confirm[0] != 'y' && confirm[0] != 'Y'))
-        {
-            std::cout << WarningMsg("Cancelling registration.") << std::endl;
-            return;
-        }
+        return;
     }
-    else
-    {
-        std::cout << InformationMsg("You don't have an account number yet. "
-                                    "Register one for easy payments? (small fee applies)")
-                  << std::endl;
-        std::cout << "Proceed? (Y/n): ";
 
-        std::string confirm;
-        std::getline(std::cin, confirm);
-        if (!confirm.empty() && confirm[0] != 'y' && confirm[0] != 'Y')
-        {
-            std::cout << WarningMsg("Cancelling registration.") << std::endl;
-            return;
-        }
+    std::cout << InformationMsg("Register an account number for easy payments? "
+                                "(small fee applies)")
+              << std::endl;
+    std::cout << "Proceed? (Y/n): ";
+
+    std::string confirm;
+    std::getline(std::cin, confirm);
+    if (!confirm.empty() && confirm[0] != 'y' && confirm[0] != 'Y')
+    {
+        std::cout << WarningMsg("Cancelling registration.") << std::endl;
+        return;
     }
 
     /* Build registration tx extra */

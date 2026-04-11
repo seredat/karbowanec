@@ -938,6 +938,20 @@ bool wallet_rpc_server::on_get_account_number(const wallet_rpc::COMMAND_RPC_GET_
 bool wallet_rpc_server::on_register_account(const wallet_rpc::COMMAND_RPC_REGISTER_ACCOUNT::request& req,
   wallet_rpc::COMMAND_RPC_REGISTER_ACCOUNT::response& res)
 {
+  // Check if already registered
+  {
+    std::string existingNumber;
+    std::promise<std::error_code> promise;
+    auto future = promise.get_future();
+    m_node.getAccountNumber(m_wallet.getAddress(), existingNumber,
+        [&promise](std::error_code ec) { promise.set_value(ec); });
+    auto ec = future.get();
+    if (!ec && !existingNumber.empty()) {
+      throw JsonRpc::JsonRpcError(WALLET_RPC_ERROR_CODE_GENERIC_TRANSFER_ERROR,
+        "This address already has account number: " + existingNumber);
+    }
+  }
+
   // Build registration tx extra
   CryptoNote::AccountKeys keys;
   m_wallet.getAccountKeys(keys);

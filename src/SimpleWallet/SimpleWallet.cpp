@@ -2457,23 +2457,16 @@ bool simple_wallet::register_account(const std::vector<std::string> &args) {
         [&promise](std::error_code ec) { promise.set_value(ec); });
     auto ec = future.get();
     if (!ec && !existingNumber.empty()) {
-      logger(WARNING, YELLOW) << "This address already has account number: " << existingNumber;
-      logger(WARNING, YELLOW) << "Re-registering will create a new account number.";
-      std::cout << "Proceed with re-registration? (y/N): ";
-      std::string confirm;
-      std::getline(std::cin, confirm);
-      if (confirm.empty() || (confirm[0] != 'y' && confirm[0] != 'Y')) {
-        logger(INFO) << "Cancelled.";
-        return true;
-      }
-    } else {
-      std::cout << "Register an account number for easy payments? (small fee applies) (Y/n): ";
-      std::string confirm;
-      std::getline(std::cin, confirm);
-      if (!confirm.empty() && confirm[0] != 'y' && confirm[0] != 'Y') {
-        logger(INFO) << "Cancelled.";
-        return true;
-      }
+      fail_msg_writer() << "This address already has account number: " << existingNumber;
+      return true;
+    }
+
+    std::cout << "Register an account number for easy payments? (small fee applies) (Y/n): ";
+    std::string confirm;
+    std::getline(std::cin, confirm);
+    if (!confirm.empty() && confirm[0] != 'y' && confirm[0] != 'Y') {
+      logger(INFO) << "Cancelled.";
+      return true;
     }
   }
 
