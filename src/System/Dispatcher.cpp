@@ -109,12 +109,10 @@ namespace System {
   void Dispatcher::interrupt(NativeContext* context) {
     assert(context != nullptr);
     if (!context->interrupted) {
+      context->interrupted = true;
       if (context->interruptProcedure != nullptr) {
         context->interruptProcedure();
         context->interruptProcedure = nullptr;
-      }
-      else {
-        context->interrupted = true;
       }
     }
   }

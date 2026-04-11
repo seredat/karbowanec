@@ -31,6 +31,7 @@ add_executable(PerformanceTests ${PerformanceTests})
 add_executable(SystemTests ${SystemTests})
 add_executable(TransfersTests ${TransfersTests})
 add_executable(UnitTests ${UnitTests})
+add_executable(LMDBReorgTests test_lmdb_reorg.cpp)
 
 add_executable(DifficultyTests Difficulty/Difficulty.cpp)
 add_executable(HashTargetTests HashTarget.cpp)
@@ -45,10 +46,13 @@ if (MSVC)
   target_link_libraries(SystemTests ws2_32)
   target_link_libraries(NodeRpcProxyTests ws2_32)
   target_link_libraries(CoreTests ws2_32)
+  target_link_libraries(LMDBReorgTests ws2_32)
+  target_link_libraries(LMDBReorgTests legacy_stdio_definitions.lib)
 endif ()
 
 target_link_libraries(TransfersTests IntegrationTestLibrary Wallet gtest_main InProcessNode NodeRpcProxy P2P Rpc Http BlockchainExplorer CryptoNoteCore Serialization System Logging Transfers Common Crypto Mnemonics upnpc-static ${Boost_LIBRARIES})
 target_link_libraries(UnitTests gtest_main PaymentGate Wallet TestGenerator InProcessNode NodeRpcProxy Rpc Http Transfers Serialization System Logging BlockchainExplorer CryptoNoteCore Common Crypto Mnemonics ${Boost_LIBRARIES})
+target_link_libraries(LMDBReorgTests TestGenerator Wallet CryptoNoteCore Serialization System Logging Common Crypto BlockchainExplorer Checkpoints ${Boost_LIBRARIES})
 
 target_link_libraries(DifficultyTests CryptoNoteCore Serialization Crypto Logging Common ${Boost_LIBRARIES})
 target_link_libraries(HashTargetTests CryptoNoteCore Crypto)
@@ -76,6 +80,7 @@ set_property(TARGET
   IntegrationTestLibrary
   TestGenerator
 
+  LMDBReorgTests
   CoreTests
   CryptoTests
   IntegrationTests
@@ -100,6 +105,7 @@ set_property(TARGET PerformanceTests PROPERTY OUTPUT_NAME "performance_tests")
 set_property(TARGET SystemTests PROPERTY OUTPUT_NAME "system_tests")
 set_property(TARGET TransfersTests PROPERTY OUTPUT_NAME "transfers_tests")
 set_property(TARGET UnitTests PROPERTY OUTPUT_NAME "unit_tests")
+set_property(TARGET LMDBReorgTests PROPERTY OUTPUT_NAME "lmdb_reorg_tests")
 set_property(TARGET DifficultyTests PROPERTY OUTPUT_NAME "difficulty_tests")
 set_property(TARGET HashTargetTests PROPERTY OUTPUT_NAME "hash_target_tests")
 set_property(TARGET HashTests PROPERTY OUTPUT_NAME "hash_tests")
@@ -113,3 +119,4 @@ endforeach(hash)
 add_test(HashTargetTests hash_target_tests)
 add_test(SystemTests system_tests)
 add_test(UnitTests unit_tests)
+add_test(LMDBReorgTests lmdb_reorg_tests)

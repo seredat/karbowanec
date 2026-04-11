@@ -23,6 +23,14 @@
 #include <vector>
 #include <stdexcept>
 
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#include <sys/file.h>
+#include <fcntl.h>
+#endif
+
 #include "crypto/hash.h"
 #include "crypto/crypto.h"
 #include "liblmdb/lmdb.h"
@@ -185,9 +193,18 @@ public:
 
   MDB_env* getEnv() const { return m_env; }
 
+  // Returns true if another process holds the exclusive lock on path.
+  static bool isLocked(const std::string& path);
+
 private:
   MDB_env* m_env      = nullptr;
   MDB_txn* m_writeTxn = nullptr;
+
+#ifdef _WIN32
+  HANDLE m_lockFile = INVALID_HANDLE_VALUE;
+#else
+  int    m_lockFd   = -1;
+#endif
 
   MDB_dbi m_dbiBlockMeta;
   MDB_dbi m_dbiBlockData;

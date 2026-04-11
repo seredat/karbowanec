@@ -88,13 +88,44 @@ LMDBBlockchainDB::~LMDBBlockchainDB() {
 // ─── open / close / clear ─────────────────────────────────────────────────
 
 bool LMDBBlockchainDB::open(const std::string& path) {
-  int rc = mdb_env_create(&m_env);
-  if (rc) return false;
+  // ── Acquire an exclusive application-level lock ──────────────────────────
+  // LMDB allows multiple processes to share the same environment (serialised
+  // writers, concurrent readers).  That is fine for the library, but two
+  // daemon instances operating on the same blockchain directory would cause
+  // application-level conflicts.  An exclusive lock file prevents this.
+  std::string lockPath = path + "/db.lock";
 
-  mdb_env_set_maxdbs(m_env, 16);
+#ifdef _WIN32
+  m_lockFile = CreateFileA(
+      lockPath.c_str(),
+      GENERIC_READ | GENERIC_WRITE,
+      0,                        // no sharing — exclusive access
+      nullptr,
+      OPEN_ALWAYS,
+      FILE_ATTRIBUTE_NORMAL | FILE_FLAG_DELETE_ON_CLOSE,
+      nullptr);
+  if (m_lockFile == INVALID_HANDLE_VALUE)
+    return false;
+#else
+  m_lockFd = ::open(lockPath.c_str(), O_RDWR | O_CREAT, 0664);
+  if (m_lockFd < 0)
+    return false;
+  if (::flock(m_lockFd, LOCK_EX | LOCK_NB) != 0) {
+    ::close(m_lockFd);
+    m_lockFd = -1;
+    return false;
+  }
+#endif
+
+  int rc = mdb_env_create(&m_env);
+  if (rc) { close(); return false; }
+
+  rc = mdb_env_set_maxdbs(m_env, 16);
+  if (rc) { close(); return false; }
 
   // Start at 1 GB; grows as needed via resizeMap()
-  mdb_env_set_mapsize(m_env, size_t(1) << 30);
+  rc = mdb_env_set_mapsize(m_env, size_t(1) << 30);
+  if (rc) { close(); return false; }
 
   // MDB_NORDAHEAD: no read-ahead (saves RAM on large chains).
   // MDB_WRITEMAP and MDB_MAPASYNC are intentionally absent: WRITEMAP writes
@@ -106,20 +137,12 @@ bool LMDBBlockchainDB::open(const std::string& path) {
 
   // Ensure the directory exists
   rc = mdb_env_open(m_env, path.c_str(), envFlags, 0664);
-  if (rc) {
-    mdb_env_close(m_env);
-    m_env = nullptr;
-    return false;
-  }
+  if (rc) { close(); return false; }
 
   // Open all named databases in a setup transaction
   MDB_txn* setupTxn = nullptr;
   rc = mdb_txn_begin(m_env, nullptr, 0, &setupTxn);
-  if (rc) {
-    mdb_env_close(m_env);
-    m_env = nullptr;
-    return false;
-  }
+  if (rc) { close(); return false; }
 
   try {
     openDb(setupTxn, "block_meta",        0,                         m_dbiBlockMeta);
@@ -137,17 +160,12 @@ bool LMDBBlockchainDB::open(const std::string& path) {
     openDb(setupTxn, "acct_reg",          0,                         m_dbiAccountRegistrations);
   } catch (...) {
     mdb_txn_abort(setupTxn);
-    mdb_env_close(m_env);
-    m_env = nullptr;
+    close();
     return false;
   }
 
   rc = mdb_txn_commit(setupTxn);
-  if (rc) {
-    mdb_env_close(m_env);
-    m_env = nullptr;
-    return false;
-  }
+  if (rc) { close(); return false; }
 
   return true;
 }
@@ -161,6 +179,18 @@ void LMDBBlockchainDB::close() {
     mdb_env_close(m_env);
     m_env = nullptr;
   }
+#ifdef _WIN32
+  if (m_lockFile != INVALID_HANDLE_VALUE) {
+    CloseHandle(m_lockFile);
+    m_lockFile = INVALID_HANDLE_VALUE;
+  }
+#else
+  if (m_lockFd >= 0) {
+    ::flock(m_lockFd, LOCK_UN);
+    ::close(m_lockFd);
+    m_lockFd = -1;
+  }
+#endif
 }
 
 void LMDBBlockchainDB::clear() {
@@ -191,6 +221,36 @@ void LMDBBlockchainDB::clear() {
 
   rc = mdb_txn_commit(txn);
   checkRc(rc, "clear:commit");
+}
+
+// ─── isLocked ─────────────────────────────────────────────────────────────
+
+bool LMDBBlockchainDB::isLocked(const std::string& path) {
+  std::string lockPath = path + "/db.lock";
+#ifdef _WIN32
+  HANDLE h = CreateFileA(
+      lockPath.c_str(),
+      GENERIC_READ | GENERIC_WRITE,
+      0,          // exclusive — will fail if already held
+      nullptr,
+      OPEN_EXISTING,
+      FILE_ATTRIBUTE_NORMAL,
+      nullptr);
+  if (h == INVALID_HANDLE_VALUE)
+    return (GetLastError() == ERROR_SHARING_VIOLATION);
+  CloseHandle(h);
+  return false;
+#else
+  int fd = ::open(lockPath.c_str(), O_RDWR, 0664);
+  if (fd < 0) return false;  // file doesn't exist → not locked
+  if (::flock(fd, LOCK_EX | LOCK_NB) != 0) {
+    ::close(fd);
+    return true;  // another process holds the lock
+  }
+  ::flock(fd, LOCK_UN);
+  ::close(fd);
+  return false;
+#endif
 }
 
 // ─── Transaction control ───────────────────────────────────────────────────
@@ -336,9 +396,10 @@ bool LMDBBlockchainDB::getBlockMetaRange(uint32_t fromHeight, uint32_t toHeight,
 bool LMDBBlockchainDB::removeLastBlockMeta() {
   assert(m_writeTxn);
   MDB_cursor* cur = nullptr;
-  mdb_cursor_open(m_writeTxn, m_dbiBlockMeta, &cur);
+  int rc = mdb_cursor_open(m_writeTxn, m_dbiBlockMeta, &cur);
+  checkRc(rc, "removeLastBlockMeta:cursor_open");
   MDB_val k{}, v{};
-  int rc = mdb_cursor_get(cur, &k, &v, MDB_LAST);
+  rc = mdb_cursor_get(cur, &k, &v, MDB_LAST);
   if (rc == MDB_NOTFOUND) { mdb_cursor_close(cur); return false; }
   checkRc(rc, "removeLastBlockMeta:get");
   rc = mdb_cursor_del(cur, 0);

@@ -9,6 +9,18 @@
 #include <stdexcept>
 
 namespace System {
+  namespace {
+    void shutdownAndClose(const std::shared_ptr<boost::asio::ip::tcp::socket>& socket) {
+      if (!socket || !socket->is_open()) {
+        return;
+      }
+
+      boost::system::error_code ignored;
+      socket->shutdown(boost::asio::ip::tcp::socket::shutdown_both, ignored);
+      ignored.clear();
+      socket->close(ignored);
+    }
+  }
 
   TcpConnection::TcpConnection() = default;
 
@@ -18,18 +30,12 @@ namespace System {
   }
 
   TcpConnection::~TcpConnection() {
-    if (socketPtr) {
-      boost::system::error_code ec;
-      socketPtr->close(ec);
-    }
+    shutdownAndClose(socketPtr);
   }
 
   TcpConnection& TcpConnection::operator=(TcpConnection&& other) noexcept {
     if (this != &other) {
-      if (socketPtr) {
-        boost::system::error_code ec;
-        socketPtr->close(ec);
-      }
+      shutdownAndClose(socketPtr);
       dispatcher = other.dispatcher;
       socketPtr = std::move(other.socketPtr);
       other.dispatcher = nullptr;
@@ -53,8 +59,7 @@ namespace System {
 
     // Set interrupt procedure: close socket to cancel outstanding read
     waiting->interruptProcedure = [socket = socketPtr]() {
-      boost::system::error_code ignored;
-      if (socket && socket->is_open()) socket->close(ignored);
+      shutdownAndClose(socket);
       };
 
     // Use async_read_some (or async_read depending on desired semantics)
@@ -70,7 +75,7 @@ namespace System {
     // Wait cooperatively for completion
     while (!done) {
       if (dispatcher->interrupted()) {
-        // interruptProcedure will close socket
+        shutdownAndClose(socketPtr);
       }
       dispatcher->dispatch();
     }
@@ -80,6 +85,7 @@ namespace System {
 
     if (ec) {
       if (ec == boost::asio::error::operation_aborted) throw InterruptedException();
+      if (ec == boost::asio::error::eof || ec == boost::asio::error::connection_reset) return 0;
       throw std::runtime_error("TcpConnection::read failed: " + ec.message());
     }
 
@@ -105,8 +111,7 @@ namespace System {
     NativeContext* waiting = dispatcher->getCurrentContext();
 
     waiting->interruptProcedure = [socket = socketPtr]() {
-      boost::system::error_code ignored;
-      if (socket && socket->is_open()) socket->close(ignored);
+      shutdownAndClose(socket);
       };
 
     boost::asio::async_write(*socketPtr, boost::asio::buffer(data, size),
@@ -119,10 +124,7 @@ namespace System {
 
     while (!done) {
       if (dispatcher->interrupted()) {
-        // interruptProcedure will close socket
-        boost::system::error_code ignored;
-        auto& socket = socketPtr;
-        if (socket && socket->is_open()) socket->close(ignored);
+        shutdownAndClose(socketPtr);
       }
       dispatcher->dispatch();
     }

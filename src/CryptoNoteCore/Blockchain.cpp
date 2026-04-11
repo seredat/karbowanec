@@ -193,6 +193,16 @@ bool Blockchain::init(const std::string& config_folder, bool load_existing) {
   if (!m_db.open(lmdbPath)) {
     namespace fs = std::filesystem;
 
+    // Check if another process already holds the exclusive lock
+    if (LMDBBlockchainDB::isLocked(lmdbPath)) {
+      logger(ERROR, BRIGHT_RED)
+          << "The blockchain database at " << lmdbPath
+          << " is already in use by another process. "
+          << "Only one process can access the database at a time. "
+          << "Please close the other instance and try again.";
+      return false;
+    }
+
     logger(WARNING, BRIGHT_YELLOW)
         << "Failed to open LMDB database at " << lmdbPath
         << ", attempting recovery...";
@@ -717,7 +727,7 @@ difficulty_type Blockchain::getDifficultyForNextBlock(const Crypto::Hash& prevHa
   // Walk backwards through the alt-chain then the main chain by hash links.
   uint32_t processed = 0;
   Crypto::Hash h = prevHash;
-  do {
+  while (processed < difficultyBlocksCount && h != NULL_HASH) {
     uint64_t       ts      = 0;
     difficulty_type cumDiff = 0;
     Crypto::Hash   prevH{};
@@ -745,8 +755,7 @@ difficulty_type Blockchain::getDifficultyForNextBlock(const Crypto::Hash& prevHa
     cumulative_difficulties.push_back(cumDiff);
     ++processed;
     h = prevH;
-
-  } while (processed < difficultyBlocksCount);
+  }
 
   std::reverse(timestamps.begin(), timestamps.end());
   std::reverse(cumulative_difficulties.begin(), cumulative_difficulties.end());
@@ -3163,6 +3172,16 @@ bool Blockchain::migrateFromSwappedVector(const std::string& config_folder) {
               << ", resizing map and retrying batch...";
             m_db.resizeMap();
             // batchStart unchanged - retry same batch from the beginning
+          }
+          catch (const std::exception& e) {
+            // Any non-map-full LMDB/storage error (e.g. EIO during commit):
+            // abort the batch transaction and return a recoverable migration
+            // failure instead of crashing daemon startup.
+            m_db.abortTxn();
+            logger(ERROR, BRIGHT_RED)
+              << "Migration: batch [" << batchStart << ", " << (batchEnd - 1)
+              << "] failed: " << e.what();
+            return false;
           }
         }
       }

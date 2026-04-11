@@ -109,6 +109,17 @@ void JsonRpcServer::init(const std::string& chain_file, const std::string& key_f
 
 void JsonRpcServer::processRequest(const CryptoNote::HttpRequest& req, CryptoNote::HttpResponse& resp) {
   try {
+    // CORS headers on every response
+    resp.addHeader("Access-Control-Allow-Origin", "*");
+    resp.addHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+    resp.addHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+
+    // Handle CORS preflight
+    if (req.getMethod() == "OPTIONS") {
+      resp.setStatus(CryptoNote::HttpResponse::STATUS_200);
+      return;
+    }
+
     if (req.getUrl() == "/json_rpc") {
       std::istringstream jsonInputStream(req.getBody());
       Common::JsonValue jsonRpcRequest;
@@ -119,8 +130,7 @@ void JsonRpcServer::processRequest(const CryptoNote::HttpRequest& req, CryptoNot
       } catch (std::runtime_error&) {
         logger(Logging::DEBUGGING) << "Couldn't parse request: \"" << req.getBody() << "\"";
         makeJsonParsingErrorResponse(jsonRpcResponse);
-        
-        resp.addHeader("Access-Control-Allow-Origin", "*");
+
         resp.setStatus(CryptoNote::HttpResponse::STATUS_200);
         resp.setBody(jsonRpcResponse.toString());
         resp.addHeader("Content-Type", "application/json");
