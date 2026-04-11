@@ -22,6 +22,7 @@
 #include "Common/StreamTools.h"
 #include "Common/StringTools.h"
 #include "CryptoNoteTools.h"
+#include "../crypto/crypto.h"
 #include "Serialization/BinaryOutputStreamSerializer.h"
 #include "Serialization/BinaryInputStreamSerializer.h"
 
@@ -271,6 +272,46 @@ bool getAccountRegistrationFromExtra(const std::vector<uint8_t>& tx_extra, Trans
     return false;
   }
   return findTransactionExtraFieldByType(tx_extra_fields, reg);
+}
+
+bool isWellFormedAccountRegistration(const std::vector<uint8_t>& tx_extra) {
+  std::vector<TransactionExtraField> extraFields;
+  if (!parseTransactionExtra(tx_extra, extraFields)) {
+    return false;
+  }
+
+  int regCount = 0;
+  bool hasNonce = false;
+  for (const auto& field : extraFields) {
+    if (field.type() == typeid(TransactionExtraAccountRegistration)) {
+      ++regCount;
+    }
+    if (field.type() == typeid(TransactionExtraNonce)) {
+      hasNonce = true;
+    }
+  }
+
+  if (regCount != 1) {
+    return false;
+  }
+
+  if (hasNonce) {
+    return false;
+  }
+
+  TransactionExtraAccountRegistration reg;
+  findTransactionExtraFieldByType(extraFields, reg);
+
+  if (!Crypto::check_key(reg.spendPublicKey) || !Crypto::check_key(reg.viewPublicKey)) {
+    return false;
+  }
+
+  static const Crypto::PublicKey identity = {};
+  if (reg.spendPublicKey == identity || reg.viewPublicKey == identity) {
+    return false;
+  }
+
+  return true;
 }
 
 

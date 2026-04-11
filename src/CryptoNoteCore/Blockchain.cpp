@@ -2582,10 +2582,11 @@ bool Blockchain::pushTransaction(BlockEntry& block, const Crypto::Hash& transact
     }
   }
 
-  // Record account registration
-  {
+  // Record account registration (non-coinbase only, well-formed only)
+  if (transactionIndex.transaction != 0) {
     TransactionExtraAccountRegistration reg;
-    if (getAccountRegistrationFromExtra(tx.extra, reg)) {
+    if (getAccountRegistrationFromExtra(tx.extra, reg) &&
+        isWellFormedAccountRegistration(tx.extra)) {
       m_db.putAccountRegistration(block.height, transactionIndex.transaction,
                                   reg.spendPublicKey.data, reg.viewPublicKey.data);
     }

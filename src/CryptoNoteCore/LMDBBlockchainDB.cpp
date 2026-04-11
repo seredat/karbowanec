@@ -935,7 +935,7 @@ bool LMDBBlockchainDB::findAccountRegistrationsByKeys(const uint8_t* spendKey, c
   checkRc(rc, "findAccountRegistrationsByKeys:open");
 
   MDB_val k{}, v{};
-  // Walk backwards from the end (newest first) for canonical lookup
+  // Walk backwards from the end — canonical account number is the most recent registration
   if (findFirst) {
     rc = mdb_cursor_get(cursor, &k, &v, MDB_LAST);
     while (rc == 0) {

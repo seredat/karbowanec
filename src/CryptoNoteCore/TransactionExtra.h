@@ -97,5 +97,6 @@ bool parsePaymentId(const std::string& paymentIdString, Crypto::Hash& paymentId)
 
 bool addAccountRegistrationToExtra(std::vector<uint8_t>& tx_extra, const Crypto::PublicKey& spendKey, const Crypto::PublicKey& viewKey);
 bool getAccountRegistrationFromExtra(const std::vector<uint8_t>& tx_extra, TransactionExtraAccountRegistration& reg);
+bool isWellFormedAccountRegistration(const std::vector<uint8_t>& tx_extra);
 
 }

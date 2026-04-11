@@ -441,45 +441,11 @@ bool Core::check_tx_semantic(const Transaction& tx, const Crypto::Hash& txHash, 
 
   // Validate account registration tx extra
   {
-    std::vector<TransactionExtraField> extraFields;
-    if (parseTransactionExtra(tx.extra, extraFields)) {
-      int regCount = 0;
-      bool hasNonce = false;
-      for (const auto& field : extraFields) {
-        if (field.type() == typeid(TransactionExtraAccountRegistration)) {
-          ++regCount;
-        }
-        if (field.type() == typeid(TransactionExtraNonce)) {
-          hasNonce = true;
-        }
-      }
-
-      if (regCount > 1) {
-        logger(ERROR) << "tx contains multiple account registration fields, rejected for tx id= " << Common::podToHex(txHash);
+    TransactionExtraAccountRegistration reg;
+    if (getAccountRegistrationFromExtra(tx.extra, reg)) {
+      if (!isWellFormedAccountRegistration(tx.extra)) {
+        logger(ERROR) << "malformed account registration, rejected for tx id= " << Common::podToHex(txHash);
         return false;
-      }
-
-      if (regCount == 1) {
-        // Registration tx must not contain a payment ID (nonce)
-        if (hasNonce) {
-          logger(ERROR) << "account registration tx must not contain payment ID, rejected for tx id= " << Common::podToHex(txHash);
-          return false;
-        }
-
-        // Validate the pubkeys are valid Ed25519 points
-        TransactionExtraAccountRegistration reg;
-        findTransactionExtraFieldByType(extraFields, reg);
-        if (!Crypto::check_key(reg.spendPublicKey) || !Crypto::check_key(reg.viewPublicKey)) {
-          logger(ERROR) << "account registration contains invalid public keys, rejected for tx id= " << Common::podToHex(txHash);
-          return false;
-        }
-
-        // Check pubkeys are not the identity point
-        static const Crypto::PublicKey identity = {};
-        if (reg.spendPublicKey == identity || reg.viewPublicKey == identity) {
-          logger(ERROR) << "account registration contains identity public key, rejected for tx id= " << Common::podToHex(txHash);
-          return false;
-        }
       }
     }
   }
