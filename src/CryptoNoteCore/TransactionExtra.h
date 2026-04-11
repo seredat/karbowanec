@@ -31,7 +31,7 @@
 #define TX_EXTRA_TAG_PUBKEY                 0x01
 #define TX_EXTRA_NONCE                      0x02
 #define TX_EXTRA_MERGE_MINING_TAG           0x03
-#define TX_EXTRA_TAG_ACCOUNT_REGISTRATION  0x04
+#define TX_EXTRA_TAG_ACCOUNT_REGISTRATION   0x04
 
 #define TX_EXTRA_NONCE_PAYMENT_ID           0x00
 
