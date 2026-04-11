@@ -1038,7 +1038,7 @@ std::error_code NodeRpcProxy::doResolveAccountNumber(const std::string& accountN
   COMMAND_RPC_RESOLVE_ACCOUNT_NUMBER::request req = AUTO_VAL_INIT(req);
   COMMAND_RPC_RESOLVE_ACCOUNT_NUMBER::response rsp = AUTO_VAL_INIT(rsp);
   req.account_number = accountNumber;
-  std::error_code ec = jsonRpcCommand("resolve_account_number", req, rsp);
+  std::error_code ec = jsonRpcCommand("resolveaccountnumber", req, rsp);
   if (!ec) {
     address = rsp.address;
   }
@@ -1059,7 +1059,7 @@ std::error_code NodeRpcProxy::doGetAccountNumber(const std::string& address, std
   COMMAND_RPC_GET_ACCOUNT_NUMBER::request req = AUTO_VAL_INIT(req);
   COMMAND_RPC_GET_ACCOUNT_NUMBER::response rsp = AUTO_VAL_INIT(rsp);
   req.address = address;
-  std::error_code ec = jsonRpcCommand("get_account_number", req, rsp);
+  std::error_code ec = jsonRpcCommand("getaccountnumber", req, rsp);
   if (!ec) {
     accountNumber = rsp.account_number;
   }

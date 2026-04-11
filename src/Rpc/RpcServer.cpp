@@ -708,8 +708,8 @@ bool RpcServer::processJsonRpcRequest(const CryptoNote::HttpRequest& request, Cr
       { "submitblock", { makeMemberMethod(&RpcServer::on_submitblock), false } },
       { "resolveopenalias", { makeMemberMethod(&RpcServer::on_resolve_open_alias), true } },
       { "search", { makeMemberMethod(&RpcServer::on_explorer_search), true } },
-      { "resolve_account_number", { makeMemberMethod(&RpcServer::on_resolve_account_number), true } },
-      { "get_account_number", { makeMemberMethod(&RpcServer::on_get_account_number), true } },
+      { "resolveaccountnumber", { makeMemberMethod(&RpcServer::on_resolve_account_number), true } },
+      { "getaccountnumber", { makeMemberMethod(&RpcServer::on_get_account_number), true } },
 
     };
 
