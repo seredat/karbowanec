@@ -145,6 +145,14 @@ namespace CryptoNote {
 
     bool getHashingBlob(const uint32_t height, BinaryArray& blob);
 
+    // Account number lookups
+    bool resolveAccountNumber(uint32_t blockHeight, uint32_t txIndex,
+                              AccountPublicAddress& address);
+    bool getAccountNumber(const AccountPublicAddress& address,
+                          uint32_t& blockHeight, uint32_t& txIndex);
+    bool getAllAccountNumbers(const AccountPublicAddress& address,
+                             std::vector<std::pair<uint32_t, uint32_t>>& results);
+
     template<class visitor_t>
     bool scanOutputKeysForIndexes(const KeyInput& tx_in_to_key, visitor_t& vis,
                                    uint32_t* pmax_related_block_height = nullptr);

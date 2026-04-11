@@ -70,7 +70,9 @@
 #include "Common/Util.h"
 #include "Common/ColouredMsg.h"
 #include "CryptoNoteCore/Account.h"
+#include "CryptoNoteCore/AccountNumber.h"
 #include "CryptoNoteCore/CryptoNoteFormatUtils.h"
+#include "CryptoNoteCore/TransactionExtra.h"
 #include "CryptoNoteCore/CryptoNoteTools.h"
 #include "CryptoNoteProtocol/CryptoNoteProtocolHandler.h"
 #include "NodeRpcProxy/NodeRpcProxy.h"
@@ -294,18 +296,41 @@ struct TransferCommand {
           std::string aliasUrl;
 #endif
           if (!m_currency.parseAccountAddressString(arg, deAddr)) {
-            Crypto::Hash paymentId;
-            if (CryptoNote::parsePaymentId(arg, paymentId)) {
-              logger(ERROR, BRIGHT_RED) << "Invalid payment ID usage. Please, use -p <payment_id>. See help for details.";
-            } else {
-#ifndef __ANDROID__
-              // if string doesn't contain a dot, we won't consider it a url for now.
-              if (strchr(arg.c_str(), '.') == NULL) {
-                logger(ERROR, BRIGHT_RED) << "Wrong address or alias: " << arg;
+            // Try to resolve as account number (e.g. 1821033-7-K)
+            CryptoNote::AccountNumber acctNum;
+            if (CryptoNote::AccountNumber::fromString(arg, acctNum)) {
+              std::string resolvedAddress;
+              std::promise<std::error_code> promise;
+              auto future = promise.get_future();
+              const_cast<CryptoNote::NodeRpcProxy&>(m_node).resolveAccountNumber(
+                  arg, resolvedAddress,
+                  [&promise](std::error_code ec) { promise.set_value(ec); });
+              auto ec = future.get();
+              if (!ec && !resolvedAddress.empty()) {
+                logger(INFO) << "Account number " << arg << " resolved to: " << resolvedAddress;
+                arg = resolvedAddress;
+                if (!m_currency.parseAccountAddressString(arg, deAddr)) {
+                  logger(ERROR, BRIGHT_RED) << "Resolved address is invalid: " << arg;
+                  return false;
+                }
+              } else {
+                logger(ERROR, BRIGHT_RED) << "Failed to resolve account number: " << arg;
                 return false;
               }
-              aliasUrl = arg;
+            } else {
+              Crypto::Hash paymentId;
+              if (CryptoNote::parsePaymentId(arg, paymentId)) {
+                logger(ERROR, BRIGHT_RED) << "Invalid payment ID usage. Please, use -p <payment_id>. See help for details.";
+              } else {
+#ifndef __ANDROID__
+                // if string doesn't contain a dot, we won't consider it a url for now.
+                if (strchr(arg.c_str(), '.') == NULL) {
+                  logger(ERROR, BRIGHT_RED) << "Wrong address or alias: " << arg;
+                  return false;
+                }
+                aliasUrl = arg;
 #endif
+              }
             }
           }
 
@@ -669,6 +694,7 @@ simple_wallet::simple_wallet(System::Dispatcher& dispatcher, const CryptoNote::C
     "If 'all' is specified, you prove the entire accounts' balance.\n");
   m_consoleHandler.setHandler("sign_message", std::bind(&simple_wallet::sign_message, this, std::placeholders::_1), "Sign the message");
   m_consoleHandler.setHandler("verify_message", std::bind(&simple_wallet::verify_message, this, std::placeholders::_1), "Verify a signature of the message");
+  m_consoleHandler.setHandler("register_account", std::bind(&simple_wallet::register_account, this, std::placeholders::_1), "Register an account number for easy payments");
   m_consoleHandler.setHandler("help", std::bind(&simple_wallet::help, this, std::placeholders::_1), "Show this help");
   m_consoleHandler.setHandler("exit", std::bind(&simple_wallet::exit, this, std::placeholders::_1), "Close wallet");
 }
@@ -2346,6 +2372,18 @@ void simple_wallet::stop() {
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::print_address(const std::vector<std::string> &args/* = std::vector<std::string>()*/) {
   success_msg_writer() << m_wallet->getAddress();
+
+  /* Check for registered account number */
+  std::string accountNumber;
+  std::promise<std::error_code> promise;
+  auto future = promise.get_future();
+  m_node->getAccountNumber(m_wallet->getAddress(), accountNumber,
+      [&promise](std::error_code ec) { promise.set_value(ec); });
+  auto ec = future.get();
+  if (!ec && !accountNumber.empty()) {
+    success_msg_writer() << "Account number: " << accountNumber;
+  }
+
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -2401,6 +2439,86 @@ bool simple_wallet::verify_message(const std::vector<std::string> &args) {
   } else {
     success_msg_writer(true) << "Valid signature from " << address_string;
   }
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::register_account(const std::vector<std::string> &args) {
+  if (m_trackingWallet) {
+    fail_msg_writer() << "This is a tracking wallet. Cannot register account number.";
+    return true;
+  }
+
+  // Check if already registered
+  std::string existingNumber;
+  {
+    std::promise<std::error_code> promise;
+    auto future = promise.get_future();
+    m_node->getAccountNumber(m_wallet->getAddress(), existingNumber,
+        [&promise](std::error_code ec) { promise.set_value(ec); });
+    auto ec = future.get();
+    if (!ec && !existingNumber.empty()) {
+      logger(WARNING, YELLOW) << "This address already has account number: " << existingNumber;
+      logger(WARNING, YELLOW) << "Re-registering will create a new account number.";
+      std::cout << "Proceed with re-registration? (y/N): ";
+      std::string confirm;
+      std::getline(std::cin, confirm);
+      if (confirm.empty() || (confirm[0] != 'y' && confirm[0] != 'Y')) {
+        logger(INFO) << "Cancelled.";
+        return true;
+      }
+    } else {
+      std::cout << "Register an account number for easy payments? (small fee applies) (Y/n): ";
+      std::string confirm;
+      std::getline(std::cin, confirm);
+      if (!confirm.empty() && confirm[0] != 'y' && confirm[0] != 'Y') {
+        logger(INFO) << "Cancelled.";
+        return true;
+      }
+    }
+  }
+
+  // Build registration tx extra
+  CryptoNote::AccountKeys keys;
+  m_wallet->getAccountKeys(keys);
+
+  std::vector<uint8_t> extra;
+  CryptoNote::addAccountRegistrationToExtra(extra, keys.address.spendPublicKey, keys.address.viewPublicKey);
+
+  std::string extraString;
+  std::copy(extra.begin(), extra.end(), std::back_inserter(extraString));
+
+  // Send a self-transfer with the registration extra
+  try {
+    CryptoNote::WalletLegacyTransfer transfer;
+    transfer.address = m_wallet->getAddress();
+    transfer.amount = CryptoNote::parameters::DEFAULT_DUST_THRESHOLD;
+
+    CryptoNote::WalletHelper::SendCompleteResultObserver sent;
+    WalletHelper::IWalletRemoveObserverGuard removeGuard(*m_wallet, sent);
+
+    CryptoNote::TransactionId tx = m_wallet->sendTransaction(transfer, m_node->getMinimalFee(), extraString, 0, 0);
+    if (tx == WALLET_LEGACY_INVALID_TRANSACTION_ID) {
+      fail_msg_writer() << "Can't send registration transaction";
+      return true;
+    }
+
+    std::error_code sendError = sent.wait(tx);
+    removeGuard.removeObserver();
+
+    if (sendError) {
+      fail_msg_writer() << sendError.message();
+      return true;
+    }
+
+    CryptoNote::WalletLegacyTransaction txInfo;
+    m_wallet->getTransaction(tx, txInfo);
+    success_msg_writer(true) << "Account registration transaction sent!";
+    success_msg_writer(true) << "Transaction hash: " << Common::podToHex(txInfo.hash);
+    logger(INFO) << "Your account number will be available once the transaction is confirmed.";
+  } catch (const std::exception& e) {
+    fail_msg_writer() << "Failed to send registration transaction: " << e.what();
+  }
+
   return true;
 }
 //----------------------------------------------------------------------------------------------------

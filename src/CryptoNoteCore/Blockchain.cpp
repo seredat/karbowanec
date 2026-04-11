@@ -2573,6 +2573,15 @@ bool Blockchain::pushTransaction(BlockEntry& block, const Crypto::Hash& transact
     }
   }
 
+  // Record account registration
+  {
+    TransactionExtraAccountRegistration reg;
+    if (getAccountRegistrationFromExtra(tx.extra, reg)) {
+      m_db.putAccountRegistration(block.height, transactionIndex.transaction,
+                                  reg.spendPublicKey.data, reg.viewPublicKey.data);
+    }
+  }
+
   // Serialize and store tx entry: [u32 tx_size][tx_blob][u32 num_gidx][u32 gidx...]
   BinaryArray txBlob = toBinaryArray(tx);
   uint32_t txSize  = static_cast<uint32_t>(txBlob.size());
@@ -2621,6 +2630,17 @@ void Blockchain::popTransaction(const Transaction& transaction,
     Crypto::Hash paymentId;
     if (getPaymentIdFromTxExtra(transaction.extra, paymentId)) {
       m_db.removePaymentId(paymentId, transactionHash);
+    }
+  }
+
+  // Remove account registration
+  {
+    TransactionExtraAccountRegistration reg;
+    if (getAccountRegistrationFromExtra(transaction.extra, reg)) {
+      uint32_t block; uint16_t txSlot;
+      if (m_db.getTxIndex(transactionHash, block, txSlot)) {
+        m_db.removeAccountRegistration(block, txSlot);
+      }
     }
   }
 
@@ -2858,6 +2878,42 @@ bool Blockchain::isBlockInMainChain(const Crypto::Hash& blockId) {
 
 bool Blockchain::isInCheckpointZone(const uint32_t height) {
   return m_checkpoints.is_in_checkpoint_zone(height);
+}
+
+// ─── Account number lookups ──────────────────────────────────────────────────
+
+bool Blockchain::resolveAccountNumber(uint32_t blockHeight, uint32_t txIndex,
+                                      AccountPublicAddress& address) {
+  std::lock_guard<std::recursive_mutex> lk(m_blockchain_lock);
+  uint8_t spendKey[32], viewKey[32];
+  if (!m_db.getAccountRegistration(blockHeight, txIndex, spendKey, viewKey)) {
+    return false;
+  }
+  memcpy(address.spendPublicKey.data, spendKey, 32);
+  memcpy(address.viewPublicKey.data, viewKey, 32);
+  return true;
+}
+
+bool Blockchain::getAccountNumber(const AccountPublicAddress& address,
+                                  uint32_t& blockHeight, uint32_t& txIndex) {
+  std::lock_guard<std::recursive_mutex> lk(m_blockchain_lock);
+  std::vector<std::pair<uint32_t, uint32_t>> results;
+  if (!m_db.findAccountRegistrationsByKeys(address.spendPublicKey.data,
+                                            address.viewPublicKey.data,
+                                            true, results)) {
+    return false;
+  }
+  blockHeight = results[0].first;
+  txIndex = results[0].second;
+  return true;
+}
+
+bool Blockchain::getAllAccountNumbers(const AccountPublicAddress& address,
+                                     std::vector<std::pair<uint32_t, uint32_t>>& results) {
+  std::lock_guard<std::recursive_mutex> lk(m_blockchain_lock);
+  return m_db.findAccountRegistrationsByKeys(address.spendPublicKey.data,
+                                              address.viewPublicKey.data,
+                                              false, results);
 }
 
 // ─── blockDifficulty / blockCumulativeDifficulty / getblockEntry ─────────────

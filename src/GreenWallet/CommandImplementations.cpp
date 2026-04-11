@@ -14,12 +14,16 @@
 #include "Common/FormatTools.h"
 #include "CryptoNoteCore/Account.h"
 #include "CryptoNoteCore/CryptoNoteBasicImpl.h"
+#include "CryptoNoteCore/TransactionExtra.h"
+#include <GreenWallet/Transfer.h>
 
 #ifndef MSVC
 #include <fstream>
 #endif
 
 #include "Mnemonics/electrum-words.h"
+
+#include <future>
 
 #include <GreenWallet/AddressBook.h>
 #include <Common/ColouredMsg.h>
@@ -1056,5 +1060,87 @@ void verifyMessage(CryptoNote::WalletGreen &wallet)
         std::cout << WarningMsg("Failed to verify message: ")
                   << WarningMsg(e.what())
                   << std::endl;
+    }
+}
+
+void registerAccountNumber(std::shared_ptr<WalletInfo> walletInfo, CryptoNote::INode &node)
+{
+    if (walletInfo->viewWallet)
+    {
+        std::cout << WarningMsg("Cannot register account number from a view wallet.") << std::endl;
+        return;
+    }
+
+    /* Check if already registered */
+    std::string existingNumber;
+    if (getAccountNumberViaNode(node, walletInfo->walletAddress, existingNumber))
+    {
+        std::cout << WarningMsg("This address already has account number: ")
+                  << SuccessMsg(existingNumber) << std::endl;
+        std::cout << WarningMsg("Re-registering will create a new account number. "
+                                "The new number will become canonical.") << std::endl;
+        std::cout << "Proceed with re-registration? (y/N): ";
+
+        std::string confirm;
+        std::getline(std::cin, confirm);
+        if (confirm.empty() || (confirm[0] != 'y' && confirm[0] != 'Y'))
+        {
+            std::cout << WarningMsg("Cancelling registration.") << std::endl;
+            return;
+        }
+    }
+    else
+    {
+        std::cout << InformationMsg("You don't have an account number yet. "
+                                    "Register one for easy payments? (small fee applies)")
+                  << std::endl;
+        std::cout << "Proceed? (Y/n): ";
+
+        std::string confirm;
+        std::getline(std::cin, confirm);
+        if (!confirm.empty() && confirm[0] != 'y' && confirm[0] != 'Y')
+        {
+            std::cout << WarningMsg("Cancelling registration.") << std::endl;
+            return;
+        }
+    }
+
+    /* Build registration tx extra */
+    CryptoNote::AccountPublicAddress address = walletInfo->wallet.getAccountPublicAddress(0);
+
+    std::vector<uint8_t> extra;
+    CryptoNote::addAccountRegistrationToExtra(extra, address.spendPublicKey, address.viewPublicKey);
+
+    /* Send a minimal self-transfer with the registration extra */
+    try
+    {
+        CryptoNote::TransactionParameters params;
+        params.destinations.push_back({walletInfo->walletAddress, CryptoNote::parameters::DEFAULT_DUST_THRESHOLD});
+        params.fee = node.getMinimalFee();
+        params.extra = std::string(extra.begin(), extra.end());
+        params.sourceAddresses = {walletInfo->walletAddress};
+        params.changeDestination = walletInfo->walletAddress;
+
+        Crypto::SecretKey txSecretKey;
+        size_t txId = walletInfo->wallet.transfer(params, txSecretKey);
+
+        auto txHash = walletInfo->wallet.getTransaction(txId).hash;
+        std::cout << SuccessMsg("Account registration transaction sent!")
+                  << std::endl
+                  << SuccessMsg("Transaction hash: ")
+                  << Common::podToHex(txHash) << std::endl
+                  << InformationMsg("Your account number will be available "
+                                    "once the transaction is confirmed.")
+                  << std::endl;
+    }
+    catch (const std::system_error &e)
+    {
+        std::cout << WarningMsg("Failed to send registration transaction: ")
+                  << WarningMsg(e.what()) << std::endl;
+    }
+    catch (const std::exception &e)
+    {
+        std::cout << WarningMsg("Failed to send registration transaction: ")
+                  << WarningMsg(e.what()) << std::endl;
     }
 }

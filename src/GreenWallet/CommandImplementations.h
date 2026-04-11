@@ -69,3 +69,5 @@ void txProof(CryptoNote::WalletGreen &wallet);
 void signMessage(std::shared_ptr<WalletInfo> walletInfo, bool viewWallet);
 
 void verifyMessage(CryptoNote::WalletGreen &wallet);
+
+void registerAccountNumber(std::shared_ptr<WalletInfo> walletInfo, CryptoNote::INode &node);

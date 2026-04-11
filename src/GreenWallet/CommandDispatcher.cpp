@@ -25,6 +25,22 @@ bool handleCommand(const std::string command,
     else if (command == "address")
     {
         std::cout << SuccessMsg(walletInfo->walletAddress) << std::endl;
+
+        /* Check if this address has a registered account number */
+        std::string accountNumber;
+        if (getAccountNumberViaNode(node, walletInfo->walletAddress, accountNumber))
+        {
+            std::cout << InformationMsg("Account number: ")
+                      << SuccessMsg(accountNumber) << std::endl;
+        }
+        else
+        {
+            std::cout << InformationMsg("No account number registered for this address.") << std::endl;
+            if (!walletInfo->viewWallet)
+            {
+                std::cout << InformationMsg("You can register one with the 'register_account' command.") << std::endl;
+            }
+        }
     }
     else if (command == "balance")
     {
@@ -119,6 +135,10 @@ bool handleCommand(const std::string command,
     else if (command == "verify_message")
     {
       verifyMessage(walletInfo->wallet);
+    }
+    else if (command == "register_account")
+    {
+        registerAccountNumber(walletInfo, node);
     }
     /* This should never happen */
     else

@@ -86,6 +86,14 @@ bool parseTransactionExtra(const std::vector<uint8_t> &transactionExtra, std::ve
         transactionExtraFields.push_back(mmTag);
         break;
       }
+
+      case TX_EXTRA_TAG_ACCOUNT_REGISTRATION: {
+        TransactionExtraAccountRegistration reg;
+        ar(reg.spendPublicKey, "spend_public_key");
+        ar(reg.viewPublicKey, "view_public_key");
+        transactionExtraFields.push_back(reg);
+        break;
+      }
       }
     }
   } catch (std::exception &) {
@@ -119,6 +127,10 @@ struct ExtraSerializerVisitor : public boost::static_visitor<bool> {
 
   bool operator()(const TransactionExtraMergeMiningTag& t) {
     return appendMergeMiningTagToExtra(extra, t);
+  }
+
+  bool operator()(const TransactionExtraAccountRegistration& t) {
+    return addAccountRegistrationToExtra(extra, t.spendPublicKey, t.viewPublicKey);
   }
 };
 
@@ -242,6 +254,23 @@ bool getPaymentIdFromTxExtra(const std::vector<uint8_t>& extra, Hash& paymentId)
   }
 
   return true;
+}
+
+bool addAccountRegistrationToExtra(std::vector<uint8_t>& tx_extra, const PublicKey& spendKey, const PublicKey& viewKey) {
+  size_t start = tx_extra.size();
+  tx_extra.resize(start + 1 + sizeof(PublicKey) + sizeof(PublicKey));
+  tx_extra[start] = TX_EXTRA_TAG_ACCOUNT_REGISTRATION;
+  memcpy(&tx_extra[start + 1], &spendKey, sizeof(PublicKey));
+  memcpy(&tx_extra[start + 1 + sizeof(PublicKey)], &viewKey, sizeof(PublicKey));
+  return true;
+}
+
+bool getAccountRegistrationFromExtra(const std::vector<uint8_t>& tx_extra, TransactionExtraAccountRegistration& reg) {
+  std::vector<TransactionExtraField> tx_extra_fields;
+  if (!parseTransactionExtra(tx_extra, tx_extra_fields)) {
+    return false;
+  }
+  return findTransactionExtraFieldByType(tx_extra_fields, reg);
 }
 
 

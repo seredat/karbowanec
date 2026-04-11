@@ -31,6 +31,7 @@
 #define TX_EXTRA_TAG_PUBKEY                 0x01
 #define TX_EXTRA_NONCE                      0x02
 #define TX_EXTRA_MERGE_MINING_TAG           0x03
+#define TX_EXTRA_TAG_ACCOUNT_REGISTRATION  0x04
 
 #define TX_EXTRA_NONCE_PAYMENT_ID           0x00
 
@@ -53,11 +54,16 @@ struct TransactionExtraMergeMiningTag {
   Crypto::Hash merkleRoot;
 };
 
+struct TransactionExtraAccountRegistration {
+  Crypto::PublicKey spendPublicKey;
+  Crypto::PublicKey viewPublicKey;
+};
+
 // tx_extra_field format, except tx_extra_padding and tx_extra_pub_key:
 //   varint tag;
 //   varint size;
 //   varint data[];
-typedef boost::variant<TransactionExtraPadding, TransactionExtraPublicKey, TransactionExtraNonce, TransactionExtraMergeMiningTag> TransactionExtraField;
+typedef boost::variant<TransactionExtraPadding, TransactionExtraPublicKey, TransactionExtraNonce, TransactionExtraMergeMiningTag, TransactionExtraAccountRegistration> TransactionExtraField;
 
 
 
@@ -88,5 +94,8 @@ bool createTxExtraWithPaymentId(const std::string& paymentIdString, std::vector<
 //returns false if payment id is not found or parse error
 bool getPaymentIdFromTxExtra(const std::vector<uint8_t>& extra, Crypto::Hash& paymentId);
 bool parsePaymentId(const std::string& paymentIdString, Crypto::Hash& paymentId);
+
+bool addAccountRegistrationToExtra(std::vector<uint8_t>& tx_extra, const Crypto::PublicKey& spendKey, const Crypto::PublicKey& viewKey);
+bool getAccountRegistrationFromExtra(const std::vector<uint8_t>& tx_extra, TransactionExtraAccountRegistration& reg);
 
 }

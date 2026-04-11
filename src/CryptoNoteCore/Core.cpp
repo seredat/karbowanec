@@ -439,6 +439,51 @@ bool Core::check_tx_semantic(const Transaction& tx, const Crypto::Hash& txHash, 
     return false;
   }
 
+  // Validate account registration tx extra
+  {
+    std::vector<TransactionExtraField> extraFields;
+    if (parseTransactionExtra(tx.extra, extraFields)) {
+      int regCount = 0;
+      bool hasNonce = false;
+      for (const auto& field : extraFields) {
+        if (field.type() == typeid(TransactionExtraAccountRegistration)) {
+          ++regCount;
+        }
+        if (field.type() == typeid(TransactionExtraNonce)) {
+          hasNonce = true;
+        }
+      }
+
+      if (regCount > 1) {
+        logger(ERROR) << "tx contains multiple account registration fields, rejected for tx id= " << Common::podToHex(txHash);
+        return false;
+      }
+
+      if (regCount == 1) {
+        // Registration tx must not contain a payment ID (nonce)
+        if (hasNonce) {
+          logger(ERROR) << "account registration tx must not contain payment ID, rejected for tx id= " << Common::podToHex(txHash);
+          return false;
+        }
+
+        // Validate the pubkeys are valid Ed25519 points
+        TransactionExtraAccountRegistration reg;
+        findTransactionExtraFieldByType(extraFields, reg);
+        if (!Crypto::check_key(reg.spendPublicKey) || !Crypto::check_key(reg.viewPublicKey)) {
+          logger(ERROR) << "account registration contains invalid public keys, rejected for tx id= " << Common::podToHex(txHash);
+          return false;
+        }
+
+        // Check pubkeys are not the identity point
+        static const Crypto::PublicKey identity = {};
+        if (reg.spendPublicKey == identity || reg.viewPublicKey == identity) {
+          logger(ERROR) << "account registration contains identity public key, rejected for tx id= " << Common::podToHex(txHash);
+          return false;
+        }
+      }
+    }
+  }
+
   return true;
 }
 
@@ -1327,6 +1372,21 @@ bool Core::getMixin(const Transaction& transaction, uint64_t& mixin) {
     }
   }
   return true;
+}
+
+bool Core::resolveAccountNumber(uint32_t blockHeight, uint32_t txIndex,
+                                AccountPublicAddress& address) {
+  return m_blockchain.resolveAccountNumber(blockHeight, txIndex, address);
+}
+
+bool Core::getAccountNumber(const AccountPublicAddress& address,
+                            uint32_t& blockHeight, uint32_t& txIndex) {
+  return m_blockchain.getAccountNumber(address, blockHeight, txIndex);
+}
+
+bool Core::getAllAccountNumbers(const AccountPublicAddress& address,
+                                std::vector<std::pair<uint32_t, uint32_t>>& results) {
+  return m_blockchain.getAllAccountNumbers(address, results);
 }
 
 bool Core::is_key_image_spent(const Crypto::KeyImage& key_im) {
