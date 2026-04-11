@@ -935,9 +935,9 @@ bool LMDBBlockchainDB::findAccountRegistrationsByKeys(const uint8_t* spendKey, c
   checkRc(rc, "findAccountRegistrationsByKeys:open");
 
   MDB_val k{}, v{};
-  // Walk backwards from the end — canonical account number is the most recent registration
+  // Walk forward from the beginning — canonical account number is the first registration
   if (findFirst) {
-    rc = mdb_cursor_get(cursor, &k, &v, MDB_LAST);
+    rc = mdb_cursor_get(cursor, &k, &v, MDB_FIRST);
     while (rc == 0) {
       if (v.mv_size == 64) {
         const uint8_t* data = static_cast<const uint8_t*>(v.mv_data);
@@ -948,7 +948,7 @@ bool LMDBBlockchainDB::findAccountRegistrationsByKeys(const uint8_t* spendKey, c
           break;
         }
       }
-      rc = mdb_cursor_get(cursor, &k, &v, MDB_PREV);
+      rc = mdb_cursor_get(cursor, &k, &v, MDB_NEXT);
     }
   } else {
     // Full scan from beginning
