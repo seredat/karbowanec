@@ -482,6 +482,67 @@ bool Blockchain::init(const std::string& config_folder, bool load_existing) {
 
   update_next_cumulative_size_limit();
 
+  // One-time backfill of account registration index for blocks that predate it.
+  // Scans backwards from chain tip down to the first known registration.
+  // If the first registration (1264265, 1) is already indexed, skip entirely.
+  {
+    static const uint32_t ACCT_REG_FIRST_HEIGHT = 1264265;
+    static const uint16_t ACCT_REG_FIRST_TX     = 1;
+    chainHeight = m_db.getChainHeight();
+
+    if (chainHeight > ACCT_REG_FIRST_HEIGHT) {
+      uint8_t sk[32], vk[32];
+      if (!m_db.getAccountRegistration(ACCT_REG_FIRST_HEIGHT, ACCT_REG_FIRST_TX, sk, vk)) {
+        logger(INFO, BRIGHT_WHITE) << "Backfilling account registration index from block "
+          << (chainHeight - 1) << " down to " << ACCT_REG_FIRST_HEIGHT << " ...";
+
+        uint32_t indexed = 0;
+        static const uint32_t BATCH = 1000;
+        uint32_t batchCount = 0;
+
+        for (uint32_t h = chainHeight - 1; h >= ACCT_REG_FIRST_HEIGHT; --h) {
+          if (batchCount == 0) {
+            m_db.growMapIfNeeded();
+            m_db.beginWriteTxn();
+          }
+
+          DbBlockMeta meta{};
+          m_db.getBlockMeta(h, meta);
+
+          for (uint16_t t = 1; t < meta.txCount; ++t) {
+            uint8_t s[32], v[32];
+            if (m_db.getAccountRegistration(h, t, s, v)) {
+              continue;
+            }
+
+            try {
+              TransactionEntry te = transactionByIndex({ h, t });
+              TransactionExtraAccountRegistration reg;
+              if (getAccountRegistrationFromExtra(te.tx.extra, reg) &&
+                  isWellFormedAccountRegistration(te.tx.extra)) {
+                m_db.putAccountRegistration(h, t, reg.spendPublicKey.data, reg.viewPublicKey.data);
+                ++indexed;
+              }
+            } catch (...) {
+            }
+          }
+
+          ++batchCount;
+          if (batchCount >= BATCH || h == ACCT_REG_FIRST_HEIGHT) {
+            m_db.commitTxn();
+            batchCount = 0;
+          }
+        }
+
+        if (indexed > 0) {
+          logger(INFO, BRIGHT_GREEN) << "Account registration backfill complete: " << indexed << " registrations indexed.";
+        } else {
+          logger(INFO) << "Account registration backfill complete: no new registrations found.";
+        }
+      }
+    }
+  }
+
   chainHeight = m_db.getChainHeight();
   DbBlockMeta tailMeta{};
   m_db.getBlockMeta(chainHeight - 1, tailMeta);
