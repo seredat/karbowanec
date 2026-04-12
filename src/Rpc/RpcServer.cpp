@@ -29,6 +29,7 @@
 #include <boost/uuid/uuid.hpp>
 
 // CryptoNote
+#include <crypto/crypto.h>
 #include <crypto/random.h>
 #include "BlockchainExplorerData.h"
 #include "Common/Base58.h"
@@ -43,6 +44,8 @@
 #include "CryptoNoteCore/IBlock.h"
 #include "CryptoNoteCore/Miner.h"
 #include "CryptoNoteCore/TransactionExtra.h"
+#include "CryptoNoteCore/AccountNumber.h"
+#include "CryptoNoteCore/CryptoNoteBasicImpl.h"
 #include "CryptoNoteProtocol/ICryptoNoteProtocolQuery.h"
 #include "P2p/ConnectionContext.h"
 #include "P2p/NetNode.h"
@@ -550,6 +553,50 @@ void RpcServer::processRequest(const CryptoNote::HttpRequest& request, CryptoNot
           return;
         }
 
+        std::string account_method = "/explorer/account/";
+        if (Common::starts_with(url, account_method)) {
+          std::string account_str = url.substr(account_method.size());
+
+          COMMAND_EXPLORER_GET_ACCOUNT_NUMBER::request req;
+          req.account_number = account_str;
+          COMMAND_EXPLORER_GET_ACCOUNT_NUMBER::response rsp;
+
+          bool r = on_get_explorer_account_number(req, rsp);
+          if (r) {
+            response.setStatus(CryptoNote::HttpResponse::STATUS_200);
+            response.setBody(rsp);
+          }
+          else {
+            response.setStatus(CryptoNote::HttpResponse::STATUS_404);
+            response.setBody("Not found");
+          }
+          response.addHeader("Content-Type", "text/html");
+
+          return;
+        }
+
+        std::string address_method = "/explorer/address/";
+        if (Common::starts_with(url, address_method)) {
+          std::string address_str = url.substr(address_method.size());
+
+          COMMAND_EXPLORER_GET_ADDRESS::request req;
+          req.address = address_str;
+          COMMAND_EXPLORER_GET_ADDRESS::response rsp;
+
+          bool r = on_get_explorer_address(req, rsp);
+          if (r) {
+            response.setStatus(CryptoNote::HttpResponse::STATUS_200);
+            response.setBody(rsp);
+          }
+          else {
+            response.setStatus(CryptoNote::HttpResponse::STATUS_404);
+            response.setBody("Not found");
+          }
+          response.addHeader("Content-Type", "text/html");
+
+          return;
+        }
+
         // default is explorer home
         uint32_t height = 0;
         if (Common::starts_with(url, page_method)) {
@@ -661,6 +708,8 @@ bool RpcServer::processJsonRpcRequest(const CryptoNote::HttpRequest& request, Cr
       { "submitblock", { makeMemberMethod(&RpcServer::on_submitblock), false } },
       { "resolveopenalias", { makeMemberMethod(&RpcServer::on_resolve_open_alias), true } },
       { "search", { makeMemberMethod(&RpcServer::on_explorer_search), true } },
+      { "resolveaccountnumber", { makeMemberMethod(&RpcServer::on_resolve_account_number), true } },
+      { "getaccountnumber", { makeMemberMethod(&RpcServer::on_get_account_number), true } },
 
     };
 
@@ -1527,7 +1576,7 @@ bool RpcServer::on_get_explorer(const COMMAND_EXPLORER::request& req, COMMAND_EX
   // Search
   body += R"(
   <form style='padding: 10px;' name='searchform' action='javascript:handleSearch()'>
-    <input type='text' name='search' id='txt_search' size='80' placeholder='Search by block height/hash, transaction hash, payment id...'>
+    <input type='text' name='search' id='txt_search' size='80' placeholder='Search by block height/hash, tx hash, payment id, account number, address...'>
     <input type='submit' value='Search'>
   </form>
   <script>
@@ -1681,13 +1730,35 @@ bool RpcServer::on_get_explorer(const COMMAND_EXPLORER::request& req, COMMAND_EX
 }
 
 bool RpcServer::on_explorer_search(const COMMAND_RPC_EXPLORER_SEARCH::request& req, COMMAND_RPC_EXPLORER_SEARCH::response& res) {
+  // Try account number format (H-I-C)
+  AccountNumber acctNum;
+  if (AccountNumber::fromString(req.query, acctNum)) {
+    AccountPublicAddress address;
+    if (m_core.resolveAccountNumber(acctNum.blockHeight, acctNum.txIndex, address)) {
+      res.result = "/explorer/account/" + req.query;
+      res.status = CORE_RPC_STATUS_OK;
+      return true;
+    }
+  }
+
+  // Try as address
+  {
+    AccountPublicAddress address;
+    uint64_t prefix;
+    if (parseAccountAddressString(prefix, address, req.query)) {
+      res.result = "/explorer/address/" + req.query;
+      res.status = CORE_RPC_STATUS_OK;
+      return true;
+    }
+  }
+
   Crypto::Hash hash;
 
   if (req.query.size() < 64) {
     // assume it's height
     uint32_t height = static_cast<uint32_t>(std::stoul(req.query));
     hash = m_core.getBlockIdByHeight(height);
-  } 
+  }
   else if (!parse_hash256(req.query, hash)) {
     throw JsonRpc::JsonRpcError{
       CORE_RPC_ERROR_CODE_WRONG_PARAM, "Failed to parse query: " + req.query };
@@ -1716,7 +1787,7 @@ bool RpcServer::on_explorer_search(const COMMAND_RPC_EXPLORER_SEARCH::request& r
   }
 
   throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_WRONG_PARAM, "Not found" };
-  
+
   return true;
 }
 
@@ -1913,6 +1984,50 @@ bool RpcServer::on_get_explorer_tx_by_hash(const COMMAND_EXPLORER_GET_TRANSACTIO
       body += "    Payment ID: <span class=\"wrap\">" + Common::podToHex(transactionsDetails.paymentId) + "</span>\n";
       body += "  </li>\n";
     }
+    // Check for account registration in tx extra
+    {
+      TransactionExtraAccountRegistration reg;
+      if (getAccountRegistrationFromExtra(txs.back().extra, reg)) {
+        AccountPublicAddress regAddr;
+        regAddr.spendPublicKey = reg.spendPublicKey;
+        regAddr.viewPublicKey = reg.viewPublicKey;
+        std::string regAddrStr = m_core.currency().accountAddressAsString(regAddr);
+
+        body += "  <li>\n";
+        body += "    Account registration: <a class=\"wrap\" href=\"/explorer/address/" + regAddrStr + "\">"
+             + regAddrStr + "</a>\n";
+        body += "  </li>\n";
+        body += "  <li>\n";
+        body += "    Spend public key: <span class=\"wrap\">" + Common::podToHex(reg.spendPublicKey) + "</span>\n";
+        body += "  </li>\n";
+        body += "  <li>\n";
+        body += "    View public key: <span class=\"wrap\">" + Common::podToHex(reg.viewPublicKey) + "</span>\n";
+        body += "  </li>\n";
+
+        // Show resulting account number if tx is in blockchain
+        if (transactionsDetails.inBlockchain) {
+          // Find tx index within block
+          uint32_t txIdx = 0;
+          uint32_t bh = transactionsDetails.blockHeight;
+          AccountPublicAddress checkAddr;
+          // Walk through possible indices to find this registration
+          for (uint32_t i = 0; i < 1000; ++i) {
+            if (m_core.resolveAccountNumber(bh, i, checkAddr)) {
+              if (checkAddr.spendPublicKey == reg.spendPublicKey &&
+                  checkAddr.viewPublicKey == reg.viewPublicKey) {
+                txIdx = i;
+                AccountNumber an{bh, txIdx};
+                body += "  <li>\n";
+                body += "    Account number: <a href=\"/explorer/account/" + an.toString() + "\">"
+                     + an.toString() + "</a>\n";
+                body += "  </li>\n";
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
     body += "</ul>\n";
 
     body += "<h3>Inputs</h3>\n";
@@ -2056,6 +2171,95 @@ bool RpcServer::on_get_explorer_txs_by_payment_id(const COMMAND_EXPLORER_GET_TRA
 
   res = body;
 
+  return true;
+}
+
+bool RpcServer::on_get_explorer_account_number(const COMMAND_EXPLORER_GET_ACCOUNT_NUMBER::request& req, COMMAND_EXPLORER_GET_ACCOUNT_NUMBER::response& res) {
+  AccountNumber acctNum;
+  if (!AccountNumber::fromString(req.account_number, acctNum)) {
+    return false;
+  }
+
+  AccountPublicAddress address;
+  if (!m_core.resolveAccountNumber(acctNum.blockHeight, acctNum.txIndex, address)) {
+    return false;
+  }
+
+  std::string addressStr = m_core.currency().accountAddressAsString(address);
+
+  std::string body = index_start + (m_core.currency().isTestnet() ? "testnet" : "mainnet") + "\n<p>";
+  body += "<a href=\"/explorer/\">Home</a>";
+  body += "<hr />";
+
+  body += "<h2>Account Number " + acctNum.toString() + "</h2>\n";
+
+  body += "<ul>\n";
+  body += "  <li>\n";
+  body += "    Block height: <a href=\"/explorer/block/" + std::to_string(acctNum.blockHeight) + "\">"
+       + std::to_string(acctNum.blockHeight) + "</a>\n";
+  body += "  </li>\n";
+  body += "  <li>\n";
+  body += "    Transaction index: " + std::to_string(acctNum.txIndex) + "\n";
+  body += "  </li>\n";
+  body += "  <li>\n";
+  body += "    Address: <a class=\"wrap\" href=\"/explorer/address/" + addressStr + "\">"
+       + addressStr + "</a>\n";
+  body += "  </li>\n";
+  body += "  <li>\n";
+  body += "    Spend public key: <span class=\"wrap\">" + Common::podToHex(address.spendPublicKey) + "</span>\n";
+  body += "  </li>\n";
+  body += "  <li>\n";
+  body += "    View public key: <span class=\"wrap\">" + Common::podToHex(address.viewPublicKey) + "</span>\n";
+  body += "  </li>\n";
+  body += "</ul>\n";
+
+  body += index_finish;
+  res = body;
+  return true;
+}
+
+bool RpcServer::on_get_explorer_address(const COMMAND_EXPLORER_GET_ADDRESS::request& req, COMMAND_EXPLORER_GET_ADDRESS::response& res) {
+  AccountPublicAddress address;
+  uint64_t prefix;
+  if (!parseAccountAddressString(prefix, address, req.address)) {
+    return false;
+  }
+
+  bool validSpend = Crypto::check_key(address.spendPublicKey);
+  bool validView = Crypto::check_key(address.viewPublicKey);
+
+  std::string body = index_start + (m_core.currency().isTestnet() ? "testnet" : "mainnet") + "\n<p>";
+  body += "<a href=\"/explorer/\">Home</a>";
+  body += "<hr />";
+
+  body += "<h2>Address</h2>\n";
+  body += "<p class=\"wrap\">" + req.address + "</p>\n";
+
+  body += "<h3>Validation</h3>\n";
+  body += "<ul>\n";
+  body += "  <li>Spend public key: <span class=\"wrap\">" + Common::podToHex(address.spendPublicKey) + "</span>"
+       + (validSpend ? " &#10004;" : " &#10008; <b>INVALID</b>") + "</li>\n";
+  body += "  <li>View public key: <span class=\"wrap\">" + Common::podToHex(address.viewPublicKey) + "</span>"
+       + (validView ? " &#10004;" : " &#10008; <b>INVALID</b>") + "</li>\n";
+  body += "</ul>\n";
+
+  // Look up registered account number
+  {
+    uint32_t blockHeight, txIndex;
+    if (m_core.getAccountNumber(address, blockHeight, txIndex)) {
+      AccountNumber an{blockHeight, txIndex};
+      std::string anStr = an.toString();
+      body += "<h3>Account Number</h3>\n";
+      body += "<p><a href=\"/explorer/account/" + anStr + "\">" + anStr + "</a>"
+              " (block <a href=\"/explorer/block/" + std::to_string(blockHeight) + "\">"
+              + std::to_string(blockHeight) + "</a>)</p>\n";
+    } else {
+      body += "<p>No account number registered for this address.</p>\n";
+    }
+  }
+
+  body += index_finish;
+  res = body;
   return true;
 }
 
@@ -3254,6 +3458,42 @@ bool RpcServer::on_resolve_open_alias(const COMMAND_RPC_RESOLVE_OPEN_ALIAS::requ
   }
 #endif
 
+  res.status = CORE_RPC_STATUS_OK;
+  return true;
+}
+
+bool RpcServer::on_resolve_account_number(const COMMAND_RPC_RESOLVE_ACCOUNT_NUMBER::request& req,
+                                          COMMAND_RPC_RESOLVE_ACCOUNT_NUMBER::response& res) {
+  AccountNumber acctNum;
+  if (!AccountNumber::fromString(req.account_number, acctNum)) {
+    throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_WRONG_PARAM, "Invalid account number format" };
+  }
+
+  AccountPublicAddress address;
+  if (!m_core.resolveAccountNumber(acctNum.blockHeight, acctNum.txIndex, address)) {
+    throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_WRONG_PARAM, "Account number not found" };
+  }
+
+  res.address = m_core.currency().accountAddressAsString(address);
+  res.status = CORE_RPC_STATUS_OK;
+  return true;
+}
+
+bool RpcServer::on_get_account_number(const COMMAND_RPC_GET_ACCOUNT_NUMBER::request& req,
+                                      COMMAND_RPC_GET_ACCOUNT_NUMBER::response& res) {
+  AccountPublicAddress address;
+  uint64_t prefix;
+  if (!parseAccountAddressString(prefix, address, req.address)) {
+    throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_WRONG_PARAM, "Invalid address" };
+  }
+
+  uint32_t blockHeight, txIndex;
+  if (!m_core.getAccountNumber(address, blockHeight, txIndex)) {
+    throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_WRONG_PARAM, "No account number registered for this address" };
+  }
+
+  AccountNumber acctNum{blockHeight, txIndex};
+  res.account_number = acctNum.toString();
   res.status = CORE_RPC_STATUS_OK;
   return true;
 }

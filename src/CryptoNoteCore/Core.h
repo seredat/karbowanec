@@ -179,6 +179,11 @@ namespace CryptoNote {
      uint8_t getBlockMajorVersionForHeight(uint32_t height) const;
      virtual bool getMixin(const Transaction& transaction, uint64_t& mixin) override;
 
+     virtual bool resolveAccountNumber(uint32_t blockHeight, uint32_t txIndex,
+                                       AccountPublicAddress& address) override;
+     virtual bool getAccountNumber(const AccountPublicAddress& address,
+                                   uint32_t& blockHeight, uint32_t& txIndex) override;
+
      bool is_key_image_spent(const Crypto::KeyImage& key_im);
      bool is_key_image_spent(const Crypto::KeyImage& key_im, uint32_t height);
      bool is_tx_spendtime_unlocked(uint64_t unlock_time);

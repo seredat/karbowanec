@@ -37,6 +37,8 @@
 #include "Common/Base58.h"
 #include "Common/Util.h"
 #include "WalletRpcServer.h"
+#include "CryptoNoteCore/AccountNumber.h"
+#include "CryptoNoteCore/TransactionExtra.h"
 
 #undef ERROR
 
@@ -268,6 +270,9 @@ void wallet_rpc_server::processRequest(const CryptoNote::HttpRequest& request, C
             { "sign_message"      , makeMemberMethod(&wallet_rpc_server::on_sign_message)      },
             { "verify_message"    , makeMemberMethod(&wallet_rpc_server::on_verify_message)    },
             { "change_password"   , makeMemberMethod(&wallet_rpc_server::on_change_password)   },
+            { "resolve_account_number", makeMemberMethod(&wallet_rpc_server::on_resolve_account_number) },
+            { "get_account_number",     makeMemberMethod(&wallet_rpc_server::on_get_account_number)     },
+            { "register_account",       makeMemberMethod(&wallet_rpc_server::on_register_account)       },
     };
 
     auto it = s_methods.find(jsonRequest.getMethod());
@@ -345,6 +350,27 @@ bool wallet_rpc_server::on_transfer(const wallet_rpc::COMMAND_RPC_TRANSFER::requ
     CryptoNote::WalletLegacyTransfer transfer;
     transfer.address = it->address;
     transfer.amount  = it->amount;
+
+    // Try to resolve account number if address parsing fails
+    CryptoNote::AccountPublicAddress ignore;
+    if (!m_currency.parseAccountAddressString(transfer.address, ignore)) {
+      CryptoNote::AccountNumber acctNum;
+      if (CryptoNote::AccountNumber::fromString(transfer.address, acctNum)) {
+        std::string resolvedAddress;
+        std::promise<std::error_code> promise;
+        auto future = promise.get_future();
+        m_node.resolveAccountNumber(transfer.address, resolvedAddress,
+            [&promise](std::error_code ec) { promise.set_value(ec); });
+        auto ec = future.get();
+        if (!ec && !resolvedAddress.empty()) {
+          transfer.address = resolvedAddress;
+        } else {
+          throw JsonRpc::JsonRpcError(WALLET_RPC_ERROR_CODE_WRONG_ADDRESS,
+            "Failed to resolve account number: " + it->address);
+        }
+      }
+    }
+
     transfers.push_back(transfer);
   }
 
@@ -649,10 +675,22 @@ bool wallet_rpc_server::on_get_height(const wallet_rpc::COMMAND_RPC_GET_HEIGHT::
   return true;
 }
 
-bool wallet_rpc_server::on_get_address(const wallet_rpc::COMMAND_RPC_GET_ADDRESS::request& req, 
+bool wallet_rpc_server::on_get_address(const wallet_rpc::COMMAND_RPC_GET_ADDRESS::request& req,
   wallet_rpc::COMMAND_RPC_GET_ADDRESS::response& res)
 {
   res.address = m_wallet.getAddress();
+
+  // Look up account number
+  std::string accountNumber;
+  std::promise<std::error_code> promise;
+  auto future = promise.get_future();
+  m_node.getAccountNumber(res.address, accountNumber,
+      [&promise](std::error_code ec) { promise.set_value(ec); });
+  auto ec = future.get();
+  if (!ec && !accountNumber.empty()) {
+    res.account_number = accountNumber;
+  }
+
   return true;
 }
 
@@ -850,6 +888,109 @@ bool wallet_rpc_server::on_change_password(const wallet_rpc::COMMAND_RPC_CHANGE_
     res.password_changed = false;
   }
   logger(Logging::INFO) << "Password changed via RPC.";
+  return true;
+}
+
+//------------------------------------------------------------------------------------------------------------------------------
+bool wallet_rpc_server::on_resolve_account_number(const wallet_rpc::COMMAND_RPC_RESOLVE_ACCOUNT_NUMBER::request& req,
+  wallet_rpc::COMMAND_RPC_RESOLVE_ACCOUNT_NUMBER::response& res)
+{
+  CryptoNote::AccountNumber acctNum;
+  if (!CryptoNote::AccountNumber::fromString(req.account_number, acctNum)) {
+    throw JsonRpc::JsonRpcError(WALLET_RPC_ERROR_CODE_WRONG_ADDRESS, "Invalid account number format");
+  }
+
+  std::string resolvedAddress;
+  std::promise<std::error_code> promise;
+  auto future = promise.get_future();
+  m_node.resolveAccountNumber(req.account_number, resolvedAddress,
+      [&promise](std::error_code ec) { promise.set_value(ec); });
+  auto ec = future.get();
+  if (ec || resolvedAddress.empty()) {
+    throw JsonRpc::JsonRpcError(WALLET_RPC_ERROR_CODE_WRONG_ADDRESS, "Account number not found");
+  }
+
+  res.address = resolvedAddress;
+  res.status = WALLET_RPC_STATUS_OK;
+  return true;
+}
+
+//------------------------------------------------------------------------------------------------------------------------------
+bool wallet_rpc_server::on_get_account_number(const wallet_rpc::COMMAND_RPC_GET_ACCOUNT_NUMBER::request& req,
+  wallet_rpc::COMMAND_RPC_GET_ACCOUNT_NUMBER::response& res)
+{
+  std::string accountNumber;
+  std::promise<std::error_code> promise;
+  auto future = promise.get_future();
+  m_node.getAccountNumber(m_wallet.getAddress(), accountNumber,
+      [&promise](std::error_code ec) { promise.set_value(ec); });
+  auto ec = future.get();
+  if (ec || accountNumber.empty()) {
+    throw JsonRpc::JsonRpcError(WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR, "No account number registered for this wallet");
+  }
+
+  res.account_number = accountNumber;
+  res.status = WALLET_RPC_STATUS_OK;
+  return true;
+}
+
+//------------------------------------------------------------------------------------------------------------------------------
+bool wallet_rpc_server::on_register_account(const wallet_rpc::COMMAND_RPC_REGISTER_ACCOUNT::request& req,
+  wallet_rpc::COMMAND_RPC_REGISTER_ACCOUNT::response& res)
+{
+  // Check if already registered
+  {
+    std::string existingNumber;
+    std::promise<std::error_code> promise;
+    auto future = promise.get_future();
+    m_node.getAccountNumber(m_wallet.getAddress(), existingNumber,
+        [&promise](std::error_code ec) { promise.set_value(ec); });
+    auto ec = future.get();
+    if (!ec && !existingNumber.empty()) {
+      throw JsonRpc::JsonRpcError(WALLET_RPC_ERROR_CODE_GENERIC_TRANSFER_ERROR,
+        "This address already has account number: " + existingNumber);
+    }
+  }
+
+  // Build registration tx extra
+  CryptoNote::AccountKeys keys;
+  m_wallet.getAccountKeys(keys);
+
+  std::vector<uint8_t> extra;
+  CryptoNote::addAccountRegistrationToExtra(extra, keys.address.spendPublicKey, keys.address.viewPublicKey);
+
+  std::string extraString;
+  std::copy(extra.begin(), extra.end(), std::back_inserter(extraString));
+
+  try
+  {
+    CryptoNote::WalletHelper::SendCompleteResultObserver sent;
+    WalletHelper::IWalletRemoveObserverGuard removeGuard(m_wallet, sent);
+
+    CryptoNote::WalletLegacyTransfer transfer;
+    transfer.address = m_wallet.getAddress();
+    transfer.amount = CryptoNote::parameters::DEFAULT_DUST_THRESHOLD;
+
+    CryptoNote::TransactionId tx = m_wallet.sendTransaction(transfer, m_node.getMinimalFee(), extraString, 0, 0);
+    if (tx == WALLET_LEGACY_INVALID_TRANSACTION_ID)
+      throw std::runtime_error("Couldn't send registration transaction");
+
+    std::error_code sendError = sent.wait(tx);
+    removeGuard.removeObserver();
+
+    if (sendError)
+      throw std::system_error(sendError);
+
+    CryptoNote::WalletLegacyTransaction txInfo;
+    m_wallet.getTransaction(tx, txInfo);
+    res.tx_hash = Common::podToHex(txInfo.hash);
+    res.tx_key = Common::podToHex(txInfo.secretKey);
+  }
+  catch (const std::exception& e)
+  {
+    throw JsonRpc::JsonRpcError(WALLET_RPC_ERROR_CODE_GENERIC_TRANSFER_ERROR, e.what());
+  }
+
   return true;
 }
 

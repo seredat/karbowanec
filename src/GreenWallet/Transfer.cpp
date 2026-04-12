@@ -10,6 +10,7 @@
 #include <boost/algorithm/string.hpp>
 
 #include <chrono>
+#include <future>
 #include <thread>
 
 #include <Common/StringTools.h>
@@ -322,7 +323,34 @@ void transfer(std::shared_ptr<WalletInfo> walletInfo, uint32_t height, bool send
         return;
     }
 
-    const std::string address = maybeAddress.x;
+    std::string address = maybeAddress.x;
+
+    /* If the input is an account number, resolve it to an address */
+    if (isAccountNumber(address))
+    {
+        std::string resolvedAddress;
+        if (!resolveAccountNumberViaNode(walletInfo->wallet.getNode(), address, resolvedAddress))
+        {
+            std::cout << WarningMsg("Failed to resolve account number ") << address << std::endl;
+            return;
+        }
+
+        std::cout << InformationMsg("Account number ") << address
+                  << InformationMsg(" resolved to:") << std::endl
+                  << InformationMsg(resolvedAddress) << std::endl << std::endl;
+
+        std::cout << "Confirm sending to this address? (Y/n): ";
+        std::string confirm;
+        std::getline(std::cin, confirm);
+        boost::algorithm::trim(confirm);
+        if (!confirm.empty() && confirm[0] != 'Y' && confirm[0] != 'y')
+        {
+            std::cout << WarningMsg("Cancelling transaction.") << std::endl;
+            return;
+        }
+
+        address = resolvedAddress;
+    }
 
 
 
@@ -891,6 +919,12 @@ Maybe<std::string> getDestinationAddress()
             return Just<std::string>(transferAddr);
         }
 
+        /* Check if input is an account number (e.g. 1821033-7-K) */
+        if (isAccountNumber(transferAddr))
+        {
+            return Just<std::string>(transferAddr);
+        }
+
         if (std::cin.fail() || std::cin.eof()) {
             std::cin.clear();
         }
@@ -1108,3 +1142,33 @@ bool askAliasesTransfersConfirmation(const std::string address)
     return answer == "y" || answer == "Y";
 }
 #endif
+
+bool isAccountNumber(const std::string& input)
+{
+    CryptoNote::AccountNumber acctNum;
+    return CryptoNote::AccountNumber::fromString(input, acctNum);
+}
+
+bool resolveAccountNumberViaNode(CryptoNote::INode& node, const std::string& accountNumber, std::string& address)
+{
+    std::promise<std::error_code> promise;
+    auto future = promise.get_future();
+
+    node.resolveAccountNumber(accountNumber, address,
+        [&promise](std::error_code ec) { promise.set_value(ec); });
+
+    auto ec = future.get();
+    return !ec && !address.empty();
+}
+
+bool getAccountNumberViaNode(CryptoNote::INode& node, const std::string& address, std::string& accountNumber)
+{
+    std::promise<std::error_code> promise;
+    auto future = promise.get_future();
+
+    node.getAccountNumber(address, accountNumber,
+        [&promise](std::error_code ec) { promise.set_value(ec); });
+
+    auto ec = future.get();
+    return !ec && !accountNumber.empty();
+}

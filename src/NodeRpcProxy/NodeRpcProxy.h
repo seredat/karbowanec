@@ -100,6 +100,9 @@ public:
   virtual void isSynchronized(bool& syncStatus, const Callback& callback) override;
   virtual void getConnections(std::vector<p2pConnection>& connections, const Callback& callback) override;
 
+  virtual void resolveAccountNumber(const std::string& accountNumber, std::string& address, const Callback& callback) override;
+  virtual void getAccountNumber(const std::string& address, std::string& accountNumber, const Callback& callback) override;
+
   virtual std::string feeAddress() const override;
   virtual uint64_t feeAmount() const override;
 
@@ -145,6 +148,8 @@ private:
   std::error_code doGetTransactions(const std::vector<Crypto::Hash>& transactionHashes, std::vector<TransactionDetails>& transactions);
   std::error_code doGetBlockTimestamp(uint32_t height, uint64_t& timestamp);
   std::error_code doGetConnections(std::vector<p2pConnection>& connections);
+  std::error_code doResolveAccountNumber(const std::string& accountNumber, std::string& address);
+  std::error_code doGetAccountNumber(const std::string& address, std::string& accountNumber);
 
   void scheduleRequest(std::function<std::error_code()>&& procedure, const Callback& callback);
   template <typename Request, typename Response>

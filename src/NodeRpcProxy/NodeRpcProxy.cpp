@@ -1024,4 +1024,46 @@ std::error_code NodeRpcProxy::jsonRpcCommand(const std::string& method, const Re
   return ec;
 }
 
+void NodeRpcProxy::resolveAccountNumber(const std::string& accountNumber, std::string& address, const Callback& callback) {
+  std::lock_guard<std::mutex> lock(m_mutex);
+  if (m_state != STATE_INITIALIZED) {
+    callback(make_error_code(error::NOT_INITIALIZED));
+    return;
+  }
+
+  scheduleRequest(std::bind(&NodeRpcProxy::doResolveAccountNumber, this, accountNumber, std::ref(address)), callback);
+}
+
+std::error_code NodeRpcProxy::doResolveAccountNumber(const std::string& accountNumber, std::string& address) {
+  COMMAND_RPC_RESOLVE_ACCOUNT_NUMBER::request req = AUTO_VAL_INIT(req);
+  COMMAND_RPC_RESOLVE_ACCOUNT_NUMBER::response rsp = AUTO_VAL_INIT(rsp);
+  req.account_number = accountNumber;
+  std::error_code ec = jsonRpcCommand("resolveaccountnumber", req, rsp);
+  if (!ec) {
+    address = rsp.address;
+  }
+  return ec;
+}
+
+void NodeRpcProxy::getAccountNumber(const std::string& address, std::string& accountNumber, const Callback& callback) {
+  std::lock_guard<std::mutex> lock(m_mutex);
+  if (m_state != STATE_INITIALIZED) {
+    callback(make_error_code(error::NOT_INITIALIZED));
+    return;
+  }
+
+  scheduleRequest(std::bind(&NodeRpcProxy::doGetAccountNumber, this, address, std::ref(accountNumber)), callback);
+}
+
+std::error_code NodeRpcProxy::doGetAccountNumber(const std::string& address, std::string& accountNumber) {
+  COMMAND_RPC_GET_ACCOUNT_NUMBER::request req = AUTO_VAL_INIT(req);
+  COMMAND_RPC_GET_ACCOUNT_NUMBER::response rsp = AUTO_VAL_INIT(rsp);
+  req.address = address;
+  std::error_code ec = jsonRpcCommand("getaccountnumber", req, rsp);
+  if (!ec) {
+    accountNumber = rsp.account_number;
+  }
+  return ec;
+}
+
 }
