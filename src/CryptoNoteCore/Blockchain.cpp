@@ -2896,12 +2896,28 @@ bool Blockchain::resolveAccountNumber(uint32_t blockHeight, uint32_t txIndex,
                                       AccountPublicAddress& address) {
   std::lock_guard<std::recursive_mutex> lk(m_blockchain_lock);
   uint8_t spendKey[32], viewKey[32];
-  if (!m_db.getAccountRegistration(blockHeight, txIndex, spendKey, viewKey)) {
+  if (m_db.getAccountRegistration(blockHeight, txIndex, spendKey, viewKey)) {
+    memcpy(address.spendPublicKey.data, spendKey, 32);
+    memcpy(address.viewPublicKey.data, viewKey, 32);
+    return true;
+  }
+
+  // Fallback: registration may predate the index — fetch the tx directly
+  if (blockHeight >= m_db.getChainHeight() || txIndex == 0) {
     return false;
   }
-  memcpy(address.spendPublicKey.data, spendKey, 32);
-  memcpy(address.viewPublicKey.data, viewKey, 32);
-  return true;
+  try {
+    TransactionEntry te = transactionByIndex({ blockHeight, static_cast<uint16_t>(txIndex) });
+    TransactionExtraAccountRegistration reg;
+    if (getAccountRegistrationFromExtra(te.tx.extra, reg) &&
+        isWellFormedAccountRegistration(te.tx.extra)) {
+      address.spendPublicKey = reg.spendPublicKey;
+      address.viewPublicKey = reg.viewPublicKey;
+      return true;
+    }
+  } catch (...) {
+  }
+  return false;
 }
 
 bool Blockchain::getAccountNumber(const AccountPublicAddress& address,
