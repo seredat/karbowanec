@@ -19,6 +19,7 @@
 #include "InProcessNode.h"
 
 #include <functional>
+#include <limits>
 #include <boost/utility/value_init.hpp>
 #include <CryptoNoteCore/TransactionApi.h>
 
@@ -1310,6 +1311,12 @@ void InProcessNode::resolveAccountNumber(const std::string& accountNumber, std::
 void InProcessNode::resolveAccountNumberAsync(const std::string& accountNumber, std::string& address, const Callback& callback) {
   AccountNumber acctNum;
   if (!AccountNumber::fromString(accountNumber, acctNum)) {
+    callback(std::make_error_code(std::errc::invalid_argument));
+    return;
+  }
+  if (acctNum.txIndex == 0 ||
+      acctNum.txIndex > std::numeric_limits<uint16_t>::max() ||
+      acctNum.blockHeight >= core.getCurrentBlockchainHeight()) {
     callback(std::make_error_code(std::errc::invalid_argument));
     return;
   }

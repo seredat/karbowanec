@@ -19,6 +19,7 @@
 // along with Karbo.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <list>
+#include <limits>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/filesystem.hpp>
 
@@ -885,6 +886,11 @@ bool wallet_rpc_server::on_resolve_account_number(const wallet_rpc::COMMAND_RPC_
 {
   CryptoNote::AccountNumber acctNum;
   if (!CryptoNote::AccountNumber::fromString(req.account_number, acctNum)) {
+    throw JsonRpc::JsonRpcError(WALLET_RPC_ERROR_CODE_WRONG_ADDRESS, "Invalid account number format");
+  }
+  if (acctNum.txIndex == 0 ||
+      acctNum.txIndex > std::numeric_limits<uint16_t>::max() ||
+      acctNum.blockHeight > m_node.getLastLocalBlockHeight()) {
     throw JsonRpc::JsonRpcError(WALLET_RPC_ERROR_CODE_WRONG_ADDRESS, "Invalid account number format");
   }
 

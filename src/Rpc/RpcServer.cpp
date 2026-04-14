@@ -23,6 +23,7 @@
 #include "version.h"
 
 #include <future>
+#include <limits>
 #include <unordered_map>
 #include <time.h>
 #include <boost/lexical_cast.hpp>
@@ -3466,6 +3467,11 @@ bool RpcServer::on_resolve_account_number(const COMMAND_RPC_RESOLVE_ACCOUNT_NUMB
                                           COMMAND_RPC_RESOLVE_ACCOUNT_NUMBER::response& res) {
   AccountNumber acctNum;
   if (!AccountNumber::fromString(req.account_number, acctNum)) {
+    throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_WRONG_PARAM, "Invalid account number format" };
+  }
+  if (acctNum.txIndex == 0 ||
+      acctNum.txIndex > std::numeric_limits<uint16_t>::max() ||
+      acctNum.blockHeight >= m_core.getCurrentBlockchainHeight()) {
     throw JsonRpc::JsonRpcError{ CORE_RPC_ERROR_CODE_WRONG_PARAM, "Invalid account number format" };
   }
 

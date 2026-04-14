@@ -19,6 +19,7 @@
 #include "Blockchain.h"
 
 #include <algorithm>
+#include <limits>
 #include <numeric>
 #include <cstdio>
 #include <cmath>
@@ -2956,6 +2957,11 @@ bool Blockchain::isInCheckpointZone(const uint32_t height) {
 bool Blockchain::resolveAccountNumber(uint32_t blockHeight, uint32_t txIndex,
                                       AccountPublicAddress& address) {
   std::lock_guard<std::recursive_mutex> lk(m_blockchain_lock);
+  const uint32_t chainHeight = m_db.getChainHeight();
+  if (blockHeight >= chainHeight || txIndex == 0 ||
+      txIndex > std::numeric_limits<uint16_t>::max()) {
+    return false;
+  }
   uint8_t spendKey[32], viewKey[32];
   if (m_db.getAccountRegistration(blockHeight, txIndex, spendKey, viewKey)) {
     memcpy(address.spendPublicKey.data, spendKey, 32);
@@ -2964,9 +2970,6 @@ bool Blockchain::resolveAccountNumber(uint32_t blockHeight, uint32_t txIndex,
   }
 
   // Fallback: registration may predate the index — fetch the tx directly
-  if (blockHeight >= m_db.getChainHeight() || txIndex == 0) {
-    return false;
-  }
   try {
     TransactionEntry te = transactionByIndex({ blockHeight, static_cast<uint16_t>(txIndex) });
     TransactionExtraAccountRegistration reg;
