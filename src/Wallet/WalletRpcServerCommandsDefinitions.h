@@ -301,12 +301,10 @@ using CryptoNote::ISerializer;
     struct response
     {
       std::string address;
-      std::string account_number;
 
       void serialize(ISerializer& s)
       {
         KV_MEMBER(address)
-        KV_MEMBER(account_number)
       }
     };
   };

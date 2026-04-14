@@ -679,18 +679,6 @@ bool wallet_rpc_server::on_get_address(const wallet_rpc::COMMAND_RPC_GET_ADDRESS
   wallet_rpc::COMMAND_RPC_GET_ADDRESS::response& res)
 {
   res.address = m_wallet.getAddress();
-
-  // Look up account number
-  std::string accountNumber;
-  std::promise<std::error_code> promise;
-  auto future = promise.get_future();
-  m_node.getAccountNumber(res.address, accountNumber,
-      [&promise](std::error_code ec) { promise.set_value(ec); });
-  auto ec = future.get();
-  if (!ec && !accountNumber.empty()) {
-    res.account_number = accountNumber;
-  }
-
   return true;
 }
 
