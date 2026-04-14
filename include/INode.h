@@ -179,6 +179,14 @@ public:
   virtual void getBlockTimestamp(uint32_t height, uint64_t& timestamp, const Callback& callback) = 0;
   virtual void isSynchronized(bool& syncStatus, const Callback& callback) = 0;
   virtual void getConnections(std::vector<p2pConnection>& connections, const Callback& callback) = 0;
+
+  // Account number resolution (default implementations return error)
+  virtual void resolveAccountNumber(const std::string& accountNumber, std::string& address, const Callback& callback) {
+    callback(std::make_error_code(std::errc::not_supported));
+  }
+  virtual void getAccountNumber(const std::string& address, std::string& accountNumber, const Callback& callback) {
+    callback(std::make_error_code(std::errc::not_supported));
+  }
 };
 
 }

@@ -66,6 +66,7 @@ std::vector<AdvancedCommand> allCommands()
 		AdvancedCommand("tx_key", "Display transaction secret key if it's stored in wallet cache", false, true),
 		AdvancedCommand("tx_proof", "Display proof of payment to specified address", false, true),
 		AdvancedCommand("verify_message", "Verify signed message", true, true),
+		AdvancedCommand("register_account", "Register an account number for easy payments", false, true),
 	};
 }
 

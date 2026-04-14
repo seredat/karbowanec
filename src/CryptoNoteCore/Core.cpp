@@ -439,6 +439,17 @@ bool Core::check_tx_semantic(const Transaction& tx, const Crypto::Hash& txHash, 
     return false;
   }
 
+  // Validate account registration tx extra
+  {
+    TransactionExtraAccountRegistration reg;
+    if (getAccountRegistrationFromExtra(tx.extra, reg)) {
+      if (!isWellFormedAccountRegistration(tx.extra)) {
+        logger(ERROR) << "malformed account registration, rejected for tx id= " << Common::podToHex(txHash);
+        return false;
+      }
+    }
+  }
+
   return true;
 }
 
@@ -1327,6 +1338,16 @@ bool Core::getMixin(const Transaction& transaction, uint64_t& mixin) {
     }
   }
   return true;
+}
+
+bool Core::resolveAccountNumber(uint32_t blockHeight, uint32_t txIndex,
+                                AccountPublicAddress& address) {
+  return m_blockchain.resolveAccountNumber(blockHeight, txIndex, address);
+}
+
+bool Core::getAccountNumber(const AccountPublicAddress& address,
+                            uint32_t& blockHeight, uint32_t& txIndex) {
+  return m_blockchain.getAccountNumber(address, blockHeight, txIndex);
 }
 
 bool Core::is_key_image_spent(const Crypto::KeyImage& key_im) {

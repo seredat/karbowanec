@@ -514,4 +514,63 @@ using CryptoNote::ISerializer;
     };
   };
 
+  /* Command: resolve_account_number */
+  struct COMMAND_RPC_RESOLVE_ACCOUNT_NUMBER
+  {
+    struct request
+    {
+      std::string account_number;
+
+      void serialize(ISerializer& s)
+      {
+        KV_MEMBER(account_number)
+      }
+    };
+    struct response
+    {
+      std::string address;
+      std::string status;
+
+      void serialize(ISerializer& s)
+      {
+        KV_MEMBER(address)
+        KV_MEMBER(status)
+      }
+    };
+  };
+
+  /* Command: get_account_number */
+  struct COMMAND_RPC_GET_ACCOUNT_NUMBER
+  {
+    typedef CryptoNote::EMPTY_STRUCT request;
+    struct response
+    {
+      std::string account_number;
+      std::string status;
+
+      void serialize(ISerializer& s)
+      {
+        KV_MEMBER(account_number)
+        KV_MEMBER(status)
+      }
+    };
+  };
+
+  /* Command: register_account */
+  struct COMMAND_RPC_REGISTER_ACCOUNT
+  {
+    typedef CryptoNote::EMPTY_STRUCT request;
+    struct response
+    {
+      std::string tx_hash;
+      std::string tx_key;
+
+      void serialize(ISerializer& s)
+      {
+        KV_MEMBER(tx_hash)
+        KV_MEMBER(tx_key)
+      }
+    };
+  };
+
 }} //Tools::wallet_rpc

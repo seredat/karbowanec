@@ -6,9 +6,12 @@
 #pragma once
 
 #include <memory>
+#include <string>
 
 #include <GreenWallet/Types.h>
 #include <GreenWallet/WalletConfig.h>
+#include <CryptoNoteCore/AccountNumber.h>
+#include <INode.h>
 
 enum BalanceInfo { NotEnoughBalance, EnoughBalance, SetMixinToZero };
 void transfer(std::shared_ptr<WalletInfo> walletInfo, uint32_t height,
@@ -56,6 +59,12 @@ Maybe<std::string> getPaymentID(std::string msg);
 Maybe<std::string> getExtra();
 
 Maybe<std::string> getDestinationAddress();
+
+bool isAccountNumber(const std::string& input);
+
+bool resolveAccountNumberViaNode(CryptoNote::INode& node, const std::string& accountNumber, std::string& address);
+
+bool getAccountNumberViaNode(CryptoNote::INode& node, const std::string& address, std::string& accountNumber);
 
 Maybe<uint64_t> getFee();
 

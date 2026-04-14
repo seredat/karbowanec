@@ -157,6 +157,7 @@ bool LMDBBlockchainDB::open(const std::string& path) {
     openDb(setupTxn, "payment_id_idx",    MDB_DUPSORT | MDB_DUPFIXED, m_dbiPaymentIdIdx);
     openDb(setupTxn, "timestamp_idx",     0,                         m_dbiTimestampIdx);
     openDb(setupTxn, "gen_tx_idx",        0,                         m_dbiGenTxIdx);
+    openDb(setupTxn, "acct_reg",          0,                         m_dbiAccountRegistrations);
   } catch (...) {
     mdb_txn_abort(setupTxn);
     close();
@@ -216,6 +217,7 @@ void LMDBBlockchainDB::clear() {
   dropDb(m_dbiPaymentIdIdx);
   dropDb(m_dbiTimestampIdx);
   dropDb(m_dbiGenTxIdx);
+  dropDb(m_dbiAccountRegistrations);
 
   rc = mdb_txn_commit(txn);
   checkRc(rc, "clear:commit");
@@ -858,6 +860,95 @@ bool LMDBBlockchainDB::removeGeneratedTxCount(uint32_t height) {
   if (rc == MDB_NOTFOUND) return false;
   checkRc(rc, "removeGeneratedTxCount");
   return true;
+}
+
+// ─── account_registrations ────────────────────────────────────────────────
+
+// Big-endian key encoding so LMDB sort order = block height order.
+// Only used for acct_reg table; other tables use native byte order.
+static void packAcctRegKey(uint32_t blockHeight, uint32_t txIndex, uint8_t out[8]) {
+  out[0] = static_cast<uint8_t>(blockHeight >> 24);
+  out[1] = static_cast<uint8_t>(blockHeight >> 16);
+  out[2] = static_cast<uint8_t>(blockHeight >>  8);
+  out[3] = static_cast<uint8_t>(blockHeight);
+  out[4] = static_cast<uint8_t>(txIndex >> 24);
+  out[5] = static_cast<uint8_t>(txIndex >> 16);
+  out[6] = static_cast<uint8_t>(txIndex >>  8);
+  out[7] = static_cast<uint8_t>(txIndex);
+}
+
+static void unpackAcctRegKey(const uint8_t in[8], uint32_t& blockHeight, uint32_t& txIndex) {
+  blockHeight = (static_cast<uint32_t>(in[0]) << 24) | (static_cast<uint32_t>(in[1]) << 16) |
+                (static_cast<uint32_t>(in[2]) <<  8) |  static_cast<uint32_t>(in[3]);
+  txIndex     = (static_cast<uint32_t>(in[4]) << 24) | (static_cast<uint32_t>(in[5]) << 16) |
+                (static_cast<uint32_t>(in[6]) <<  8) |  static_cast<uint32_t>(in[7]);
+}
+
+bool LMDBBlockchainDB::putAccountRegistration(uint32_t blockHeight, uint32_t txIndex,
+                                              const uint8_t* spendKey, const uint8_t* viewKey) {
+  assert(m_writeTxn);
+  uint8_t keyBuf[8];
+  packAcctRegKey(blockHeight, txIndex, keyBuf);
+  uint8_t valueBuf[64];
+  memcpy(valueBuf, spendKey, 32);
+  memcpy(valueBuf + 32, viewKey, 32);
+  MDB_val k = {sizeof(keyBuf), keyBuf};
+  MDB_val v = {64, valueBuf};
+  int rc = mdb_put(m_writeTxn, m_dbiAccountRegistrations, &k, &v, 0);
+  checkRc(rc, "putAccountRegistration");
+  return true;
+}
+
+bool LMDBBlockchainDB::getAccountRegistration(uint32_t blockHeight, uint32_t txIndex,
+                                              uint8_t* spendKey, uint8_t* viewKey) const {
+  auto guard = readTxn();
+  uint8_t keyBuf[8];
+  packAcctRegKey(blockHeight, txIndex, keyBuf);
+  MDB_val k = {sizeof(keyBuf), keyBuf}, v{};
+  int rc = mdb_get(guard.txn, m_dbiAccountRegistrations, &k, &v);
+  if (rc == MDB_NOTFOUND) return false;
+  checkRc(rc, "getAccountRegistration");
+  if (v.mv_size != 64) return false;
+  memcpy(spendKey, v.mv_data, 32);
+  memcpy(viewKey, static_cast<const uint8_t*>(v.mv_data) + 32, 32);
+  return true;
+}
+
+bool LMDBBlockchainDB::removeAccountRegistration(uint32_t blockHeight, uint32_t txIndex) {
+  assert(m_writeTxn);
+  uint8_t keyBuf[8];
+  packAcctRegKey(blockHeight, txIndex, keyBuf);
+  MDB_val k = {sizeof(keyBuf), keyBuf};
+  int rc = mdb_del(m_writeTxn, m_dbiAccountRegistrations, &k, nullptr);
+  if (rc == MDB_NOTFOUND) return false;
+  checkRc(rc, "removeAccountRegistration");
+  return true;
+}
+
+bool LMDBBlockchainDB::findAccountRegistrationByKeys(const uint8_t* spendKey, const uint8_t* viewKey,
+                                                     uint32_t& blockHeight, uint32_t& txIndex) const {
+  auto guard = readTxn();
+  MDB_cursor* cursor = nullptr;
+  int rc = mdb_cursor_open(guard.txn, m_dbiAccountRegistrations, &cursor);
+  checkRc(rc, "findAccountRegistrationByKeys:open");
+
+  MDB_val k{}, v{};
+  // Walk forward — canonical account number is the first registration
+  rc = mdb_cursor_get(cursor, &k, &v, MDB_FIRST);
+  while (rc == 0) {
+    if (v.mv_size == 64) {
+      const uint8_t* data = static_cast<const uint8_t*>(v.mv_data);
+      if (memcmp(data, spendKey, 32) == 0 && memcmp(data + 32, viewKey, 32) == 0) {
+        unpackAcctRegKey(static_cast<const uint8_t*>(k.mv_data), blockHeight, txIndex);
+        mdb_cursor_close(cursor);
+        return true;
+      }
+    }
+    rc = mdb_cursor_get(cursor, &k, &v, MDB_NEXT);
+  }
+
+  mdb_cursor_close(cursor);
+  return false;
 }
 
 } // namespace CryptoNote
