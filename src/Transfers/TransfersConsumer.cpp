@@ -47,8 +47,7 @@ using namespace CryptoNote;
 
 class MarkTransactionConfirmedException : public std::exception {
 public:
-  MarkTransactionConfirmedException(const Crypto::Hash& txHash) {
-  }
+  explicit MarkTransactionConfirmedException(const Crypto::Hash& txHash) : m_txHash(txHash) {}
 
   const Hash& getTxHash() const {
     return m_txHash;
