@@ -163,8 +163,8 @@ private:
   void getConnectionsAsync(std::vector<p2pConnection>& connections, const Callback& callback);
   std::error_code doGetConnections(std::vector<p2pConnection>& connections);
 
-  void resolveAccountNumberAsync(const std::string& accountNumber, std::string& address, const Callback& callback);
-  void getAccountNumberAsync(const std::string& address, std::string& accountNumber, const Callback& callback);
+  void resolveAccountNumberAsync(std::string accountNumber, std::string& address, const Callback& callback);
+  void getAccountNumberAsync(std::string address, std::string& accountNumber, const Callback& callback);
 
   void workerFunc();
   bool doShutdown();

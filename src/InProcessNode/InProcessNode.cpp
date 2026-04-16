@@ -1298,17 +1298,18 @@ void InProcessNode::resolveAccountNumber(const std::string& accountNumber, std::
     return;
   }
 
+  std::string numberCopy = accountNumber;
   ioService.post(
     std::bind(&InProcessNode::resolveAccountNumberAsync,
       this,
-      std::cref(accountNumber),
+      std::move(numberCopy),
       std::ref(address),
       callback
     )
   );
 }
 
-void InProcessNode::resolveAccountNumberAsync(const std::string& accountNumber, std::string& address, const Callback& callback) {
+void InProcessNode::resolveAccountNumberAsync(std::string accountNumber, std::string& address, const Callback& callback) {
   AccountNumber acctNum;
   if (!AccountNumber::fromString(accountNumber, acctNum)) {
     callback(std::make_error_code(std::errc::invalid_argument));
@@ -1339,17 +1340,18 @@ void InProcessNode::getAccountNumber(const std::string& address, std::string& ac
     return;
   }
 
+  std::string addressCopy = address;  // copy before posting
   ioService.post(
     std::bind(&InProcessNode::getAccountNumberAsync,
       this,
-      std::cref(address),
+      std::move(addressCopy),
       std::ref(accountNumber),
       callback
     )
   );
 }
 
-void InProcessNode::getAccountNumberAsync(const std::string& address, std::string& accountNumber, const Callback& callback) {
+void InProcessNode::getAccountNumberAsync(std::string address, std::string& accountNumber, const Callback& callback) {
   AccountPublicAddress addr;
   uint64_t prefix;
   if (!parseAccountAddressString(prefix, addr, address)) {
