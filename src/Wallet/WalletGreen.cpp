@@ -3293,7 +3293,8 @@ void WalletGreen::updateBalance(CryptoNote::ITransfersContainer* container) {
     m_actualBalance += actual - it->actualBalance;
     updated = true;
   } else if (it->actualBalance > actual) {
-    m_actualBalance -= it->actualBalance - actual;
+    uint64_t delta = it->actualBalance - actual;
+    m_actualBalance = (m_actualBalance >= delta) ? m_actualBalance - delta : 0;
     updated = true;
   }
 
@@ -3301,7 +3302,8 @@ void WalletGreen::updateBalance(CryptoNote::ITransfersContainer* container) {
     m_pendingBalance += pending - it->pendingBalance;
     updated = true;
   } else if (it->pendingBalance > pending) {
-    m_pendingBalance -= it->pendingBalance - pending;
+    uint64_t delta = it->pendingBalance - pending;
+    m_pendingBalance = (m_pendingBalance >= delta) ? m_pendingBalance - delta : 0;
     updated = true;
   }
 
