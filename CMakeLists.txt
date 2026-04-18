@@ -616,8 +616,8 @@ treat_warnings_as_errors(src)
 option(BUILD_TESTS "Build tests." OFF)
 
 if(BUILD_TESTS)
-  add_subdirectory(tests)
   enable_testing()
+  add_subdirectory(tests)
 endif()
 
 set(COMMIT_ID_IN_VERSION ON CACHE BOOL "Include commit ID in version")

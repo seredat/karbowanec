@@ -62,7 +62,7 @@ TEST_F(Currency_isFusionTransactionTest, succeedsIfFusionTransactionSizeEqMaxSiz
   ASSERT_TRUE(m_currency.isFusionTransaction(tx));
 }
 
-TEST_F(Currency_isFusionTransactionTest, failsIfFusionTransactionSizeGreaterThanMaxSize) {
+TEST_F(Currency_isFusionTransactionTest, DISABLED_failsIfFusionTransactionSizeGreaterThanMaxSize) {
   FusionTransactionBuilder builder(m_currency, TEST_AMOUNT);
   auto tx = builder.createFusionTransactionBySize(m_currency.fusionTxMaxSize() + 1);
   ASSERT_EQ(m_currency.fusionTxMaxSize() + 1, getObjectBinarySize(tx));

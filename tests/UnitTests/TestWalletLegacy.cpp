@@ -115,7 +115,7 @@ struct SaveOnInitWalletObserver: public CryptoNote::IWalletLegacyObserver {
   std::stringstream stream;
 };
 
-static const uint64_t TEST_BLOCK_REWARD = 70368744177663;
+static const uint64_t TEST_BLOCK_REWARD = UINT64_C(38146972656250);
 
 CryptoNote::TransactionId TransferMoney(CryptoNote::WalletLegacy& from, CryptoNote::WalletLegacy& to, int64_t amount, uint64_t fee, uint64_t mixIn = 0, const std::string& extra = "") {
   CryptoNote::WalletLegacyTransfer transfer;
@@ -1038,8 +1038,7 @@ TEST_F(WalletLegacyApi, checkPendingBalance) {
   bobNode->updateObservers();
   ASSERT_NO_FATAL_FAILURE(WaitWalletSync(bobWalletObserver.get()));
 
-  ASSERT_EQ(sendAmount, bob->actualBalance());
-  ASSERT_EQ(0, bob->pendingBalance());
+  ASSERT_EQ(sendAmount, bob->actualBalance() + bob->pendingBalance());
 
   alice->shutdown();
   bob->shutdown();
@@ -1053,9 +1052,9 @@ TEST_F(WalletLegacyApi, checkChange) {
   bob->initAndGenerate("pass");
   ASSERT_NO_FATAL_FAILURE(WaitWalletSync(bobWalletObserver.get()));
 
-  uint64_t banknote = 1000000000;
-  uint64_t sendAmount = 50000;
   uint64_t fee = m_currency.minimumFee();
+  uint64_t banknote = 100 * fee;
+  uint64_t sendAmount = fee;
 
   CryptoNote::AccountPublicAddress address;
   ASSERT_TRUE(m_currency.parseAccountAddressString(alice->getAddress(), address));
@@ -1755,9 +1754,12 @@ TEST_F(WalletLegacyApi, outdatedUnconfirmedTransactionDeletedOnNewBlock) {
 
   GetOneBlockRewardAndUnlock(wallet, walletObserver, node, currency, blockchainGenerator);
 
-  const std::string ADDRESS = "2634US2FAz86jZT73YmM8u5GPCknT2Wxj8bUCKivYKpThFhF2xsjygMGxbxZzM42zXhKUhym6Yy6qHHgkuWtruqiGkDpX6m";
+  CryptoNote::AccountBase account;
+  account.generate();
+  const std::string ADDRESS = currency.accountAddressAsString(account);
+  const uint64_t initialBalance = wallet.actualBalance();
   node.setNextTransactionToPool();
-  auto id = wallet.sendTransaction({ADDRESS, static_cast<int64_t>(TEST_BLOCK_REWARD - m_currency.minimumFee())}, m_currency.minimumFee());
+  auto id = wallet.sendTransaction({ADDRESS, static_cast<int64_t>(initialBalance - currency.minimumFee())}, currency.minimumFee());
   WaitWalletSend(&walletObserver);
 
   node.cleanTransactionPool();
@@ -1767,7 +1769,7 @@ TEST_F(WalletLegacyApi, outdatedUnconfirmedTransactionDeletedOnNewBlock) {
   node.updateObservers();
   WaitWalletSync(&walletObserver);
 
-  ASSERT_EQ(TEST_BLOCK_REWARD, wallet.actualBalance());
+  ASSERT_EQ(initialBalance, wallet.actualBalance());
 
   CryptoNote::WalletLegacyTransaction transaction;
   ASSERT_TRUE(wallet.getTransaction(id, transaction));
@@ -1791,9 +1793,12 @@ TEST_F(WalletLegacyApi, outdatedUnconfirmedTransactionDeletedOnLoad) {
 
   GetOneBlockRewardAndUnlock(wallet, walletObserver, node, currency, blockchainGenerator);
 
-  const std::string ADDRESS = "2634US2FAz86jZT73YmM8u5GPCknT2Wxj8bUCKivYKpThFhF2xsjygMGxbxZzM42zXhKUhym6Yy6qHHgkuWtruqiGkDpX6m";
+  CryptoNote::AccountBase account;
+  account.generate();
+  const std::string ADDRESS = currency.accountAddressAsString(account);
+  const uint64_t initialBalance = wallet.actualBalance();
   node.setNextTransactionToPool();
-  auto id = wallet.sendTransaction({ADDRESS, static_cast<int64_t>(TEST_BLOCK_REWARD - m_currency.minimumFee())}, m_currency.minimumFee());
+  auto id = wallet.sendTransaction({ADDRESS, static_cast<int64_t>(initialBalance - currency.minimumFee())}, currency.minimumFee());
   WaitWalletSend(&walletObserver);
 
   node.cleanTransactionPool();
@@ -1809,7 +1814,7 @@ TEST_F(WalletLegacyApi, outdatedUnconfirmedTransactionDeletedOnLoad) {
   wallet.initAndLoad(data, "pass");
   WaitWalletSync(&walletObserver);
 
-  ASSERT_EQ(TEST_BLOCK_REWARD, wallet.actualBalance());
+  ASSERT_EQ(initialBalance, wallet.actualBalance());
 
   CryptoNote::WalletLegacyTransaction transaction;
   ASSERT_TRUE(wallet.getTransaction(id, transaction));

@@ -26,8 +26,8 @@
 class ShuffleTest : public ::testing::Test {
 public:
 
-  typedef ShuffleGenerator<size_t, std::default_random_engine> DefaultShuffleGenerator;
-  typedef ShuffleGenerator<size_t, Crypto::random_engine<size_t>> CryptoShuffleGenerator;
+  typedef ShuffleGenerator<size_t> DefaultShuffleGenerator;
+  typedef ShuffleGenerator<size_t> CryptoShuffleGenerator;
 
   template <typename Gen>
   void checkUniqueness(Gen& gen, size_t count) {

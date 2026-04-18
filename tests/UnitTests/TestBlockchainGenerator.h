@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <map>
 #include <vector>
 #include <unordered_map>
 
@@ -61,15 +62,9 @@ public:
   bool getTransactionIdsByPaymentId(const Crypto::Hash& paymentId, std::vector<Crypto::Hash>& transactionHashes);
 
   bool getTransactionGlobalIndexesByHash(const Crypto::Hash& transactionHash, std::vector<uint32_t>& globalIndexes);
-  bool getMultisignatureOutputByGlobalIndex(uint64_t amount, uint32_t globalIndex, CryptoNote::MultisignatureOutput& out);
   void setMinerAccount(const CryptoNote::AccountBase& account);
 
 private:
-  struct MultisignatureOutEntry {
-    Crypto::Hash transactionHash;
-    uint16_t indexOut;
-  };
-
   struct KeyOutEntry {
     Crypto::Hash transactionHash;
     uint16_t indexOut;
@@ -84,7 +79,6 @@ private:
   std::vector<CryptoNote::Block> m_blockchain;
   std::unordered_map<Crypto::Hash, CryptoNote::Transaction> m_txs;
   std::unordered_map<Crypto::Hash, std::vector<uint32_t>> transactionGlobalOuts;
-  std::unordered_map<uint64_t, std::vector<MultisignatureOutEntry>> multisignatureOutsIndex;
   std::unordered_map<uint64_t, std::vector<KeyOutEntry>> keyOutsIndex;
 
   std::unordered_map<Crypto::Hash, CryptoNote::Transaction> m_txPool;
@@ -92,8 +86,8 @@ private:
 
   CryptoNote::PaymentIdIndex m_paymentIdIndex;
   CryptoNote::TimestampTransactionsIndex m_timestampIndex;
-  CryptoNote::GeneratedTransactionsIndex m_generatedTransactionsIndex;
-  CryptoNote::OrphanBlocksIndex m_orthanBlocksIndex;
+  std::map<uint32_t, uint64_t> m_generatedTransactionsByHeight;
+  std::map<uint32_t, std::vector<Crypto::Hash>> m_orphanBlockIdsByHeight;
 
   void addToBlockchain(const CryptoNote::Transaction& tx);
   void addToBlockchain(const std::vector<CryptoNote::Transaction>& txs);

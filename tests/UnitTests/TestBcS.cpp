@@ -143,13 +143,15 @@ public:
     m_blockchain.resize(height);
   }
 
-  virtual bool onNewBlocks(const CompleteBlock* blocks, uint32_t startHeight, uint32_t count) override {
+  virtual uint32_t onNewBlocks(const CompleteBlock* blocks, uint32_t startHeight, uint32_t count) override {
     //assert(m_blockchain.size() == startHeight);
-    while (count--) {
+    uint32_t processed = 0;
+    while (processed < count) {
       m_blockchain.push_back(blocks->blockHash);
       ++blocks;
+      ++processed;
     }
-    return true;
+    return processed;
   }
 
   const std::vector<Hash>& getBlockchain() const {
@@ -987,8 +989,8 @@ public:
 
   FunctorialBlockhainConsumerStub(const Hash& genesisBlockHash) : ConsumerStub(genesisBlockHash), onBlockchainDetachFunctor([](uint32_t) {}) {}
 
-  virtual bool onNewBlocks(const CompleteBlock* blocks, uint32_t startHeight, uint32_t count) override {
-    return onNewBlocksFunctor(blocks, startHeight, count);
+  virtual uint32_t onNewBlocks(const CompleteBlock* blocks, uint32_t startHeight, uint32_t count) override {
+    return onNewBlocksFunctor(blocks, startHeight, count) ? count : 0;
   }
 
   virtual void onBlockchainDetach(uint32_t height) override {

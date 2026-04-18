@@ -17,7 +17,7 @@
 
 #include "gtest/gtest.h"
 
-#include "CryptoNoteCore/Checkpoints.h"
+#include "Checkpoints/Checkpoints.h"
 #include <Logging/LoggerGroup.h>
 
 using namespace CryptoNote;

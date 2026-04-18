@@ -435,7 +435,9 @@ TEST_F(DetachTest, testDetachWithWallet) {
   Bob.addObserver(&BobCompleted);
 
   auto expectedTransactionBlockHeight = m_node.getLastLocalBlockHeight();
-  generator.generateEmptyBlocks(1); //unlock bob's pending money
+  for (size_t i = 0; i < 10; ++i) {
+    generator.getBlockRewardForAddress(AliceKeys.address); // keep blocks non-empty so wallet height advances
+  }
 
   m_node.updateObservers();
 
@@ -458,7 +460,9 @@ TEST_F(DetachTest, testDetachWithWallet) {
   ASSERT_EQ(Bob.actualBalance(), tr.amount);
 
   m_node.startAlternativeChain(txInfo.blockHeight - 1);
-  generator.generateEmptyBlocks(2);
+  for (size_t i = 0; i < 2; ++i) {
+    generator.getBlockRewardForAddress(AliceKeys.address);
+  }
 
   //sync Bob
   AliceCompleted.syncCompleted = std::promise<std::error_code>();

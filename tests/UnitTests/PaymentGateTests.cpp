@@ -49,14 +49,14 @@ public:
   std::unique_ptr<WalletService> createWalletService(const WalletConfiguration& cfg) {
     WalletGreen* walletGreen = new CryptoNote::WalletGreen(dispatcher, currency, nodeStub, logger);
     wallet.reset(walletGreen);
-    std::unique_ptr<WalletService> service(new WalletService(currency, dispatcher, nodeStub, *walletGreen, *walletGreen, cfg, logger));
+    std::unique_ptr<WalletService> service(new WalletService(currency, dispatcher, nodeStub, *walletGreen, cfg, logger));
     service->init();
     return service;
   }
 
   void generateWallet(const WalletConfiguration& conf) {
     unlink(conf.walletFile.c_str());
-    generateNewWallet(currency, conf, logger, dispatcher);
+    generateNewWallet(currency, conf, logger, dispatcher, nodeStub);
   }
 
 protected:  

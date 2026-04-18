@@ -106,6 +106,10 @@ public:
   virtual bool verifyMessage(const std::string &message, const std::string& address, const std::string &signature) override;
 
   virtual size_t transfer(const TransactionParameters& sendingTransaction, Crypto::SecretKey& txSecretKey) override;
+  size_t transfer(const TransactionParameters& sendingTransaction) {
+    Crypto::SecretKey txSecretKey;
+    return transfer(sendingTransaction, txSecretKey);
+  }
 
   virtual size_t makeTransaction(const TransactionParameters& sendingTransaction) override;
   virtual void commitTransaction(size_t) override;

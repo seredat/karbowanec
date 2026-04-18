@@ -57,9 +57,10 @@ int main(int argc, char *argv[]) {
             begin = end - currency.difficultyWindow();
         }
         uint64_t res = currency.nextDifficulty(
-			CryptoNote::BLOCK_MAJOR_VERSION_1,
+            static_cast<uint32_t>(n),
+            CryptoNote::BLOCK_MAJOR_VERSION_1,
             vector<uint64_t>(timestamps.begin() + begin, timestamps.begin() + end),
-            vector<uint64_t>(cumulative_difficulties.begin() + begin, cumulative_difficulties.begin() + end));
+            vector<CryptoNote::difficulty_type>(cumulative_difficulties.begin() + begin, cumulative_difficulties.begin() + end));
         if (res != difficulty) {
             cerr << "Wrong difficulty for block " << n << endl
                 << "Expected: " << difficulty << endl

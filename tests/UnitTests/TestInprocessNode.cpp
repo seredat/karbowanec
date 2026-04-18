@@ -26,7 +26,7 @@
 #include "ICryptoNoteProtocolQueryStub.h"
 #include "InProcessNode/InProcessNode.h"
 #include "TestBlockchainGenerator.h"
-#include "Logging/FileLogger.h"
+#include "Logging/ConsoleLogger.h"
 #include "CryptoNoteCore/TransactionApi.h"
 #include "CryptoNoteCore/CryptoNoteTools.h"
 #include "CryptoNoteCore/VerificationContext.h"
@@ -60,6 +60,7 @@ class InProcessNodeTests : public ::testing::Test {
 public:
   InProcessNodeTests() :
     node(coreStub, protocolQueryStub),
+    logger(Logging::ERROR),
     currency(CryptoNote::CurrencyBuilder(logger).currency()),
     generator(currency) {}
   void SetUp() override;
@@ -70,14 +71,13 @@ protected:
   ICoreStub coreStub;
   ICryptoNoteProtocolQueryStub protocolQueryStub;
   CryptoNote::InProcessNode node;
-
+  Logging::ConsoleLogger logger;
   CryptoNote::Currency currency;
   TestBlockchainGenerator generator;
-  Logging::FileLogger logger;
 };
 
 void InProcessNodeTests::SetUp() {
-  logger.init("/dev/null");
+  logger.setMaxLevel(Logging::ERROR);
   for (auto iter = generator.getBlockchain().begin(); iter != generator.getBlockchain().end(); iter++) {
     coreStub.addBlock(*iter);
   }

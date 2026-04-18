@@ -30,7 +30,7 @@
 
 #include "CryptoNoteCore/CryptoNoteTools.h"
 
-#include "Logging/FileLogger.h"
+#include "Logging/ConsoleLogger.h"
 
 #include "BlockchainExplorer/BlockchainExplorer.h"
 
@@ -99,6 +99,7 @@ private:
 class BlockchainExplorerTests : public ::testing::Test {
 public:
   BlockchainExplorerTests() :
+    logger(Logging::ERROR),
     currency(CurrencyBuilder(logger).currency()),
     generator(currency),
     nodeStub(generator),
@@ -108,16 +109,16 @@ public:
   void TearDown() override;
 
 protected:
+  Logging::ConsoleLogger logger;
   Currency currency;
   TestBlockchainGenerator generator;
   INodeTrivialRefreshStub nodeStub;
-  Logging::FileLogger logger;
   dummyObserver observer;
   BlockchainExplorer blockchainExplorer;
 };
 
 void BlockchainExplorerTests::SetUp() {
-  logger.init("/dev/null");
+  logger.setMaxLevel(Logging::ERROR);
   ASSERT_NO_THROW(blockchainExplorer.init());
 }
 
