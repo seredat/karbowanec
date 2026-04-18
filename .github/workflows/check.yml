@@ -25,9 +25,6 @@ jobs:
       - name: Add msbuild to PATH
         uses: microsoft/setup-msbuild@v1.1
 
-      - name: Install OpenSSL
-        run: choco install openssl --version=3.3.2 --allow-downgrade
-
       - name: Install curl
         run: |
           choco install curl -y
