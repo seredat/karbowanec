@@ -335,7 +335,7 @@ std::shared_ptr<WalletInfo> openWallet(CryptoNote::WalletGreen &wallet,
 
         try
         {
-			wallet.load(walletFileName, walletPass);
+            wallet.load(walletFileName, walletPass);
 
             const std::string walletAddress = wallet.getAddress(0);
 

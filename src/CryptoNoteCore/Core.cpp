@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
-// Copyright (c) 2016-2021, The Karbo developers
+// Copyright (c) 2016-2026, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -829,7 +829,7 @@ std::list<CryptoNote::tx_memory_pool::TransactionDetails> Core::getMemoryPool() 
   //std::list<CryptoNote::tx_memory_pool::TransactionDetails> txs;
   //m_mempool.getMemoryPool(txs);
   //return txs;
-	return m_mempool.getMemoryPool();
+  return m_mempool.getMemoryPool();
 }
 
 std::vector<Crypto::Hash> Core::buildSparseChain() {

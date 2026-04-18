@@ -121,10 +121,7 @@ public:
   void clearCaches() { return clearCaches(true, true); };
   size_t getTxSize(const TransactionParameters &sendingTransaction);
   void clearCacheAndShutdown();
-  void createViewWallet(const std::string &password,
-	const std::string address,
-	const Crypto::SecretKey &viewSecretKey,
-	const std::string& path);
+  void createViewWallet(const std::string &password, const std::string address, const Crypto::SecretKey &viewSecretKey, const std::string& path);
 
   uint64_t getBalanceMinusDust(const std::vector<std::string>& addresses);
 
@@ -154,7 +151,6 @@ protected:
   std::string doCreateAddress(const Crypto::PublicKey& spendPublicKey, const Crypto::SecretKey& spendSecretKey, uint64_t creationTimestamp);
   std::vector<std::string> doCreateAddressList(const std::vector<NewAddressData>& addressDataList);
 
-  CryptoNote::BlockDetails getBlock(const uint32_t blockHeight);
   Crypto::SecretKey getTransactionDeterministicSecretKey(Crypto::Hash& transactionHash) const;
 
   uint64_t getBlockTimestamp(const uint32_t blockHeight);

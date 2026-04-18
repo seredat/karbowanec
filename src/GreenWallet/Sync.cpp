@@ -92,10 +92,10 @@ void syncWallet(CryptoNote::INode &node,
 
         transactionCount = 0;
 
-		// WalletGreen will handle it
-		transactionCount = walletInfo->wallet.getTransactionCount();
-		walletInfo->knownTransactionCount = transactionCount;
-		walletHeight = walletInfo->wallet.getTransaction(transactionCount - 1).blockHeight;
+        // WalletGreen will handle it
+        transactionCount = walletInfo->wallet.getTransactionCount();
+        walletInfo->knownTransactionCount = transactionCount;
+        walletHeight = walletInfo->wallet.getTransaction(transactionCount - 1).blockHeight;
         //walletInfo->wallet.clearCaches();
     }
 
@@ -169,7 +169,7 @@ void syncWallet(CryptoNote::INode &node,
                    to sometimes force the sync to resume properly.
                    So we'll try this before warning the user.
                 */
-				walletInfo->wallet.save();
+                walletInfo->wallet.save();
                 waitSeconds = 5;
             }
         }
@@ -220,7 +220,7 @@ void syncWallet(CryptoNote::INode &node,
 
     /* In case the user force closes, we don't want them to have to rescan
        the whole chain. */
-	walletInfo->wallet.save();
+    walletInfo->wallet.save();
 
     walletInfo->knownTransactionCount = transactionCount;
 }

@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
-// Copyright (c) 2017-2018, Karbo developers
+// Copyright (c) 2017-2026, Karbo developers
 // 
 // All rights reserved.
 // 
@@ -37,13 +37,13 @@ namespace Logging {
 class LoggerRef
 {
 public:
-	LoggerRef(ILogger& logger, const std::string& category);
-	LoggerMessage operator()(Level level = INFO, const std::string& color = DEFAULT) const;
-	ILogger& getLogger() const;
+  LoggerRef(ILogger& logger, const std::string& category);
+  LoggerMessage operator()(Level level = INFO, const std::string& color = DEFAULT) const;
+  ILogger& getLogger() const;
 
 private:
-	ILogger* m_logger;
-	std::string m_sCategory;
+  ILogger* m_logger;
+  std::string m_sCategory;
 };
 
 } //Logging

@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2018, The CryptoNote developers, The Bytecoin developers
-// Copyright (c) 2016-2020, The Karbo developers
+// Copyright (c) 2016-2026, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -25,12 +25,12 @@
 
 #define CRYPTO_MAKE_COMPARABLE(type, cmp)                                                                 \
 namespace Crypto { \
-	inline bool operator==(const type &_v1, const type &_v2) { return cmp(&_v1, &_v2, sizeof(type)) == 0; } \
-	inline bool operator!=(const type &_v1, const type &_v2) { return cmp(&_v1, &_v2, sizeof(type)) != 0; } \
-	inline bool operator<(const type &_v1, const type &_v2) { return cmp(&_v1, &_v2, sizeof(type)) < 0; }   \
-	inline bool operator<=(const type &_v1, const type &_v2) { return cmp(&_v1, &_v2, sizeof(type)) <= 0; } \
-	inline bool operator>(const type &_v1, const type &_v2) { return cmp(&_v1, &_v2, sizeof(type)) > 0; }   \
-	inline bool operator>=(const type &_v1, const type &_v2) { return cmp(&_v1, &_v2, sizeof(type)) >= 0; } \
+  inline bool operator==(const type &_v1, const type &_v2) { return cmp(&_v1, &_v2, sizeof(type)) == 0; } \
+  inline bool operator!=(const type &_v1, const type &_v2) { return cmp(&_v1, &_v2, sizeof(type)) != 0; } \
+  inline bool operator<(const type &_v1, const type &_v2) { return cmp(&_v1, &_v2, sizeof(type)) < 0; }   \
+  inline bool operator<=(const type &_v1, const type &_v2) { return cmp(&_v1, &_v2, sizeof(type)) <= 0; } \
+  inline bool operator>(const type &_v1, const type &_v2) { return cmp(&_v1, &_v2, sizeof(type)) > 0; }   \
+  inline bool operator>=(const type &_v1, const type &_v2) { return cmp(&_v1, &_v2, sizeof(type)) >= 0; } \
 }
 
 #define CRYPTO_MAKE_HASHABLE(type)                                                                        \

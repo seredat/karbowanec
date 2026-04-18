@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2016, The Forknote developers
-// Copyright (c) 2017-2022, The Karbo developers
+// Copyright (c) 2017-2026, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -582,7 +582,7 @@ struct COMMAND_RPC_GETBLOCKTEMPLATE {
     uint32_t height;
     uint64_t reserved_offset;
     std::string blocktemplate_blob;
-	std::string blockhashing_blob;
+  std::string blockhashing_blob;
     std::string status;
 
     void serialize(ISerializer &s) {
@@ -590,7 +590,7 @@ struct COMMAND_RPC_GETBLOCKTEMPLATE {
       KV_MEMBER(height)
       KV_MEMBER(reserved_offset)
       KV_MEMBER(blocktemplate_blob)
-	  KV_MEMBER(blockhashing_blob)
+    KV_MEMBER(blockhashing_blob)
       KV_MEMBER(status)
     }
   };
@@ -918,31 +918,31 @@ struct COMMAND_RPC_CHECK_TRANSACTION_KEY {
 
 //-----------------------------------------------
 struct COMMAND_RPC_CHECK_TRANSACTION_WITH_PRIVATE_VIEW_KEY {
-	struct request {
-		std::string transaction_id;
-		std::string view_key;
-		std::string address;
+  struct request {
+    std::string transaction_id;
+    std::string view_key;
+    std::string address;
 
-		void serialize(ISerializer &s) {
-			KV_MEMBER(transaction_id)
-			KV_MEMBER(view_key)
-			KV_MEMBER(address)
-		}
-	};
+    void serialize(ISerializer &s) {
+      KV_MEMBER(transaction_id)
+      KV_MEMBER(view_key)
+      KV_MEMBER(address)
+    }
+  };
 
-	struct response {
-		uint64_t amount;
-		std::vector<TransactionOutput> outputs;
-		uint32_t confirmations = 0;
-		std::string status;
+  struct response {
+    uint64_t amount;
+    std::vector<TransactionOutput> outputs;
+    uint32_t confirmations = 0;
+    std::string status;
 
-		void serialize(ISerializer &s) {
-			KV_MEMBER(amount)
-			KV_MEMBER(outputs)
-			KV_MEMBER(confirmations)
-			KV_MEMBER(status)
-		}
-	};
+    void serialize(ISerializer &s) {
+      KV_MEMBER(amount)
+      KV_MEMBER(outputs)
+      KV_MEMBER(confirmations)
+      KV_MEMBER(status)
+    }
+  };
 };
 
 struct COMMAND_RPC_VALIDATE_ADDRESS {
@@ -1276,13 +1276,13 @@ struct reserve_proof_entry
 };
 
 struct reserve_proof {
-	std::vector<reserve_proof_entry> proofs;
-	Crypto::Signature signature;
+  std::vector<reserve_proof_entry> proofs;
+  Crypto::Signature signature;
 
-	void serialize(ISerializer &s) {
-		KV_MEMBER(proofs)
-		KV_MEMBER(signature)
-	}
+  void serialize(ISerializer &s) {
+    KV_MEMBER(proofs)
+    KV_MEMBER(signature)
+  }
 };
 
 struct COMMAND_RPC_CHECK_TRANSACTION_PROOF {

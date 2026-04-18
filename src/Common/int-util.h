@@ -137,17 +137,17 @@ static inline uint64_t ident64(uint64_t x) { return x; }
 #      define swap32 __swap32
 #  elif !defined(swap32)
 static inline uint32_t swap32(uint32_t x) {
-	x = ((x & 0x00ff00ff) << 8) | ((x & 0xff00ff00) >> 8);
-	return (x << 16) | (x >> 16);
+  x = ((x & 0x00ff00ff) << 8) | ((x & 0xff00ff00) >> 8);
+  return (x << 16) | (x >> 16);
 }
 #  endif
 #  if defined(__ANDROID__) && defined(__swap64) && !defined(swap64)
 #      define swap64 __swap64
 #  elif !defined(swap64)
 static inline uint64_t swap64(uint64_t x) {
-	x = ((x & 0x00ff00ff00ff00ff) << 8) | ((x & 0xff00ff00ff00ff00) >> 8);
-	x = ((x & 0x0000ffff0000ffff) << 16) | ((x & 0xffff0000ffff0000) >> 16);
-	return (x << 32) | (x >> 32);
+  x = ((x & 0x00ff00ff00ff00ff) << 8) | ((x & 0xff00ff00ff00ff00) >> 8);
+  x = ((x & 0x0000ffff0000ffff) << 16) | ((x & 0xffff0000ffff0000) >> 16);
+  return (x << 32) | (x >> 32);
 }
 #  endif
 #endif /* __OpenBSD__ */

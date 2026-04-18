@@ -106,7 +106,7 @@ bool handleCommand(const std::string command,
     }
     else if (command == "save")
     {
-		save(walletInfo->wallet);
+        save(walletInfo->wallet);
     }
     else if (command == "save_csv")
     {

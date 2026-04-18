@@ -1,4 +1,5 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2016-2026, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -44,7 +45,7 @@ BlockchainMessage::BlockchainMessage(NewBlockMessage&& message) : type(MessageTy
 BlockchainMessage::BlockchainMessage(NewAlternativeBlockMessage&& message) : type(MessageType::NEW_ALTERNATIVE_BLOCK_MESSAGE), newAlternativeBlockMessage(std::move(message)) {}
 
 BlockchainMessage::BlockchainMessage(ChainSwitchMessage&& message) : type(MessageType::CHAIN_SWITCH_MESSAGE) {
-	chainSwitchMessage = new ChainSwitchMessage(std::move(message));
+  chainSwitchMessage = new ChainSwitchMessage(std::move(message));
 }
 
 BlockchainMessage::BlockchainMessage(const BlockchainMessage& other) : type(other.type) {
@@ -56,7 +57,7 @@ BlockchainMessage::BlockchainMessage(const BlockchainMessage& other) : type(othe
       new (&newAlternativeBlockMessage) NewAlternativeBlockMessage(other.newAlternativeBlockMessage);
       break;
     case MessageType::CHAIN_SWITCH_MESSAGE:
-	  chainSwitchMessage = new ChainSwitchMessage(*other.chainSwitchMessage);
+      chainSwitchMessage = new ChainSwitchMessage(*other.chainSwitchMessage);
       break;
   }
 }
@@ -70,7 +71,7 @@ BlockchainMessage::~BlockchainMessage() {
       newAlternativeBlockMessage.~NewAlternativeBlockMessage();
       break;
     case MessageType::CHAIN_SWITCH_MESSAGE:
-	  delete chainSwitchMessage;
+      delete chainSwitchMessage;
       break;
   }
 }

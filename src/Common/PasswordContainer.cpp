@@ -1,7 +1,7 @@
 // Copyright (c) 2012-2017, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2014-2018, The Monero Project
 // Copyright (c) 2018, The TurtleCoin Developers
-// Copyright (c) 2018-2019, The Karbo Developers
+// Copyright (c) 2018-2026, The Karbo Developers
 //
 // This file is part of Karbo.
 //
@@ -85,17 +85,17 @@ namespace Tools
   }
 
   bool PasswordContainer::read_and_validate() {
-	  std::string tmpPassword = m_password;
+    std::string tmpPassword = m_password;
 
-	  if (!read_password())
-	  {
-		  std::cout << "Failed to read password!";
-		  return false;
-	  }
-	  bool validPass = m_password == tmpPassword;
-	  m_password = tmpPassword;
+    if (!read_password())
+    {
+      std::cout << "Failed to read password!";
+      return false;
+    }
+    bool validPass = m_password == tmpPassword;
+    m_password = tmpPassword;
 
-	  return validPass;
+    return validPass;
   }
 
   bool PasswordContainer::read_password(bool verify)
@@ -121,7 +121,7 @@ namespace Tools
             {
               m_password = std::move(password2);
               m_empty = false;
-	          return true;
+              return true;
             }
             else
             {
@@ -194,17 +194,17 @@ namespace Tools
             if (password1 == password2) {
               m_password = std::move(password2);
               m_empty = false;
-	            return true;
+              return true;
             } else {
               std::cout << WarningMsg("Passwords do not match, try again.")
                         << std::endl;
               clear();
-	            return read_password(true, msg);
+              return read_password(true, msg);
             }
           }
-	      }
+        }
       } else {
-	      r = read_from_tty(m_password);
+        r = read_from_tty(m_password);
       }
     } else {
       r = read_from_file();

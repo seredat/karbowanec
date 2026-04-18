@@ -1,7 +1,7 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2014 - 2017 XDN - project developers
 // Copyright (c) 2018, The TurtleCoin Developers
-// Copyright (c) 2018-2019 The Karbo developers
+// Copyright (c) 2018-2026 The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -184,17 +184,17 @@ void Configuration::init(const po::variables_map& options) {
   }
 
   if (options.count("view-key") != 0) {
-	if (!generateNewContainer) {
-	  throw ConfigurationError("generate-container parameter is required");
-	}
-	secretViewKey = options["view-key"].as<std::string>();
+    if (!generateNewContainer) {
+      throw ConfigurationError("generate-container parameter is required");
+    }
+    secretViewKey = options["view-key"].as<std::string>();
   }
 
   if (options.count("spend-key") != 0) {
-	if (!generateNewContainer) {
-	  throw ConfigurationError("generate-container parameter is required");
-	}
-	secretSpendKey = options["spend-key"].as<std::string>();
+    if (!generateNewContainer) {
+      throw ConfigurationError("generate-container parameter is required");
+    }
+    secretSpendKey = options["spend-key"].as<std::string>();
   }
 
   if (options.count("mnemonic-seed") != 0) {
@@ -215,12 +215,11 @@ void Configuration::init(const po::variables_map& options) {
     if (containerFile.empty() && containerPassword.empty()) {
       throw ConfigurationError("Both container-file and container-password parameters are required");
     }
-	if (containerPassword.empty()) {
-		if (pwd_container.read_password()) {
-			containerPassword = pwd_container.password();
-		}
-	}
-
+    if (containerPassword.empty()) {
+      if (pwd_container.read_password()) {
+        containerPassword = pwd_container.password();
+      }
+    }
   }
 }
 

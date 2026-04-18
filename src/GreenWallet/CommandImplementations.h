@@ -22,13 +22,13 @@ void reset(CryptoNote::INode &node, std::shared_ptr<WalletInfo> walletInfo);
 void status(CryptoNote::INode &node, CryptoNote::WalletGreen &wallet);
 
 void printHeights(uint32_t localHeight, uint32_t remoteHeight,
-	uint32_t walletHeight);
+    uint32_t walletHeight);
 
 void printSyncStatus(uint32_t localHeight, uint32_t remoteHeight,
-	uint32_t walletHeight);
+    uint32_t walletHeight);
 
 void printSyncSummary(uint32_t localHeight, uint32_t remoteHeight,
-	uint32_t walletHeight);
+    uint32_t walletHeight);
 
 void printPeerCount(size_t peerCount);
 

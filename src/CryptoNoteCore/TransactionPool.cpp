@@ -1,5 +1,6 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2016, The Forknote developers
+// Copyright (c) 2016-2026, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -268,19 +269,19 @@ namespace CryptoNote {
 
   //---------------------------------------------------------------------------------
   void tx_memory_pool::getMemoryPool(std::list<tx_memory_pool::TransactionDetails> txs) const {
-	  std::lock_guard<std::recursive_mutex> lock(m_transactions_lock);
-	  for (const auto& txd : m_fee_index) {
-		  txs.push_back(txd);
-	  }
+    std::lock_guard<std::recursive_mutex> lock(m_transactions_lock);
+    for (const auto& txd : m_fee_index) {
+      txs.push_back(txd);
+    }
   }
 
   std::list<CryptoNote::tx_memory_pool::TransactionDetails> tx_memory_pool::getMemoryPool() const {
-	  std::lock_guard<std::recursive_mutex> lock(m_transactions_lock);
-	  std::list<tx_memory_pool::TransactionDetails> txs;
-	  for (const auto& txd : m_fee_index) {
-		  txs.push_back(txd);
-	  }
-	  return txs;
+    std::lock_guard<std::recursive_mutex> lock(m_transactions_lock);
+    std::list<tx_memory_pool::TransactionDetails> txs;
+    for (const auto& txd : m_fee_index) {
+      txs.push_back(txd);
+    }
+    return txs;
   }
 
   //---------------------------------------------------------------------------------
@@ -289,15 +290,15 @@ namespace CryptoNote {
     std::unordered_set<Crypto::Hash> ready_tx_ids;
     for (const auto& tx : m_transactions) {
       TransactionCheckInfo checkInfo(tx);
-	  if (m_validated_transactions.find(tx.id) != m_validated_transactions.end()) {
-		  ready_tx_ids.insert(tx.id);
-		  logger(TRACE) << "MemPool - tx " << tx.id << " loaded from cache";
-	  }
-	  else if (is_transaction_ready_to_go(tx.tx, checkInfo)) {
-		  ready_tx_ids.insert(tx.id);
-		  m_validated_transactions.insert(tx.id);
-		  logger(TRACE) << "MemPool - tx " << tx.id << " added to cache";
-	  }
+      if (m_validated_transactions.find(tx.id) != m_validated_transactions.end()) {
+        ready_tx_ids.insert(tx.id);
+        logger(TRACE) << "MemPool - tx " << tx.id << " loaded from cache";
+      }
+      else if (is_transaction_ready_to_go(tx.tx, checkInfo)) {
+        ready_tx_ids.insert(tx.id);
+        m_validated_transactions.insert(tx.id);
+        logger(TRACE) << "MemPool - tx " << tx.id << " added to cache";
+      }
     }
 
     std::unordered_set<Crypto::Hash> known_set(known_tx_ids.begin(), known_tx_ids.end());
@@ -321,7 +322,7 @@ namespace CryptoNote {
     if (!m_validated_transactions.empty()) {
       logger(DEBUGGING) << "MemPool - Block height incremented, cleared " << m_validated_transactions.size() << " cached transaction hashes. New height: " << new_block_height << " Top block: " << top_block_id;
       m_validated_transactions.clear();
-	}
+    }
     return true;
   }
   //---------------------------------------------------------------------------------
@@ -330,7 +331,7 @@ namespace CryptoNote {
     if (!m_validated_transactions.empty()) {
       logger(DEBUGGING, YELLOW) << "MemPool - Block height decremented " << m_validated_transactions.size() << " cached transaction hashes. New height: " << new_block_height << " Top block: " << top_block_id;
       m_validated_transactions.clear();
-	}
+    }
     return true;
   }
   //---------------------------------------------------------------------------------
@@ -671,8 +672,8 @@ namespace CryptoNote {
   bool tx_memory_pool::getTransactionIdsByPaymentId(const Crypto::Hash& paymentId, std::vector<Crypto::Hash>& transactionIds) {
     std::lock_guard<std::recursive_mutex> lock(m_transactions_lock);
     //return m_paymentIdIndex.find(paymentId, transactionIds);
-	transactionIds = m_paymentIdIndex.find(paymentId);
-	return true;
+    transactionIds = m_paymentIdIndex.find(paymentId);
+    return true;
   }
 
   bool tx_memory_pool::getTransactionIdsByTimestamp(uint64_t timestampBegin, uint64_t timestampEnd, uint32_t transactionsNumberLimit, std::vector<Crypto::Hash>& hashes, uint64_t& transactionsNumberWithinTimestamps) {

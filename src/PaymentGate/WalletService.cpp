@@ -2,7 +2,7 @@
 // Copyright (c) 2018, The TurtleCoin Developers
 // Copyright (c) 2018-2019 The Cash2 developers
 // Copyright (c) 2021-2023, The Talleo developers
-// Copyright (c) 2016-2024, The Karbo developers
+// Copyright (c) 2016-2026, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -1034,13 +1034,13 @@ std::error_code WalletService::getTransactions(const std::vector<std::string>& a
 
     Crypto::Hash blockHash = parseHash(blockHashString, logger);
 
-	std::vector<TransactionsInBlockRpcInfo> txs = getRpcTransactions(blockHash, blockCount, transactionFilter);
-	for (TransactionsInBlockRpcInfo& b : txs){
-		for (TransactionRpcInfo& t : b.transactions) {
-			t.confirmations = (t.blockIndex != UNCONFIRMED_TRANSACTION_GLOBAL_OUTPUT_INDEX ? wallet.getBlockCount() - t.blockIndex : 0);
-		}
-	}
-	transactions = txs;
+    std::vector<TransactionsInBlockRpcInfo> txs = getRpcTransactions(blockHash, blockCount, transactionFilter);
+    for (TransactionsInBlockRpcInfo& b : txs){
+      for (TransactionRpcInfo& t : b.transactions) {
+        t.confirmations = (t.blockIndex != UNCONFIRMED_TRANSACTION_GLOBAL_OUTPUT_INDEX ? wallet.getBlockCount() - t.blockIndex : 0);
+      }
+    }
+    transactions = txs;
   } catch (std::system_error& x) {
     logger(Logging::WARNING, Logging::BRIGHT_YELLOW) << "Error while getting transactions: " << x.what();
     return x.code();
@@ -1064,13 +1064,13 @@ std::error_code WalletService::getTransactions(const std::vector<std::string>& a
 
     TransactionsInBlockInfoFilter transactionFilter(addresses, paymentId);
 
-	std::vector<TransactionsInBlockRpcInfo> txs = getRpcTransactions(firstBlockIndex, blockCount, transactionFilter);
-	for (TransactionsInBlockRpcInfo& b : txs){
-		for (TransactionRpcInfo& t : b.transactions) {
-			t.confirmations = (t.blockIndex != UNCONFIRMED_TRANSACTION_GLOBAL_OUTPUT_INDEX ? wallet.getBlockCount() - t.blockIndex : 0);
-		}
-	}
-	transactions = txs;
+    std::vector<TransactionsInBlockRpcInfo> txs = getRpcTransactions(firstBlockIndex, blockCount, transactionFilter);
+    for (TransactionsInBlockRpcInfo& b : txs){
+      for (TransactionRpcInfo& t : b.transactions) {
+        t.confirmations = (t.blockIndex != UNCONFIRMED_TRANSACTION_GLOBAL_OUTPUT_INDEX ? wallet.getBlockCount() - t.blockIndex : 0);
+      }
+    }
+    transactions = txs;
   } catch (std::system_error& x) {
     logger(Logging::WARNING, Logging::BRIGHT_YELLOW) << "Error while getting transactions: " << x.what();
     return x.code();
@@ -1094,9 +1094,9 @@ std::error_code WalletService::getTransaction(const std::string& transactionHash
       return make_error_code(CryptoNote::error::OBJECT_NOT_FOUND);
     }
 
-	TransactionRpcInfo tempTrans = convertTransactionWithTransfersToTransactionRpcInfo(transactionWithTransfers);
-	tempTrans.confirmations = (transactionWithTransfers.transaction.blockHeight != UNCONFIRMED_TRANSACTION_GLOBAL_OUTPUT_INDEX ? wallet.getBlockCount() - transactionWithTransfers.transaction.blockHeight : 0);
-	transaction = tempTrans;
+    TransactionRpcInfo tempTrans = convertTransactionWithTransfersToTransactionRpcInfo(transactionWithTransfers);
+    tempTrans.confirmations = (transactionWithTransfers.transaction.blockHeight != UNCONFIRMED_TRANSACTION_GLOBAL_OUTPUT_INDEX ? wallet.getBlockCount() - transactionWithTransfers.transaction.blockHeight : 0);
+    transaction = tempTrans;
 
   } catch (std::system_error& x) {
     logger(Logging::WARNING, Logging::BRIGHT_YELLOW) << "Error while getting transaction: " << x.what();
@@ -1116,7 +1116,7 @@ std::error_code WalletService::getTransactionSecretKey(const std::string& transa
 
     Crypto::SecretKey txSecretKey = wallet.getTransactionSecretKey(hash);
 
-	if (txSecretKey == CryptoNote::NULL_SECRET_KEY) {
+    if (txSecretKey == CryptoNote::NULL_SECRET_KEY) {
       logger(Logging::WARNING, Logging::BRIGHT_YELLOW) << "Transaction " << transactionHash << " secret key is not available";
       return make_error_code(CryptoNote::error::OBJECT_NOT_FOUND);
     }
@@ -1149,9 +1149,9 @@ std::error_code WalletService::getTransactionProof(const std::string& transactio
         logger(Logging::WARNING, Logging::BRIGHT_YELLOW) << "Failed to parse tx secret key: " << transactionSecretKey;
         return make_error_code(CryptoNote::error::WRONG_TX_SECRET_KEY);
       }
-	  txSecretKeyFromReq = *(struct Crypto::SecretKey *) &tx_key_hash;
+      txSecretKeyFromReq = *(struct Crypto::SecretKey *) &tx_key_hash;
 
-	  if (txSecretKey != CryptoNote::NULL_SECRET_KEY && txSecretKey != txSecretKeyFromReq) {
+      if (txSecretKey != CryptoNote::NULL_SECRET_KEY && txSecretKey != txSecretKeyFromReq) {
         logger(Logging::WARNING, Logging::BRIGHT_YELLOW) << "Transaction secret keys do not match";
         return make_error_code(CryptoNote::error::WRONG_TX_SECRET_KEY);
       }
@@ -1464,8 +1464,8 @@ std::error_code WalletService::getStatus(uint32_t& blockCount, uint32_t& knownBl
     knownBlockCount = node.getKnownBlockCount();
     peerCount = static_cast<uint32_t>(node.getPeerCount());
     blockCount = wallet.getBlockCount();
-	localDaemonBlockCount = node.getLocalBlockCount();
-	minimalFee = node.getMinimalFee();
+    localDaemonBlockCount = node.getLocalBlockCount();
+    minimalFee = node.getMinimalFee();
 
     auto lastHashes = wallet.getBlockHashes(blockCount - 1, 1);
     lastBlockHash = Common::podToHex(lastHashes.back());

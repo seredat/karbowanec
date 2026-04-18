@@ -1,4 +1,5 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
+// Copyright (c) 2016-2026, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -84,15 +85,15 @@ bool PaymentIdIndex::find(const Crypto::Hash& paymentId, std::vector<Crypto::Has
 }
 
 std::vector<Crypto::Hash> PaymentIdIndex::find(const Crypto::Hash& paymentId) {
-	if (!enabled) {
-		throw std::runtime_error("Payment id index disabled.");
-	}
-	std::vector<Crypto::Hash> transactionHashes;
-	auto range = index.equal_range(paymentId);
-	for (auto iter = range.first; iter != range.second; ++iter) {
-		transactionHashes.emplace_back(iter->second);
-	}
-	return transactionHashes;
+  if (!enabled) {
+    throw std::runtime_error("Payment id index disabled.");
+  }
+  std::vector<Crypto::Hash> transactionHashes;
+  auto range = index.equal_range(paymentId);
+  for (auto iter = range.first; iter != range.second; ++iter) {
+    transactionHashes.emplace_back(iter->second);
+  }
+  return transactionHashes;
 }
 
 void PaymentIdIndex::clear() {

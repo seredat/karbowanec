@@ -1,7 +1,7 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2018, The TurtleCoin Developers
 // Copyright (c) 2018-2019 The Cash2 developers
-// Copyright (c) 2018-2019 The Karbo developers
+// Copyright (c) 2018-2026 The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -115,20 +115,20 @@ struct GetStatus {
 };
 
 struct ValidateAddress {
-	struct Request {
-		std::string address;
-		
-		void serialize(CryptoNote::ISerializer& serializer);
-	};
+  struct Request {
+    std::string address;
+    
+    void serialize(CryptoNote::ISerializer& serializer);
+  };
 
-	struct Response {
-		bool isValid;
-		std::string address;
-		std::string spendPublicKey;
-		std::string viewPublicKey;
+  struct Response {
+    bool isValid;
+    std::string address;
+    std::string spendPublicKey;
+    std::string viewPublicKey;
 
-		void serialize(CryptoNote::ISerializer& serializer);
-	};
+    void serialize(CryptoNote::ISerializer& serializer);
+  };
 };
 
 struct GetAddresses {
@@ -463,7 +463,7 @@ struct SendTransaction {
 
   struct Response {
     std::string transactionHash;
-	std::string transactionSecretKey;
+    std::string transactionSecretKey;
 
     void serialize(CryptoNote::ISerializer& serializer);
   };

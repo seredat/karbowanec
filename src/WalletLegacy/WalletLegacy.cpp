@@ -362,7 +362,7 @@ void WalletLegacy::doLoad(std::istream& source) {
       // ignore cache loading errors
     }
 
-	// Read all output keys cache
+    // Read all output keys cache
     std::vector<TransactionOutputInformation> allTransfers;
     m_transferDetails->getOutputs(allTransfers, ITransfersContainer::IncludeAll);
     m_logger(Logging::INFO) << "Loaded " + std::to_string(allTransfers.size()) + " known transfer(s)";
@@ -524,15 +524,15 @@ std::error_code WalletLegacy::changePassword(const std::string& oldPassword, con
 
 bool WalletLegacy::getSeed(std::string& electrum_words)
 {
-	std::string lang = "English";
-	Crypto::ElectrumWords::bytes_to_words(m_account.getAccountKeys().spendSecretKey, electrum_words, lang);
+  std::string lang = "English";
+  Crypto::ElectrumWords::bytes_to_words(m_account.getAccountKeys().spendSecretKey, electrum_words, lang);
 
-	Crypto::SecretKey second;
-	keccak((uint8_t *)&m_account.getAccountKeys().spendSecretKey, sizeof(Crypto::SecretKey), (uint8_t *)&second, sizeof(Crypto::SecretKey));
+  Crypto::SecretKey second;
+  keccak((uint8_t *)&m_account.getAccountKeys().spendSecretKey, sizeof(Crypto::SecretKey), (uint8_t *)&second, sizeof(Crypto::SecretKey));
 
-	sc_reduce32((uint8_t *)&second);
+  sc_reduce32((uint8_t *)&second);
 
-	return memcmp(second.data, m_account.getAccountKeys().viewSecretKey.data, sizeof(Crypto::SecretKey)) == 0;
+  return memcmp(second.data, m_account.getAccountKeys().viewSecretKey.data, sizeof(Crypto::SecretKey)) == 0;
 }
 
 std::string WalletLegacy::getAddress() {

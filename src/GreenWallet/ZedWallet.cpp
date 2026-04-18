@@ -28,13 +28,13 @@
 
 int main(int argc, char **argv)
 {
-	/* Fix wallet not responding when enter cyrillic (non-latin) characters
-	   by setting operating system default locale.
-	   Set cyrillic locale on Windows explicitly - this is Karbovanets after all. */
-	setlocale(LC_CTYPE, "");
+    /* Fix wallet not responding when enter cyrillic (non-latin) characters
+       by setting operating system default locale.
+       Set cyrillic locale on Windows explicitly - this is Karbovanets after all. */
+    setlocale(LC_CTYPE, "");
 #ifdef WIN32
-	SetConsoleCP(1251);
-	SetConsoleOutputCP(1251);
+    SetConsoleCP(1251);
+    SetConsoleOutputCP(1251);
 #endif
     /* On ctrl+c the program seems to throw "zedwallet.exe has stopped
        working" when calling exit(0)... I'm not sure why, this is a bit of
@@ -58,16 +58,16 @@ int main(int argc, char **argv)
     const CryptoNote::Currency currency
         = CryptoNote::CurrencyBuilder(logManager).currency();
 
-	System::Dispatcher dispatcher;
+    System::Dispatcher dispatcher;
 
     /* Our connection to daemon */
-	CryptoNote::INode* node = new CryptoNote::NodeRpcProxy(config.host, config.port, config.path, config.ssl);
+    CryptoNote::INode* node = new CryptoNote::NodeRpcProxy(config.host, config.port, config.path, config.ssl);
 
     // Set ssl options
     if (!config.daemonCert.empty()) node->setRootCert(config.daemonCert);
     if (config.disableVerify) node->disableVerify();
 
-	std::unique_ptr<CryptoNote::INode> nodeGuard(node);
+    std::unique_ptr<CryptoNote::INode> nodeGuard(node);
 
     std::promise<std::error_code> errorPromise;
 
@@ -104,67 +104,67 @@ int main(int argc, char **argv)
         }
     }
 
-	/*
-	  This will check to see if the node responded to /feeaddress and actually
-	  returned something that it expects us to use for convenience charges
-	  for using that node to send transactions.
-	*/
-	if (!node->feeAddress().empty()) {
+    /*
+      This will check to see if the node responded to /feeaddress and actually
+      returned something that it expects us to use for convenience charges
+      for using that node to send transactions.
+    */
+    if (!node->feeAddress().empty()) {
 
     uint64_t nodeFee = node->feeAmount();
 
     std::stringstream feemsg;
 
-		feemsg << std::endl << "You have connected to a node that charges " <<
-			"a fee to send transactions." << std::endl << std::endl
-			<< "The fee for sending transactions is " <<
+        feemsg << std::endl << "You have connected to a node that charges " <<
+            "a fee to send transactions." << std::endl << std::endl
+            << "The fee for sending transactions is " <<
       (nodeFee == 0 ? "0.25% of transaction amount, but no more than " +
         formatAmount(CryptoNote::parameters::COIN) : formatAmount(nodeFee)) <<
-			std::endl << std::endl <<
-			"If you don't want to pay the node fee, please " <<
-			"relaunch " << WalletConfig::walletName <<
-			" and run your own node." <<
-			std::endl;
+            std::endl << std::endl <<
+            "If you don't want to pay the node fee, please " <<
+            "relaunch " << WalletConfig::walletName <<
+            " and run your own node." <<
+            std::endl;
 
-		std::cout << WarningMsg(feemsg.str()) << std::endl;
-	}
+        std::cout << WarningMsg(feemsg.str()) << std::endl;
+    }
 
     /* Create the wallet instance */
-	CryptoNote::WalletGreen* wallet = new CryptoNote::WalletGreen(dispatcher, currency, *node, logManager);
-	std::unique_ptr<CryptoNote::WalletGreen> walletGuard(wallet);
+    CryptoNote::WalletGreen* wallet = new CryptoNote::WalletGreen(dispatcher, currency, *node, logManager);
+    std::unique_ptr<CryptoNote::WalletGreen> walletGuard(wallet);
 
     /* Run the interactive wallet interface */
     run(*wallet, *node, config);
 }
 
 void run(CryptoNote::WalletGreen &wallet, CryptoNote::INode &node,
-	Config &config)
+    Config &config)
 {
-	std::cout << InformationMsg(getVersion()) << std::endl;
+    std::cout << InformationMsg(getVersion()) << std::endl;
 
-	std::shared_ptr<WalletInfo> walletInfo;
+    std::shared_ptr<WalletInfo> walletInfo;
 
-	bool quit;
+    bool quit;
 
-	std::tie(quit, walletInfo) = selectionScreen(config, wallet, node);
+    std::tie(quit, walletInfo) = selectionScreen(config, wallet, node);
 
-	bool alreadyShuttingDown = false;
+    bool alreadyShuttingDown = false;
 
-	if (!quit)
-	{
-		/* Call shutdown on ctrl+c */
-		Tools::SignalHandler::install([&]
-		{
-			/* If we're already shutting down let control flow continue
-			   as normal */
-			if (shutdown(walletInfo, node, alreadyShuttingDown))
-			{
-				exit(0);
-			}
-		});
+    if (!quit)
+    {
+        /* Call shutdown on ctrl+c */
+        Tools::SignalHandler::install([&]
+        {
+            /* If we're already shutting down let control flow continue
+               as normal */
+            if (shutdown(walletInfo, node, alreadyShuttingDown))
+            {
+                exit(0);
+            }
+        });
 
-		mainLoop(walletInfo, node);
-	}
+        mainLoop(walletInfo, node);
+    }
 
-	shutdown(walletInfo, node, alreadyShuttingDown);
+    shutdown(walletInfo, node, alreadyShuttingDown);
 }

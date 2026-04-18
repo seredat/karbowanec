@@ -871,7 +871,7 @@ void WalletGreen::convertAndLoadWalletFile(const std::string& path, std::ifstrea
   boost::filesystem::path tmpPath = boost::filesystem::unique_path(path + ".tmp.%%%%-%%%%");
 
   if (boost::filesystem::exists(bakPath)) {
-	m_logger(INFO) << "Wallet backup already exists! Creating random file name backup.";
+    m_logger(INFO) << "Wallet backup already exists! Creating random file name backup.";
     bakPath = boost::filesystem::unique_path(path + ".%%%%-%%%%" + ".backup");
   }
 
@@ -1290,50 +1290,50 @@ uint64_t WalletGreen::getBlockTimestamp(const uint32_t blockHeight) {
 }
 
 uint64_t WalletGreen::scanHeightToTimestamp(const uint32_t scanHeight) {
-	if (scanHeight == 0) {
-		return 0;
-	}
+  if (scanHeight == 0) {
+    return 0;
+  }
 
-	/* Get the block timestamp from the node if the node has it */
+  /* Get the block timestamp from the node if the node has it */
   uint64_t timestamp = getBlockTimestamp(scanHeight);
 
-	if (timestamp != 0) {
-		return timestamp;
-	}
+  if (timestamp != 0) {
+    return timestamp;
+  }
 
-	/* Get the amount of seconds since the blockchain launched */
-	uint64_t secondsSinceLaunch = scanHeight * CryptoNote::parameters::DIFFICULTY_TARGET;
+  /* Get the amount of seconds since the blockchain launched */
+  uint64_t secondsSinceLaunch = scanHeight * CryptoNote::parameters::DIFFICULTY_TARGET;
 
-	/* Add a bit of a buffer in case of difficulty weirdness, blocks coming
-	   out too fast */
-	secondsSinceLaunch = static_cast<uint64_t>(secondsSinceLaunch * 0.95);
+  /* Add a bit of a buffer in case of difficulty weirdness, blocks coming
+     out too fast */
+  secondsSinceLaunch = static_cast<uint64_t>(secondsSinceLaunch * 0.95);
 
-	/* Get the genesis block timestamp and add the time since launch */
-	timestamp = UINT64_C(1464595534) + secondsSinceLaunch;
+  /* Get the genesis block timestamp and add the time since launch */
+  timestamp = UINT64_C(1464595534) + secondsSinceLaunch;
 
-	/* Timestamp in the future */
-	if (timestamp >= static_cast<uint64_t>(std::time(nullptr))) {
-		return getCurrentTimestampAdjusted();
-	}
+  /* Timestamp in the future */
+  if (timestamp >= static_cast<uint64_t>(std::time(nullptr))) {
+    return getCurrentTimestampAdjusted();
+  }
 
-	return timestamp;
+  return timestamp;
 }
 
 uint64_t WalletGreen::getCurrentTimestampAdjusted() {
-	/* Get the current time as a unix timestamp */
-	std::time_t time = std::time(nullptr);
+  /* Get the current time as a unix timestamp */
+  std::time_t time = std::time(nullptr);
 
-	/* Take the amount of time a block can potentially be in the past/future */
-	std::initializer_list<uint64_t> limits = {
-		CryptoNote::parameters::CRYPTONOTE_BLOCK_FUTURE_TIME_LIMIT,
-		CryptoNote::parameters::CRYPTONOTE_BLOCK_FUTURE_TIME_LIMIT_V1
-	};
+  /* Take the amount of time a block can potentially be in the past/future */
+  std::initializer_list<uint64_t> limits = {
+    CryptoNote::parameters::CRYPTONOTE_BLOCK_FUTURE_TIME_LIMIT,
+    CryptoNote::parameters::CRYPTONOTE_BLOCK_FUTURE_TIME_LIMIT_V1
+  };
 
-	/* Get the largest adjustment possible */
-	uint64_t adjust = std::max(limits);
+  /* Get the largest adjustment possible */
+  uint64_t adjust = std::max(limits);
 
-	/* Take the earliest timestamp that will include all possible blocks */
-	return time - adjust;
+  /* Take the earliest timestamp that will include all possible blocks */
+  return time - adjust;
 }
 
 void WalletGreen::reset(const uint64_t scanHeight)
@@ -1562,21 +1562,21 @@ size_t WalletGreen::transfer(const TransactionParameters& transactionParameters,
 
 uint64_t WalletGreen::getBalanceMinusDust(const std::vector<std::string>& addresses)
 {
-    std::vector<WalletOuts> wallets = addresses.empty() ? pickWalletsWithMoney() : pickWallets(addresses);
-    std::vector<OutputToTransfer> unused;
+  std::vector<WalletOuts> wallets = addresses.empty() ? pickWalletsWithMoney() : pickWallets(addresses);
+  std::vector<OutputToTransfer> unused;
 
-	/* We want to get the full balance, so don't stop getting outputs early */
-	uint64_t needed = std::numeric_limits<uint64_t>::max();
+  /* We want to get the full balance, so don't stop getting outputs early */
+  uint64_t needed = std::numeric_limits<uint64_t>::max();
 
-	return selectTransfers
-	(
-		needed,
-		/* Don't include dust outputs */
-		false,
-		m_currency.defaultDustThreshold(),
-		std::move(wallets),
-		unused
-	);
+  return selectTransfers
+  (
+    needed,
+    /* Don't include dust outputs */
+    false,
+    m_currency.defaultDustThreshold(),
+    std::move(wallets),
+    unused
+  );
 }
 
 void WalletGreen::prepareTransaction(std::vector<WalletOuts>&& wallets,
@@ -2841,7 +2841,7 @@ std::string WalletGreen::getReserveProof(const uint64_t &reserve, const std::str
   }
   else {
     std::vector<WalletOuts> walletsWithMoney = pickWalletsWithMoney();
-	for (const auto& w : walletsWithMoney) {
+    for (const auto& w : walletsWithMoney) {
       if (w.wallet->actualBalance >= reserve) {
         wallets.push_back(w);
         break;

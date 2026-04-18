@@ -317,7 +317,7 @@ std::string ipAddressToString(uint32_t ip) {
 uint32_t stringToIpAddress(std::string addr) {
   uint32_t v[4];
   if (sscanf(addr.c_str(), "%d.%d.%d.%d", &v[0], &v[1], &v[2], &v[3]) != 4) {
-	  return false;
+    return false;
   }
 
   for (int i = 0; i < 4; ++i) {

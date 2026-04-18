@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
-// Copyright (c) 2018, Karbo developers
+// Copyright (c) 2026, Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -42,7 +42,7 @@ bool WalletUserTransactionsCache::serialize(CryptoNote::ISerializer& s) {
 
     updateUnconfirmedTransactions();
     deleteOutdatedTransactions();
-	rebuildPaymentsIndex();
+    rebuildPaymentsIndex();
   } else {
     UserTransactions txsToSave;
     UserTransfers transfersToSave;
@@ -210,7 +210,7 @@ std::shared_ptr<WalletLegacyEvent> WalletUserTransactionsCache::onTransactionDel
   std::shared_ptr<WalletLegacyEvent> event;
   if (id != CryptoNote::WALLET_LEGACY_INVALID_TRANSACTION_ID) {
     WalletLegacyTransaction& tr = getTransaction(id);
-	std::vector<uint8_t> extra(tr.extra.begin(), tr.extra.end());
+    std::vector<uint8_t> extra(tr.extra.begin(), tr.extra.end());
     PaymentId paymentId;
     if (getPaymentIdFromTxExtra(extra, paymentId)) {
       popFromPaymentsIndex(paymentId, id);

@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
-// Copyright (c) 2016-2025, The Karbo developers
+// Copyright (c) 2016-2026, The Karbo developers
 
 #pragma once
 
@@ -25,7 +25,7 @@ public:
     size_t read(uint8_t* data, size_t size);
     size_t write(const uint8_t* data, size_t size);
     std::pair<Ipv4Address, uint16_t> getPeerAddressAndPort() const;
-	boost::asio::ip::tcp::socket& getSocket();
+    boost::asio::ip::tcp::socket& getSocket();
 
 private:
     friend class TcpConnector;

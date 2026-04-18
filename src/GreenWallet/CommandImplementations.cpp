@@ -52,7 +52,7 @@ void changePassword(std::shared_ptr<WalletInfo> walletInfo)
     walletInfo->walletPass = newPassword;
 
     /* Make sure we save with the new password */
-	walletInfo->wallet.save();
+    walletInfo->wallet.save();
 
     std::cout << SuccessMsg("Your password has been changed!") << std::endl;
 }
@@ -101,7 +101,7 @@ void printPrivateKeys(CryptoNote::WalletGreen &wallet, bool viewWallet)
         return;
     }
 
-	auto privateSpendKey = wallet.getAddressSpendKey(0).secretKey;
+    auto privateSpendKey = wallet.getAddressSpendKey(0).secretKey;
 
     Crypto::SecretKey derivedPrivateViewKey;
 
@@ -257,100 +257,100 @@ void blockchainHeight(CryptoNote::INode &node, CryptoNote::WalletGreen &wallet)
 }
 
 void printHeights(uint32_t localHeight, uint32_t remoteHeight,
-	uint32_t walletHeight)
+    uint32_t walletHeight)
 {
-	/* This is the height that the wallet has been scanned to. The blockchain
-	   can be fully updated, but we have to walk the chain to find our
-	   transactions, and this number indicates that progress. */
-	std::cout << "Wallet blockchain height: ";
+    /* This is the height that the wallet has been scanned to. The blockchain
+       can be fully updated, but we have to walk the chain to find our
+       transactions, and this number indicates that progress. */
+    std::cout << "Wallet blockchain height: ";
 
-	/* Small buffer because wallet height doesn't update instantly like node
-	   height does */
-	if (walletHeight + 1000 > remoteHeight)
-	{
-		std::cout << SuccessMsg(std::to_string(walletHeight));
-	}
-	else
-	{
-		std::cout << WarningMsg(std::to_string(walletHeight));
-	}
+    /* Small buffer because wallet height doesn't update instantly like node
+       height does */
+    if (walletHeight + 1000 > remoteHeight)
+    {
+        std::cout << SuccessMsg(std::to_string(walletHeight));
+    }
+    else
+    {
+        std::cout << WarningMsg(std::to_string(walletHeight));
+    }
 
-	std::cout << std::endl << "Local blockchain height: ";
+    std::cout << std::endl << "Local blockchain height: ";
 
-	if (localHeight == remoteHeight)
-	{
-		std::cout << SuccessMsg(std::to_string(localHeight));
-	}
-	else
-	{
-		std::cout << WarningMsg(std::to_string(localHeight));
-	}
+    if (localHeight == remoteHeight)
+    {
+        std::cout << SuccessMsg(std::to_string(localHeight));
+    }
+    else
+    {
+        std::cout << WarningMsg(std::to_string(localHeight));
+    }
 
-	std::cout << std::endl << "Network blockchain height: "
-		<< SuccessMsg(std::to_string(remoteHeight)) << std::endl;
+    std::cout << std::endl << "Network blockchain height: "
+        << SuccessMsg(std::to_string(remoteHeight)) << std::endl;
 }
 
 void printSyncStatus(uint32_t localHeight, uint32_t remoteHeight,
-	uint32_t walletHeight)
+    uint32_t walletHeight)
 {
-	std::string networkSyncPercentage
-		= Common::Format::get_sync_percentage(localHeight, remoteHeight) + "%";
+    std::string networkSyncPercentage
+        = Common::Format::get_sync_percentage(localHeight, remoteHeight) + "%";
 
-	std::string walletSyncPercentage
-		= Common::Format::get_sync_percentage(walletHeight, remoteHeight) + "%";
+    std::string walletSyncPercentage
+        = Common::Format::get_sync_percentage(walletHeight, remoteHeight) + "%";
 
-	std::cout << "Network sync status: ";
+    std::cout << "Network sync status: ";
 
-	if (localHeight == remoteHeight)
-	{
-		std::cout << SuccessMsg(networkSyncPercentage) << std::endl;
-	}
-	else
-	{
-		std::cout << WarningMsg(networkSyncPercentage) << std::endl;
-	}
+    if (localHeight == remoteHeight)
+    {
+        std::cout << SuccessMsg(networkSyncPercentage) << std::endl;
+    }
+    else
+    {
+        std::cout << WarningMsg(networkSyncPercentage) << std::endl;
+    }
 
-	std::cout << "Wallet sync status: ";
+    std::cout << "Wallet sync status: ";
 
-	/* Small buffer because wallet height is not always completely accurate */
-	if (walletHeight + 1000 > remoteHeight)
-	{
-		std::cout << SuccessMsg(walletSyncPercentage) << std::endl;
-	}
-	else
-	{
-		std::cout << WarningMsg(walletSyncPercentage) << std::endl;
-	}
+    /* Small buffer because wallet height is not always completely accurate */
+    if (walletHeight + 1000 > remoteHeight)
+    {
+        std::cout << SuccessMsg(walletSyncPercentage) << std::endl;
+    }
+    else
+    {
+        std::cout << WarningMsg(walletSyncPercentage) << std::endl;
+    }
 }
 
 void printSyncSummary(uint32_t localHeight, uint32_t remoteHeight,
-	uint32_t walletHeight)
+    uint32_t walletHeight)
 {
-	if (localHeight == 0 && remoteHeight == 0)
-	{
-		std::cout << WarningMsg("Uh oh, it looks like you don't have ")
-			<< WarningMsg(WalletConfig::daemonName)
-			<< WarningMsg(" open!")
-			<< std::endl;
-	}
-	else if (walletHeight + 1000 < remoteHeight && localHeight == remoteHeight)
-	{
-		std::cout << InformationMsg("You are synced with the network, but the "
-			"blockchain is still being scanned for "
-			"your transactions.")
-			<< std::endl
-			<< "Balances might be incorrect whilst this is ongoing."
-			<< std::endl;
-	}
-	else if (localHeight == remoteHeight)
-	{
-		std::cout << SuccessMsg("Yay! You are synced!") << std::endl;
-	}
-	else
-	{
-		std::cout << WarningMsg("Be patient, you are still syncing with the "
-			"network!") << std::endl;
-	}
+    if (localHeight == 0 && remoteHeight == 0)
+    {
+        std::cout << WarningMsg("Uh oh, it looks like you don't have ")
+            << WarningMsg(WalletConfig::daemonName)
+            << WarningMsg(" open!")
+            << std::endl;
+    }
+    else if (walletHeight + 1000 < remoteHeight && localHeight == remoteHeight)
+    {
+        std::cout << InformationMsg("You are synced with the network, but the "
+            "blockchain is still being scanned for "
+            "your transactions.")
+            << std::endl
+            << "Balances might be incorrect whilst this is ongoing."
+            << std::endl;
+    }
+    else if (localHeight == remoteHeight)
+    {
+        std::cout << SuccessMsg("Yay! You are synced!") << std::endl;
+    }
+    else
+    {
+        std::cout << WarningMsg("Be patient, you are still syncing with the "
+            "network!") << std::endl;
+    }
 }
 
 void printPeerCount(size_t peerCount)
@@ -410,25 +410,25 @@ void status(CryptoNote::INode &node, CryptoNote::WalletGreen &wallet)
 
 void reset(CryptoNote::INode &node, std::shared_ptr<WalletInfo> walletInfo)
 {
-	uint64_t scanHeight = getScanHeight();
+    uint64_t scanHeight = getScanHeight();
 
-	std::cout << std::endl
-		<< InformationMsg("This process may take some time to complete.")
-		<< std::endl
-		<< InformationMsg("You can't make any transactions during the ")
-		<< InformationMsg("process.")
-		<< std::endl << std::endl;
+    std::cout << std::endl
+        << InformationMsg("This process may take some time to complete.")
+        << std::endl
+        << InformationMsg("You can't make any transactions during the ")
+        << InformationMsg("process.")
+        << std::endl << std::endl;
 
-	if (!confirm("Are you sure?"))
-	{
-		return;
-	}
+    if (!confirm("Are you sure?"))
+    {
+        return;
+    }
 
-	std::cout << InformationMsg("Resetting wallet...") << std::endl;
+    std::cout << InformationMsg("Resetting wallet...") << std::endl;
 
-	walletInfo->wallet.reset(scanHeight);
+    walletInfo->wallet.reset(scanHeight);
 
-	syncWallet(node, walletInfo);
+    syncWallet(node, walletInfo);
 }
 
 void saveCSV(CryptoNote::WalletGreen &wallet, CryptoNote::INode &node)
@@ -596,9 +596,9 @@ void listTransfers(bool incoming, bool outgoing,
 
 void save(CryptoNote::WalletGreen &wallet)
 {
-	std::cout << InformationMsg("Saving.") << std::endl;
-	wallet.save();
-	std::cout << InformationMsg("Saved.") << std::endl;
+    std::cout << InformationMsg("Saving.") << std::endl;
+    wallet.save();
+    std::cout << InformationMsg("Saved.") << std::endl;
 }
 
 void help(std::shared_ptr<WalletInfo> wallet)
@@ -632,7 +632,7 @@ void advanced(std::shared_ptr<WalletInfo> wallet)
 void txSecretKey(CryptoNote::WalletGreen &wallet)
 {
     std::string hashStr;
-	Crypto::Hash txid;
+    Crypto::Hash txid;
 
     while (true)
     {
@@ -728,7 +728,7 @@ void txProof(CryptoNote::WalletGreen &wallet)
             }
             else {
                 txSecretKey = *(struct Crypto::SecretKey *) &tx_key_hash;
-				break;
+                break;
             }
 
             if (std::cin.fail() || std::cin.eof()) {
@@ -885,7 +885,7 @@ void reserveProof(std::shared_ptr<WalletInfo> walletInfo, bool viewWallet)
                 std::cout << WarningMsg("Enter valid file name") << std::endl;
             }
 
-	        if (std::cin.fail() || std::cin.eof()) {
+            if (std::cin.fail() || std::cin.eof()) {
                 std::cin.clear();
                 break;
             }

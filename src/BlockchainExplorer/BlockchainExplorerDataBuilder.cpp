@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
-// Copyright (c) 2016-2020, The Karbo developers
+// Copyright (c) 2016-2026, The Karbo developers
 //
 // This file is part of Karbo.
 //
@@ -297,7 +297,7 @@ bool BlockchainExplorerDataBuilder::fillTransactionDetails(const Transaction& tr
       for (const TransactionOutput& out : transaction.outputs) {
         txInGenDetails.amount += out.amount;
       }
-	  txInDetails = txInGenDetails;
+      txInDetails = txInGenDetails;
     } else if (txIn.type() == typeid(KeyInput)) {
       CryptoNote::KeyInputDetails txInToKeyDetails;
       const KeyInput& txInToKey = boost::get<KeyInput>(txIn);
@@ -307,13 +307,13 @@ bool BlockchainExplorerDataBuilder::fillTransactionDetails(const Transaction& tr
         return false;
       }
       txInToKeyDetails.mixin = txInToKey.outputIndexes.size();
-	  for (const auto& r : outputReferences) {
-		  TransactionOutputReferenceDetails d;
-		  d.number = r.second;
-		  d.transactionHash = r.first;
-		  txInToKeyDetails.outputs.push_back(d);
-	  }
-	  txInDetails = txInToKeyDetails;
+      for (const auto& r : outputReferences) {
+        TransactionOutputReferenceDetails d;
+        d.number = r.second;
+        d.transactionHash = r.first;
+        txInToKeyDetails.outputs.push_back(d);
+      }
+      txInDetails = txInToKeyDetails;
     } else {
       return false;
     }
@@ -334,8 +334,8 @@ bool BlockchainExplorerDataBuilder::fillTransactionDetails(const Transaction& tr
   for (const outputWithIndex& txOutput : range) {
     transactionOutputDetails2 txOutDetails;
     txOutDetails.globalIndex = txOutput.get<1>();
-	txOutDetails.output.amount = txOutput.get<0>().amount;
-	txOutDetails.output.target = txOutput.get<0>().target;
+    txOutDetails.output.amount = txOutput.get<0>().amount;
+    txOutDetails.output.target = txOutput.get<0>().target;
     transactionDetails.outputs.push_back(std::move(txOutDetails));
   }
 

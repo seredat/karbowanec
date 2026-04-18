@@ -59,7 +59,7 @@ using namespace Logging;
 #undef ERROR
 
 namespace{
-	Tools::PasswordContainer pwd_container;
+  Tools::PasswordContainer pwd_container;
 }
 
 namespace CryptoNote

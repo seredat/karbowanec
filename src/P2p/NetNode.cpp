@@ -330,8 +330,8 @@ namespace CryptoNote
         context.m_state = CryptoNoteConnectionContext::state_shutdown;
       }
     });
-	logger(INFO) << "Host " << Common::ipAddressToString(address_ip) << " blocked.";
-	return true;
+  logger(INFO) << "Host " << Common::ipAddressToString(address_ip) << " blocked.";
+  return true;
   }
   //-----------------------------------------------------------------------------------
   
@@ -509,7 +509,7 @@ namespace CryptoNote
     // m_net_server.get_config_object().m_pcommands_handler = this;
     // m_net_server.get_config_object().m_invoke_timeout = CryptoNote::P2P_DEFAULT_INVOKE_TIMEOUT;
 
-	logger(INFO) << "Network: " << m_network_id;
+    logger(INFO) << "Network: " << m_network_id;
 
     //try to bind
     logger(INFO) << "Binding on " << m_bind_ip << ":" << m_port;
@@ -1234,11 +1234,11 @@ namespace CryptoNote
   {
     context.version = arg.node_data.version;
 
-	if (!is_remote_host_allowed(context.m_remote_ip)) {
-		logger(Logging::DEBUGGING) << context << "Banned node connected " << Common::ipAddressToString(context.m_remote_ip) << ", dropping connection.";
-		context.m_state = CryptoNoteConnectionContext::state_shutdown;
-		return 1;
-	}
+    if (!is_remote_host_allowed(context.m_remote_ip)) {
+      logger(Logging::DEBUGGING) << context << "Banned node connected " << Common::ipAddressToString(context.m_remote_ip) << ", dropping connection.";
+      context.m_state = CryptoNoteConnectionContext::state_shutdown;
+      return 1;
+    }
 
     if (arg.node_data.network_id != m_network_id) {
       add_host_fail(context.m_remote_ip);

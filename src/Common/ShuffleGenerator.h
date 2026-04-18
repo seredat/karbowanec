@@ -1,7 +1,7 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2014-2018, The Monero Project
 // Copyright (c) 2018-2019, The TurtleCoin Developers
-// Copyright (c) 2018-2019, The Karbo Developers
+// Copyright (c) 2018-2026, The Karbo Developers
 //
 // This file is part of Karbo.
 //
@@ -37,7 +37,7 @@ public:
       throw std::runtime_error("shuffle sequence ended");
     }
 
-	T value = Random::randomValue<T>(0, --count);
+    T value = Random::randomValue<T>(0, --count);
 
     auto rvalIt = selected.find(count);
     auto rval = rvalIt != selected.end() ? rvalIt->second : count;
