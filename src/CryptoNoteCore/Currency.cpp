@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2016, The CryptoNote developers, The Bytecoin developers
 // Copyright (c) 2016-2018  zawy12
-// Copyright (c) 2016-2021, The Karbowanec developers
+// Copyright (c) 2016-2026, The Karbowanec developers
 //
 // This file is part of Karbo.
 //
@@ -154,26 +154,16 @@ namespace CryptoNote {
 	}
 
 	uint64_t Currency::calculateReward(uint64_t alreadyGeneratedCoins) const {
-		// assert(alreadyGeneratedCoins <= m_moneySupply);
 		assert(m_emissionSpeedFactor > 0 && m_emissionSpeedFactor <= 8 * sizeof(uint64_t));
-
-		uint64_t baseRewardInitial, baseRewardTail, baseReward;
-
-		baseRewardInitial = alreadyGeneratedCoins < m_moneySupply ? (m_moneySupply - alreadyGeneratedCoins) >> m_emissionSpeedFactor : CryptoNote::parameters::TAIL_EMISSION_REWARD;
-		// Tail emission
-		// Flat rate tail emission reward, inflation slowly diminishing in relation to supply
-		// baseRewardTail = CryptoNote::parameters::TAIL_EMISSION_REWARD;
-		// changed to Friedman's k-percent rule, inflation 2% of total coins in circulation p.a.
+		// Initial exponential emission curve with fallback to flat rate tail emission
+		uint64_t baseRewardInitial = alreadyGeneratedCoins < m_moneySupply ? (m_moneySupply - alreadyGeneratedCoins) >> m_emissionSpeedFactor : CryptoNote::parameters::TAIL_EMISSION_REWARD;
+		// Friedman's k-percent rule, inflation 2% of total coins in circulation p.a.
 		const uint64_t blocksInOneYear = expectedNumberOfBlocksPerDay() * 365;
-		uint64_t twoPercentOfEmission = alreadyGeneratedCoins / 100 * 2; // sic! use integers
-		baseRewardTail = twoPercentOfEmission / blocksInOneYear;
-
-		baseReward = std::max<uint64_t>(baseRewardInitial, baseRewardTail);
-
-		logger(DEBUGGING) << "Init. reward: " << formatAmount(baseRewardInitial);
-		logger(DEBUGGING) << "Tail  reward: " << formatAmount(baseRewardTail);
-
-		return baseReward;
+		assert(blocksInOneYear > 0);
+		uint64_t twoPercentOfEmission = alreadyGeneratedCoins / 100 * 2;
+		uint64_t baseRewardTail = twoPercentOfEmission / blocksInOneYear;
+		// Transition from exponential to tail emission (whichever reward is larger)
+		return std::max(baseRewardInitial, baseRewardTail);
 	}
 
   bool Currency::getBlockReward(uint8_t blockMajorVersion, size_t medianSize, size_t currentBlockSize, uint64_t alreadyGeneratedCoins,
