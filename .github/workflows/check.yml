@@ -14,7 +14,7 @@ jobs:
     name: Windows
     runs-on: windows-2022
     env:
-      BOOST_ROOT: C:\thirdparties\boost-1.83.0
+      BOOST_ROOT: C:\thirdparties\boost-1.84.0
 
     steps:
       - uses: actions/checkout@master
@@ -32,12 +32,12 @@ jobs:
         run: |
           choco install curl -y
 
-      - name: Download and Install Boost 1.83
+      - name: Download and Install Boost 1.84
         run: |
-          $Url = "https://sourceforge.net/projects/boost/files/boost-binaries/1.83.0/boost_1_83_0-msvc-14.3-64.exe"
+          $Url = "https://sourceforge.net/projects/boost/files/boost-binaries/1.84.0/boost_1_84_0-msvc-14.3-64.exe"
           $OutputPath = "C:\\Users\\runneradmin\\AppData\\Local\\Temp\\boost-installer.exe"
           curl -L $Url -o $OutputPath
-          Start-Process -Wait -FilePath $OutputPath "/SILENT","/SP-","/SUPPRESSMSGBOXES","/DIR=C:\\thirdparties\\boost-1.83.0"
+          Start-Process -Wait -FilePath $OutputPath "/SILENT","/SP-","/SUPPRESSMSGBOXES","/DIR=C:\\thirdparties\\boost-1.84.0"
 
       - name: Build
         shell: powershell
