@@ -148,6 +148,7 @@ public:
                                     AccountPublicAddress& address) = 0;
   virtual bool getAccountNumber(const AccountPublicAddress& address,
                                 uint32_t& blockHeight, uint32_t& txIndex) = 0;
+  virtual bool getCanonicalAccountRegistrationsCount(uint64_t& count) = 0;
 };
 
 } //namespace CryptoNote

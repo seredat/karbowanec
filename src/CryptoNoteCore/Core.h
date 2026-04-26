@@ -183,6 +183,7 @@ namespace CryptoNote {
                                        AccountPublicAddress& address) override;
      virtual bool getAccountNumber(const AccountPublicAddress& address,
                                    uint32_t& blockHeight, uint32_t& txIndex) override;
+     virtual bool getCanonicalAccountRegistrationsCount(uint64_t& count) override;
 
      bool is_key_image_spent(const Crypto::KeyImage& key_im);
      bool is_key_image_spent(const Crypto::KeyImage& key_im, uint32_t height);

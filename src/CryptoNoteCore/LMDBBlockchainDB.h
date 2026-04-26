@@ -164,6 +164,7 @@ public:
   // Reverse lookup: find the first (canonical) registration matching given spend+view keys.
   bool findAccountRegistrationByKeys(const uint8_t* spendKey, const uint8_t* viewKey,
                                      uint32_t& blockHeight, uint32_t& txIndex) const;
+  bool getCanonicalAccountRegistrationsCount(uint64_t& count) const;
 
   // ── Resize when map is full ───────────────────────────────────────────────
   // Call this when no write txn is active, then re-begin the txn.

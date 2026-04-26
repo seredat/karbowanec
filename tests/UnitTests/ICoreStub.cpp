@@ -634,3 +634,16 @@ bool ICoreStub::getMixin(const CryptoNote::Transaction& transaction, uint64_t& m
 bool ICoreStub::isInCheckpointZone(uint32_t height) const {
   return false;
 }
+
+bool ICoreStub::resolveAccountNumber(uint32_t blockHeight, uint32_t txIndex, CryptoNote::AccountPublicAddress& address) {
+  return false;
+}
+
+bool ICoreStub::getAccountNumber(const CryptoNote::AccountPublicAddress& address, uint32_t& blockHeight, uint32_t& txIndex) {
+  return false;
+}
+
+bool ICoreStub::getCanonicalAccountRegistrationsCount(uint64_t& count) {
+  count = 0;
+  return true;
+}

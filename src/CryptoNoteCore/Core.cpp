@@ -1350,6 +1350,10 @@ bool Core::getAccountNumber(const AccountPublicAddress& address,
   return m_blockchain.getAccountNumber(address, blockHeight, txIndex);
 }
 
+bool Core::getCanonicalAccountRegistrationsCount(uint64_t& count) {
+  return m_blockchain.getCanonicalAccountRegistrationsCount(count);
+}
+
 bool Core::is_key_image_spent(const Crypto::KeyImage& key_im) {
   return m_blockchain.have_tx_keyimg_as_spent(key_im);
 }

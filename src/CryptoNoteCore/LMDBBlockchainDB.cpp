@@ -17,8 +17,10 @@
 
 #include "LMDBBlockchainDB.h"
 
+#include <array>
 #include <cassert>
 #include <cstring>
+#include <set>
 #include <stdexcept>
 
 namespace CryptoNote {
@@ -949,6 +951,34 @@ bool LMDBBlockchainDB::findAccountRegistrationByKeys(const uint8_t* spendKey, co
 
   mdb_cursor_close(cursor);
   return false;
+}
+
+bool LMDBBlockchainDB::getCanonicalAccountRegistrationsCount(uint64_t& count) const {
+  auto guard = readTxn();
+  MDB_cursor* cursor = nullptr;
+  int rc = mdb_cursor_open(guard.txn, m_dbiAccountRegistrations, &cursor);
+  checkRc(rc, "getCanonicalAccountRegistrationsCount:open");
+
+  // Later registrations for the same address are aliases; only the first one is canonical.
+  std::set<std::array<uint8_t, 64>> uniqueAddresses;
+  MDB_val k{}, v{};
+  rc = mdb_cursor_get(cursor, &k, &v, MDB_FIRST);
+  while (rc == 0) {
+    if (v.mv_size == 64) {
+      std::array<uint8_t, 64> addressKeys;
+      std::memcpy(addressKeys.data(), v.mv_data, addressKeys.size());
+      uniqueAddresses.insert(addressKeys);
+    }
+    rc = mdb_cursor_get(cursor, &k, &v, MDB_NEXT);
+  }
+
+  mdb_cursor_close(cursor);
+  if (rc != MDB_NOTFOUND) {
+    checkRc(rc, "getCanonicalAccountRegistrationsCount:next");
+  }
+
+  count = uniqueAddresses.size();
+  return true;
 }
 
 } // namespace CryptoNote

@@ -2992,6 +2992,11 @@ bool Blockchain::getAccountNumber(const AccountPublicAddress& address,
                                             blockHeight, txIndex);
 }
 
+bool Blockchain::getCanonicalAccountRegistrationsCount(uint64_t& count) {
+  std::lock_guard<std::recursive_mutex> lk(m_blockchain_lock);
+  return m_db.getCanonicalAccountRegistrationsCount(count);
+}
+
 // ─── blockDifficulty / blockCumulativeDifficulty / getblockEntry ─────────────
 
 uint64_t Blockchain::blockDifficulty(size_t i) {

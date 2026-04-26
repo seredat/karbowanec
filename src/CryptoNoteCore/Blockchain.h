@@ -150,6 +150,7 @@ namespace CryptoNote {
                               AccountPublicAddress& address);
     bool getAccountNumber(const AccountPublicAddress& address,
                           uint32_t& blockHeight, uint32_t& txIndex);
+    bool getCanonicalAccountRegistrationsCount(uint64_t& count);
 
     template<class visitor_t>
     bool scanOutputKeysForIndexes(const KeyInput& tx_in_to_key, visitor_t& vis,

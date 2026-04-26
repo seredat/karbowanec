@@ -2273,6 +2273,10 @@ bool RpcServer::on_get_info(const COMMAND_RPC_GET_INFO::request& req, COMMAND_RP
   res.difficulty = m_core.getNextBlockDifficulty();
   res.transactions_count = m_core.getBlockchainTotalTransactions() - res.height; //without coinbase
   res.transactions_pool_size = m_core.getPoolTransactionsCount();
+  if (!m_core.getCanonicalAccountRegistrationsCount(res.registered_account_numbers_count)) {
+    throw JsonRpc::JsonRpcError{
+      CORE_RPC_ERROR_CODE_INTERNAL_ERROR, "Internal error: can't get registered account numbers count." };
+  }
   res.alt_blocks_count = m_core.getAlternativeBlocksCount();
   uint64_t total_conn = m_p2p.get_connections_count();
   res.outgoing_connections_count = m_p2p.get_outgoing_connections_count();
