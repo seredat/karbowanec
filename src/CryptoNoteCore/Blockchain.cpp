@@ -518,7 +518,7 @@ bool Blockchain::init(const std::string& config_folder, bool load_existing) {
 
             try {
               TransactionEntry te = transactionByIndex({ h, t });
-              TransactionExtraAccountRegistration reg;
+                TransactionExtraAccountRegistration reg;
               if (getAccountRegistrationFromExtra(te.tx.extra, reg) &&
                   isWellFormedAccountRegistration(te.tx.extra)) {
                 m_db.putAccountRegistration(h, t, reg.spendPublicKey.data, reg.viewPublicKey.data);
@@ -2651,6 +2651,7 @@ bool Blockchain::pushTransaction(BlockEntry& block, const Crypto::Hash& transact
         isWellFormedAccountRegistration(tx.extra)) {
       m_db.putAccountRegistration(block.height, transactionIndex.transaction,
                                   reg.spendPublicKey.data, reg.viewPublicKey.data);
+      invalidateAccountRegistrationsCountCache();
     }
   }
 
@@ -2712,6 +2713,7 @@ void Blockchain::popTransaction(const Transaction& transaction,
       uint32_t block; uint16_t txSlot;
       if (m_db.getTxIndex(transactionHash, block, txSlot)) {
         m_db.removeAccountRegistration(block, txSlot);
+        invalidateAccountRegistrationsCountCache();
       }
     }
   }
@@ -2992,9 +2994,26 @@ bool Blockchain::getAccountNumber(const AccountPublicAddress& address,
                                             blockHeight, txIndex);
 }
 
+void Blockchain::invalidateAccountRegistrationsCountCache() {
+  m_accountRegistrationsCountCacheTime = std::chrono::steady_clock::time_point();
+}
+
 bool Blockchain::getCanonicalAccountRegistrationsCount(uint64_t& count) {
   std::lock_guard<std::recursive_mutex> lk(m_blockchain_lock);
-  return m_db.getCanonicalAccountRegistrationsCount(count);
+  const auto now = std::chrono::steady_clock::now();
+  if (m_accountRegistrationsCountCacheTime != std::chrono::steady_clock::time_point() &&
+      now - m_accountRegistrationsCountCacheTime < std::chrono::seconds(ACCOUNT_REGISTRATIONS_COUNT_CACHE_SECONDS)) {
+    count = m_cachedCanonicalAccountRegistrationsCount;
+    return true;
+  }
+
+  if (!m_db.getCanonicalAccountRegistrationsCount(count)) {
+    return false;
+  }
+
+  m_cachedCanonicalAccountRegistrationsCount = count;
+  m_accountRegistrationsCountCacheTime = now;
+  return true;
 }
 
 // ─── blockDifficulty / blockCumulativeDifficulty / getblockEntry ─────────────

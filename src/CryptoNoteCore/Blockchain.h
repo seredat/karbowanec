@@ -19,6 +19,7 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <unordered_map>
 #include <parallel_hashmap/phmap.h>
 
@@ -246,6 +247,7 @@ namespace CryptoNote {
     bool getBlockLongHash(Crypto::cn_context& context, const Block& b, Crypto::Hash& res);
 
   private:
+    void invalidateAccountRegistrationsCountCache();
 
     struct TransactionEntry {
       Transaction tx;
@@ -311,6 +313,10 @@ namespace CryptoNote {
     UpgradeDetector m_upgradeDetectorV6;
 
     bool m_no_blobs;
+
+    uint64_t m_cachedCanonicalAccountRegistrationsCount = 0;
+    std::chrono::steady_clock::time_point m_accountRegistrationsCountCacheTime;
+    static constexpr uint64_t ACCOUNT_REGISTRATIONS_COUNT_CACHE_SECONDS = 60 * 60;
 
     // ── Batch-commit state (Monero-style) ──────────────────────────────────
     // Blocks written into the currently-open batch write txn (0 = no open txn).
