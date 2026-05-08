@@ -19,6 +19,7 @@
 #pragma once
 
 #include <atomic>
+#include <mutex>
 
 #include <Common/ObserverManager.h>
 
@@ -174,6 +175,7 @@ namespace CryptoNote
     bool on_connection_synchronized();
     void updateObservedHeight(uint32_t peerHeight, const CryptoNoteConnectionContext& context);
     void recalculateMaxObservedHeight(const CryptoNoteConnectionContext& context);
+    std::vector<CryptoNoteConnectionContext> get_dandelion_stem_snapshot() const;
     int processObjects(CryptoNoteConnectionContext& context, const std::vector<parsed_block_entry>& blocks);
     Logging::LoggerRef logger;
 
@@ -198,6 +200,7 @@ namespace CryptoNote
 
     OnceInInterval m_dandelionStemSelectInterval;
     OnceInInterval m_dandelionStemFluffInterval;
+    mutable std::mutex m_dandelionStemMutex;
     std::vector<CryptoNoteConnectionContext> m_dandelion_stem;
 
     StemPool m_stemPool;
