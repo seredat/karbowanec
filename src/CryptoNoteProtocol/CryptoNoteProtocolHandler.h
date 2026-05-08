@@ -57,7 +57,7 @@ namespace CryptoNote
 
     bool hasTransactions() {
       std::lock_guard<std::recursive_mutex> lk(m_stempool_mutex);
-      return m_stempool.empty();
+      return !m_stempool.empty();
     }
 
     bool hasTransaction(const Crypto::Hash& txid) {
@@ -176,6 +176,7 @@ namespace CryptoNote
     void updateObservedHeight(uint32_t peerHeight, const CryptoNoteConnectionContext& context);
     void recalculateMaxObservedHeight(const CryptoNoteConnectionContext& context);
     std::vector<CryptoNoteConnectionContext> get_dandelion_stem_snapshot() const;
+    bool get_dandelion_stem_peer(CryptoNoteConnectionContext& peer, const net_connection_id* excludeConnection = nullptr) const;
     int processObjects(CryptoNoteConnectionContext& context, const std::vector<parsed_block_entry>& blocks);
     Logging::LoggerRef logger;
 

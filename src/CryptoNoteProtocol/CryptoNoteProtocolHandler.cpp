@@ -108,6 +108,28 @@ std::vector<CryptoNoteConnectionContext> CryptoNoteProtocolHandler::get_dandelio
   return m_dandelion_stem;
 }
 
+bool CryptoNoteProtocolHandler::get_dandelion_stem_peer(CryptoNoteConnectionContext& peer, const net_connection_id* excludeConnection) const {
+  std::vector<CryptoNoteConnectionContext> candidates;
+  for (const auto& dandelionPeer : get_dandelion_stem_snapshot()) {
+    if (excludeConnection && dandelionPeer.m_connection_id == *excludeConnection) {
+      continue;
+    }
+
+    if (dandelionPeer.m_state == CryptoNoteConnectionContext::state_normal ||
+        dandelionPeer.m_state == CryptoNoteConnectionContext::state_synchronizing) {
+      candidates.push_back(dandelionPeer);
+    }
+  }
+
+  if (candidates.empty()) {
+    return false;
+  }
+
+  ShuffleGenerator<size_t> candidatesGenerator(candidates.size());
+  peer = candidates[candidatesGenerator()];
+  return true;
+}
+
 void CryptoNoteProtocolHandler::onConnectionOpened(CryptoNoteConnectionContext& context) {
 }
 
@@ -403,25 +425,20 @@ int CryptoNoteProtocolHandler::handle_notify_new_transactions(int command, NOTIF
 
   if (arg.txs.size()) {
     //TODO: add announce usage here
-    auto dandelionStem = get_dandelion_stem_snapshot();
-    if (arg.stem && !dandelionStem.empty()) {
+    CryptoNoteConnectionContext dandelionPeer;
+    if (arg.stem && get_dandelion_stem_peer(dandelionPeer, &context.m_connection_id)) {
       std::mt19937 rng = Random::generator();
-      std::uniform_int_distribution<> dis(0, 100);
+      std::uniform_int_distribution<> dis(0, 99);
       auto coin_flip = dis(rng);
       if (coin_flip < CryptoNote::parameters::DANDELION_STEM_TX_PROPAGATION_PROBABILITY) { // Stem propagation
-        for (const auto& dandelion_peer : dandelionStem) {
-          if (dandelion_peer.m_state == CryptoNoteConnectionContext::state_normal || dandelion_peer.m_state == CryptoNoteConnectionContext::state_synchronizing) {
-            if (!post_notify<NOTIFY_NEW_TRANSACTIONS>(*m_p2p, arg, dandelion_peer)) {
-              arg.stem = false;
-              logger(Logging::DEBUGGING) << "Failed to relay transactions to Dandelion peer " << dandelion_peer.m_remote_ip << ", remove from stempool and broadcast as fluff:";
-              for (const auto& h : txHashes) {
-                m_stemPool.removeTransaction(h);
-                logger(Logging::DEBUGGING) << h;
-              }
-              relay_post_notify<NOTIFY_NEW_TRANSACTIONS>(*m_p2p, arg, &context.m_connection_id); // Fluff broadcast
-              break;
-            }
+        if (!post_notify<NOTIFY_NEW_TRANSACTIONS>(*m_p2p, arg, dandelionPeer)) {
+          arg.stem = false;
+          logger(Logging::DEBUGGING) << "Failed to relay transactions to Dandelion peer " << dandelionPeer.m_remote_ip << ", remove from stempool and broadcast as fluff:";
+          for (const auto& h : txHashes) {
+            m_stemPool.removeTransaction(h);
+            logger(Logging::DEBUGGING) << h;
           }
+          relay_post_notify<NOTIFY_NEW_TRANSACTIONS>(*m_p2p, arg, &context.m_connection_id); // Fluff broadcast
         }
       } else { // Switch to fluff broadcast
         arg.stem = false;
@@ -708,7 +725,7 @@ bool CryptoNoteProtocolHandler::select_dandelion_stem() {
 
 // Fail-safe to ensure stem txs are broadcasted
 bool CryptoNoteProtocolHandler::fluffStemPool() {
-  if (!m_stemPool.hasTransactions()) {
+  if (m_stemPool.hasTransactions()) {
     NOTIFY_NEW_TRANSACTIONS::request notification;
     notification.stem = false;
     logger(Logging::DEBUGGING) << "Broadcasting as fluff " << m_stemPool.getTransactionsCount() << " timeout stem transaction(s):";
@@ -1107,8 +1124,8 @@ void CryptoNoteProtocolHandler::relay_block(NOTIFY_NEW_BLOCK::request& arg) {
 }
 
 void CryptoNoteProtocolHandler::relay_transactions(NOTIFY_NEW_TRANSACTIONS::request& arg) {
-  auto dandelionStem = get_dandelion_stem_snapshot();
-  if (arg.stem && !dandelionStem.empty()) { // Dandelion broadcast
+  CryptoNoteConnectionContext dandelionPeer;
+  if (arg.stem && get_dandelion_stem_peer(dandelionPeer)) { // Dandelion broadcast
     std::vector<Crypto::Hash> txHashes;
     for (auto tx_blob_it = arg.txs.begin(); tx_blob_it != arg.txs.end(); tx_blob_it++) {
       auto transactionBinary = asBinaryArray(*tx_blob_it);
@@ -1122,30 +1139,14 @@ void CryptoNoteProtocolHandler::relay_transactions(NOTIFY_NEW_TRANSACTIONS::requ
     }
 
     std::mt19937 rng = Random::generator();
-    std::uniform_int_distribution<> dis(0, 100);
+    std::uniform_int_distribution<> dis(0, 99);
     auto coin_flip = dis(rng);
     if (coin_flip < CryptoNote::parameters::DANDELION_STEM_TX_PROPAGATION_PROBABILITY) { // Stem propagation
       std::list<boost::uuids::uuid> stemRelayList;
-      for (const auto& dandelion_peer : dandelionStem) {
-        if (dandelion_peer.m_state == CryptoNoteConnectionContext::state_normal || dandelion_peer.m_state == CryptoNoteConnectionContext::state_synchronizing) {
-          stemRelayList.push_back(dandelion_peer.m_connection_id);
-        }
-      }
+      stemRelayList.push_back(dandelionPeer.m_connection_id);
 
-      if (!stemRelayList.empty()) {
-        auto buf = LevinProtocol::encode(arg);
-        m_p2p->externalRelayNotifyToList(NOTIFY_NEW_TRANSACTIONS::ID, buf, stemRelayList);
-      } else {
-        logger(Logging::WARNING, Logging::BRIGHT_YELLOW) << "No live Dandelion peers, broadcasting in dandelion fluff mode";
-        arg.stem = false;
-        for (const auto& h : txHashes) {
-          m_stemPool.removeTransaction(h);
-          logger(Logging::DEBUGGING) << h;
-        }
-
-        auto buf = LevinProtocol::encode(arg);
-        m_p2p->externalRelayNotifyToAll(NOTIFY_NEW_TRANSACTIONS::ID, buf, nullptr);
-      }
+      auto buf = LevinProtocol::encode(arg);
+      m_p2p->externalRelayNotifyToList(NOTIFY_NEW_TRANSACTIONS::ID, buf, stemRelayList);
     } else { // Switch to fluff broadcast
       arg.stem = false;
       logger(Logging::DEBUGGING) << "Switching to fluff broadcast of stem transactions:";

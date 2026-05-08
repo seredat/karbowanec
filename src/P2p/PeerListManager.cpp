@@ -19,6 +19,7 @@
 
 #include "PeerListManager.h"
 
+#include <algorithm>
 #include <time.h>
 #include <boost/foreach.hpp>
 #include <crypto/random.h>
@@ -63,17 +64,21 @@ PeerlistManager::Peerlist::Peerlist(peers_indexed& peers, size_t maxSize) :
 }
 
 void PeerlistManager::serialize(ISerializer& s) {
-  const uint8_t currentVersion = 3;
+  const uint8_t currentVersion = 4;
   uint8_t version = currentVersion;
 
   s(version, "version");
 
-  if (version != currentVersion) {
+  if (version < 3 || version > currentVersion) {
     return;
   }
 
   s(m_peers_white, "whitelist");
   s(m_peers_gray, "graylist");
+
+  if (version >= 4) {
+    s(m_peers_anchor, "anchorlist");
+  }
 }
 
 size_t PeerlistManager::Peerlist::count() const {
@@ -119,6 +124,14 @@ void PeerlistManager::trim_white_peerlist() {
 //--------------------------------------------------------------------------------------------------
 void PeerlistManager::trim_gray_peerlist() {
   m_grayPeerlist.trim();
+}
+
+//--------------------------------------------------------------------------------------------------
+void PeerlistManager::trim_anchor_peerlist() {
+  anchor_peers_indexed::index<by_time>::type& sorted_index = m_peers_anchor.get<by_time>();
+  while (m_peers_anchor.size() > CryptoNote::P2P_LOCAL_ANCHOR_PEERLIST_LIMIT) {
+    sorted_index.erase(sorted_index.begin());
+  }
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -230,15 +243,19 @@ bool PeerlistManager::set_peer_just_seen(PeerIdType peer, const NetworkAddress& 
 bool PeerlistManager::append_with_peer_anchor(const AnchorPeerlistEntry& ple)
 {
   try {
-      if (!is_ip_allowed(ple.adr.ip))
+    if (!is_ip_allowed(ple.adr.ip))
       return true;
 
     auto by_addr_it_anchor = m_peers_anchor.get<by_addr>().find(ple.adr);
     if (by_addr_it_anchor == m_peers_anchor.get<by_addr>().end()) {
-      //put new record into white list
       m_peers_anchor.insert(ple);
+    } else {
+      AnchorPeerlistEntry updated = ple;
+      updated.first_seen = std::min(by_addr_it_anchor->first_seen, ple.first_seen);
+      m_peers_anchor.replace(by_addr_it_anchor, updated);
     }
 
+    trim_anchor_peerlist();
     return true;
   }
   catch (std::exception&) {
@@ -309,17 +326,11 @@ bool PeerlistManager::append_with_peer_gray(const PeerlistEntry& ple)
 }
 //--------------------------------------------------------------------------------------------------
 
-bool PeerlistManager::get_and_empty_anchor_peerlist(std::vector<AnchorPeerlistEntry>& apl)
+bool PeerlistManager::get_anchor_peerlist(std::vector<AnchorPeerlistEntry>& apl) const
 {
   try {
-    auto begin = m_peers_anchor.get<by_time>().begin();
-    auto end = m_peers_anchor.get<by_time>().end();
-
-    std::for_each(begin, end, [&apl](const AnchorPeerlistEntry& a) {
-      apl.push_back(a);
-      });
-
-    m_peers_anchor.get<by_time>().clear();
+    const anchor_peers_indexed::index<by_time>::type& by_time_index = m_peers_anchor.get<by_time>();
+    std::copy(by_time_index.rbegin(), by_time_index.rend(), std::back_inserter(apl));
     return true;
   }
   catch (std::exception&) {

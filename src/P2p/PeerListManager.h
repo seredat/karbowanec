@@ -92,13 +92,14 @@ public:
   bool is_ip_allowed(uint32_t ip) const;
   void trim_white_peerlist();
   void trim_gray_peerlist();
+  void trim_anchor_peerlist();
 
   void serialize(ISerializer& s);
 
   Peerlist& getWhite();
   Peerlist& getGray();
 
-  bool get_and_empty_anchor_peerlist(std::vector<AnchorPeerlistEntry>& apl);
+  bool get_anchor_peerlist(std::vector<AnchorPeerlistEntry>& apl) const;
   bool remove_from_peer_anchor(const NetworkAddress& addr);
 
 private:

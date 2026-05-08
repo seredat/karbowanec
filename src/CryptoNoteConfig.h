@@ -168,6 +168,7 @@ const char     RPC_DEFAULT_KEY_FILE[]                        = "rpc_server.key";
 
 const size_t   P2P_LOCAL_WHITE_PEERLIST_LIMIT                =  1000;
 const size_t   P2P_LOCAL_GRAY_PEERLIST_LIMIT                 =  5000;
+const size_t   P2P_LOCAL_ANCHOR_PEERLIST_LIMIT               =  100;
 
 // This defines our current P2P network version
 // and the minimum version for communication between nodes

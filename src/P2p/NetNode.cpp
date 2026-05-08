@@ -1031,7 +1031,7 @@ namespace CryptoNote
     std::vector<AnchorPeerlistEntry> apl;
 
     if (peer_type == anchor) {
-      m_peerlist.get_and_empty_anchor_peerlist(apl);
+      m_peerlist.get_anchor_peerlist(apl);
     }
     
     size_t conn_count = get_outgoing_connections_count();
@@ -1367,14 +1367,6 @@ namespace CryptoNote
   
   void NodeServer::on_connection_close(P2pConnectionContext& context)
   {
-    if (!m_stopEvent.get() && !context.m_is_income) {
-      NetworkAddress na;
-      na.ip = context.m_remote_ip;
-      na.port = context.m_remote_port;
-
-      m_peerlist.remove_from_peer_anchor(na);
-    }
-    
     logger(TRACE) << context << "CLOSE CONNECTION";
     m_payload_handler.onConnectionClosed(context);
   }
