@@ -860,10 +860,14 @@ uint64_t Blockchain::getCurrentCumulativeBlocksizeLimit() {
 // ─── Hashing blobs ───────────────────────────────────────────────────────────
 
 bool Blockchain::getHashingBlob(const uint32_t height, BinaryArray& blob) {
-  if (!m_no_blobs && height < m_blobs.size()) {
-    blob = m_blobs[height];
-    return true;
+  if (!m_no_blobs) {
+    std::lock_guard<decltype(m_blockchain_lock)> lk(m_blockchain_lock);
+    if (height < m_blobs.size()) {
+      blob = m_blobs[height];
+      return true;
+    }
   }
+
   std::vector<uint8_t> blobData;
   if (m_db.getHashingBlob(height, blobData)) {
     blob = BinaryArray(blobData.begin(), blobData.end());
@@ -899,7 +903,7 @@ bool Blockchain::checkProofOfWork(Crypto::cn_context& context, const Block& bloc
 
 bool Blockchain::getBlockLongHash(Crypto::cn_context& context, const Block& b, Crypto::Hash& res) {
   std::list<Crypto::Hash> dummy_alt_chain;
-  return getBlockLongHash(context, b, res, dummy_alt_chain, false);
+  return getBlockLongHash(context, b, res, dummy_alt_chain, m_no_blobs);
 }
 
 // Big-endian load — interprets byte at offset as most significant.
@@ -1032,8 +1036,15 @@ bool Blockchain::getBlockLongHash(Crypto::cn_context& context, const Block& b, C
             seq ^= load_u32_le(ba.data(), 0);
           }
         } else {
-          if (height_j < m_blobs.size()) {
-            const BinaryArray& ba = m_blobs[height_j];
+          BinaryArray ba;
+          {
+            std::lock_guard<decltype(m_blockchain_lock)> lk(m_blockchain_lock);
+            if (height_j < m_blobs.size()) {
+              ba = m_blobs[height_j];
+            }
+          }
+
+          if (!ba.empty()) {
             pot.insert(pot.end(), ba.begin(), ba.end());
             // v6: mix memory content into seq
             if (b.majorVersion >= CryptoNote::BLOCK_MAJOR_VERSION_6 && ba.size() >= 4) {
