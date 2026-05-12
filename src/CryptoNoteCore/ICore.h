@@ -143,6 +143,7 @@ public:
 
   virtual bool getMixin(const Transaction& transaction, uint64_t& mixin) = 0;
   virtual bool isInCheckpointZone(uint32_t height) const = 0;
+  virtual uint32_t getRejectDeepReorgDepth() const = 0;
 
   virtual bool resolveAccountNumber(uint32_t blockHeight, uint32_t txIndex,
                                     AccountPublicAddress& address) = 0;

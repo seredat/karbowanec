@@ -117,6 +117,7 @@ public:
   virtual bool getBlockLongHash(Crypto::cn_context &context, const CryptoNote::Block& b, Crypto::Hash& res) override;
   virtual bool getMixin(const CryptoNote::Transaction& transaction, uint64_t& mixin) override;
   virtual bool isInCheckpointZone(uint32_t height) const override;
+  virtual uint32_t getRejectDeepReorgDepth() const override { return 0; }
   virtual bool resolveAccountNumber(uint32_t blockHeight, uint32_t txIndex, CryptoNote::AccountPublicAddress& address) override;
   virtual bool getAccountNumber(const CryptoNote::AccountPublicAddress& address, uint32_t& blockHeight, uint32_t& txIndex) override;
   virtual bool getCanonicalAccountRegistrationsCount(uint64_t& count) override;

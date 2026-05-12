@@ -55,6 +55,7 @@ namespace CryptoNote
     bool check_block(uint32_t height, const Crypto::Hash& h, bool& is_a_checkpoint) const;
     bool is_alternative_block_allowed(uint32_t blockchain_height, uint32_t block_height) const;
     std::vector<uint32_t> getCheckpointHeights() const;
+    uint32_t getRejectDeepReorgDepth() const { return m_reject_deep_reorg_depth; }
 
   private:
     std::map<uint32_t, Crypto::Hash> m_points;

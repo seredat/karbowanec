@@ -2303,6 +2303,17 @@ bool RpcServer::on_get_info(const COMMAND_RPC_GET_INFO::request& req, COMMAND_RP
   }
   res.max_cumulative_block_size = (uint64_t)m_core.currency().maxBlockCumulativeSize(res.height);
 
+  uint32_t rejectDeepReorgDepth = m_core.getRejectDeepReorgDepth();
+  res.deep_reorg_protection = rejectDeepReorgDepth > 0;
+  res.max_reorg_depth = rejectDeepReorgDepth;
+  if (res.deep_reorg_protection && res.height > rejectDeepReorgDepth) {
+    res.finalized_height = res.height - 1 - rejectDeepReorgDepth;
+    res.finalized_hash = Common::podToHex(m_core.getBlockIdByHeight(res.finalized_height));
+  } else {
+    res.finalized_height = 0;
+    res.finalized_hash = std::string();
+  }
+
   res.status = CORE_RPC_STATUS_OK;
   return true;
 }

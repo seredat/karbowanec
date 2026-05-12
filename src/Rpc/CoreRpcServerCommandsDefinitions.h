@@ -428,7 +428,11 @@ struct COMMAND_RPC_GET_INFO {
     uint64_t start_time;
     uint8_t block_major_version;
     std::string already_generated_coins;
-    std::string contact;   
+    std::string contact;
+    bool deep_reorg_protection;
+    uint32_t max_reorg_depth;
+    uint32_t finalized_height;
+    std::string finalized_hash;
 
     void serialize(ISerializer &s) {
       KV_MEMBER(status)
@@ -453,7 +457,11 @@ struct COMMAND_RPC_GET_INFO {
       KV_MEMBER(start_time)
       KV_MEMBER(block_major_version)
       KV_MEMBER(already_generated_coins)
-      KV_MEMBER(contact)      
+      KV_MEMBER(contact)
+      KV_MEMBER(deep_reorg_protection)
+      KV_MEMBER(max_reorg_depth)
+      KV_MEMBER(finalized_height)
+      KV_MEMBER(finalized_hash)
     }
   };
 };

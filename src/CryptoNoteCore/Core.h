@@ -139,6 +139,7 @@ namespace CryptoNote {
      void set_cryptonote_protocol(i_cryptonote_protocol* pprotocol);
      void set_checkpoints(Checkpoints&& chk_pts);
      virtual bool isInCheckpointZone(uint32_t height) const override;
+     virtual uint32_t getRejectDeepReorgDepth() const override { return m_checkpoints.getRejectDeepReorgDepth(); }
 
      // Flush any pending batch write txn (e.g. at shutdown).
      bool flushBatch() { return m_blockchain.flushBatch(); }
