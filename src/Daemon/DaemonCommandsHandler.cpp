@@ -395,6 +395,11 @@ bool DaemonCommandsHandler::print_pool_count(const std::vector<std::string>& arg
 }
 //--------------------------------------------------------------------------------
 bool DaemonCommandsHandler::start_mining(const std::vector<std::string> &args) {
+  if (protocolQuery.getPeerCount() == 0) {
+    std::cout << "Mining was not started because there are no connected peers." << std::endl;
+    return true;
+  }
+
   if (!args.size()) {
     std::cout << "Please, specify wallet address to mine for: start_mining <spend key> <view key> [threads=1]" << std::endl;
     return true;

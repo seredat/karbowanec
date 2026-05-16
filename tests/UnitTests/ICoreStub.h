@@ -62,6 +62,7 @@ public:
   virtual bool get_stat_info(CryptoNote::core_stat_info& st_inf) override { return false; }
   virtual bool on_idle() override { return false; }
   virtual void pause_mining() override {}
+  virtual void stop_mining_for_no_peers() override {}
   virtual void update_block_template_and_resume_mining() override {}
   virtual bool handle_incoming_block_blob(const CryptoNote::BinaryArray& block_blob, CryptoNote::block_verification_context& bvc, bool control_miner, bool relay_block) override { return false; }
   virtual bool handle_get_objects(CryptoNote::NOTIFY_REQUEST_GET_OBJECTS::request& arg, CryptoNote::NOTIFY_RESPONSE_GET_OBJECTS::request& rsp) override { return false; }

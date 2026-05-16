@@ -1771,6 +1771,11 @@ bool RpcServer::on_start_mining(const COMMAND_RPC_START_MINING::request& req, CO
     res.status = "Method disabled";
     return false;
   }
+
+  if (m_protocolQuery.getPeerCount() == 0) {
+    res.status = "Mining was not started because there are no connected peers";
+    return true;
+  }
   
   AccountKeys keys = boost::value_initialized<AccountKeys>();
 

@@ -658,6 +658,12 @@ void Core::pause_mining() {
   m_miner->pause();
 }
 
+void Core::stop_mining_for_no_peers() {
+  if (m_miner->stop(true)) {
+    logger(WARNING, BRIGHT_YELLOW) << "Mining stopped because all peers disconnected";
+  }
+}
+
 void Core::update_block_template_and_resume_mining() {
   if (update_miner_block_template()) {
     m_miner->resume();

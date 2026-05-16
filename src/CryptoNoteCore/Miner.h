@@ -46,7 +46,7 @@ namespace CryptoNote {
     bool start(const AccountKeys& acc, size_t threads_count);
     uint64_t get_speed();
     void send_stop_signal();
-    bool stop();
+    bool stop(bool keepMiningRequested = false);
     bool is_mining();
     bool on_idle();
     void on_synchronized();

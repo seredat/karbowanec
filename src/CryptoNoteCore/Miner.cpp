@@ -264,10 +264,14 @@ namespace CryptoNote
     m_starter_nonce = Random::randomValue<uint32_t>();
 
     if (!m_template_no) {
-      request_block_template(); //lets update block template
+      if (!request_block_template()) { //lets update block template
+        return false;
+      }
     }
 
+    m_do_mining = true;
     m_stop = false;
+    m_pausers_count = 0; // in case mining wasn't resumed after pause
 
     for (uint32_t i = 0; i != threads_count; i++) {
       m_threads.push_back(std::thread(std::bind(&miner::worker_thread, this, i)));
@@ -293,8 +297,12 @@ namespace CryptoNote
   }
 
   //-----------------------------------------------------------------------------------------------------
-  bool miner::stop()
+  bool miner::stop(bool keepMiningRequested)
   {
+    if (!keepMiningRequested) {
+      m_do_mining = false;
+    }
+
     std::lock_guard<std::mutex> lk(m_threads_lock);
 
     bool mining = !m_threads.empty();
@@ -377,7 +385,7 @@ namespace CryptoNote
   //-----------------------------------------------------------------------------------------------------
   void miner::on_synchronized()
   {
-    if(m_do_mining) {
+    if(m_do_mining && !is_mining()) {
       start(m_mine_account, m_threads_total);
     }
   }

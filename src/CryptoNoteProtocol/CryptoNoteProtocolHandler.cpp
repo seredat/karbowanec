@@ -150,8 +150,11 @@ void CryptoNoteProtocolHandler::onConnectionClosed(CryptoNoteConnectionContext& 
   }
 
   if (context.m_state != CryptoNoteConnectionContext::state_befor_handshake) {
-    m_peersCount--;
-    m_observerManager.notify(&ICryptoNoteProtocolObserver::peerCountUpdated, m_peersCount.load());
+    const size_t peersCount = m_peersCount > 0 ? --m_peersCount : 0;
+    m_observerManager.notify(&ICryptoNoteProtocolObserver::peerCountUpdated, peersCount);
+    if (peersCount == 0) {
+      m_core.stop_mining_for_no_peers();
+    }
   }
 }
 
@@ -967,6 +970,8 @@ bool CryptoNoteProtocolHandler::on_connection_synchronized() {
     Crypto::Hash hash;
     m_core.get_blockchain_top(height, hash);
     m_observerManager.notify(&ICryptoNoteProtocolObserver::blockchainSynchronized, height);
+  } else {
+    m_core.on_synchronized();
   }
   return true;
 }

@@ -66,6 +66,7 @@ public:
   virtual bool get_stat_info(CryptoNote::core_stat_info& st_inf) = 0;
   virtual bool on_idle() = 0;
   virtual void pause_mining() = 0;
+  virtual void stop_mining_for_no_peers() = 0;
   virtual void update_block_template_and_resume_mining() = 0;
   virtual bool handle_incoming_block_blob(const CryptoNote::BinaryArray& block_blob, CryptoNote::block_verification_context& bvc, bool control_miner, bool relay_block) = 0;
   virtual bool handle_incoming_block(const Block& b, block_verification_context& bvc, bool control_miner, bool relay_block) = 0;
