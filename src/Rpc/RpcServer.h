@@ -21,6 +21,7 @@
 
 #include <list>
 #include <functional>
+#include <memory>
 #include <unordered_map>
 #include "HTTP/HttpServer.h"
 #include "HTTP/HttpRequest.h"
@@ -42,6 +43,7 @@ namespace CryptoNote {
 class Core;
 class NodeServer;
 class BlockchainExplorer;
+class BuiltinExplorer;
 class ICryptoNoteProtocolQuery;
 
 class RpcServer {
@@ -174,6 +176,9 @@ private:
   CryptoNote::NodeServer& m_p2p;
   CryptoNote::BlockchainExplorerDataBuilder blockchainExplorerDataBuilder;
   const ICryptoNoteProtocolQuery& m_protocolQuery;
+  // HTML pages (built-in block explorer + status pages) live in their own
+  // module; the on_get_* methods on this class are thin forwarders.
+  std::unique_ptr<CryptoNote::BuiltinExplorer> m_builtinExplorer;
   std::unique_ptr<CryptoNote::HttpServer> m_httpServer;
   std::unique_ptr<CryptoNote::HttpServer> m_httpsServer;
   System::ContextGroup m_workingContextGroup;
