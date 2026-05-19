@@ -2842,7 +2842,21 @@ bool Blockchain::checkCheckpoints(uint32_t& lastValidCheckpointHeight) {
 void Blockchain::rollbackBlockchainTo(uint32_t height) {
   flushBatch();  // ensure no pending batch before removing blocks
   while (height + 1 < m_db.getChainHeight()) {
-    removeLastBlock();
+    try {
+      removeLastBlock();
+    } catch (const LMDBMapFullException&) {
+      // Each removeLastBlock opens its own write txn; LMDB's copy-on-write
+      // accumulates free pages inside the txn that aren't reclaimable until
+      // commit, so deep rewinds can spill the map. Abort the partial txn,
+      // double the map, and retry the same block — the push path uses the
+      // same dance for IBD map-full.
+      m_db.abortTxn();
+      logger(WARNING, BRIGHT_YELLOW) << "LMDB map full during rollback at height "
+                                     << (m_db.getChainHeight() - 1)
+                                     << "; doubling map and retrying.";
+      m_db.resizeMap();
+      removeLastBlock();
+    }
   }
 }
 
