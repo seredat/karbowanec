@@ -642,6 +642,15 @@ void Blockchain::commitBatchOrBlock(bool forceSingle) {
 
 bool Blockchain::resetAndSetGenesisBlock(const Block& b) {
   std::lock_guard<decltype(m_blockchain_lock)> lk(m_blockchain_lock);
+  if (m_db.hasActiveTxn()) {
+    m_db.abortTxn();
+    m_batchCount = 0;
+    if (m_batchFastMode) {
+      m_db.setFastSyncMode(false);
+      m_batchFastMode = false;
+    }
+  }
+
   m_db.clear();
   m_alternative_chains.clear();
   m_orphanBlocksIndex.clear();
@@ -1822,7 +1831,7 @@ size_t Blockchain::find_end_of_allowed_index(uint64_t amount) {
     if (!m_db.getKeyOutput(amount, static_cast<uint32_t>(i), block, txSlot, outIdx)) {
       continue;
     }
-    if (block + (block < m_currency.minedMoneyUnlockWindow()) <= chainHeight) {
+    if (block + m_currency.minedMoneyUnlockWindow() <= chainHeight) {
       return i + 1;
     }
   } while (i != 0);
@@ -2205,8 +2214,14 @@ bool Blockchain::addNewBlock(const Block& bl, block_verification_context& bvc) {
     }
 
     if (!(bl.previousBlockHash == getTailId())) {
+      uint32_t blockHeight = 0;
+      if (!bl.baseTransaction.inputs.empty()) {
+        if (const BaseInput* baseInput = boost::get<BaseInput>(&bl.baseTransaction.inputs.front())) {
+          blockHeight = baseInput->blockIndex;
+        }
+      }
       logger(DEBUGGING) << "handling alternative block " << Common::podToHex(id)
-        << " at height " << boost::get<BaseInput>(bl.baseTransaction.inputs.front()).blockIndex
+        << " at height " << blockHeight
         << " as it doesn't refer to chain tail " << Common::podToHex(getTailId())
         << ", its prev. block hash: " << Common::podToHex(bl.previousBlockHash);
       bvc.m_added_to_main_chain = false;
@@ -2398,13 +2413,46 @@ bool Blockchain::pushBlock(const Block& blockData, const std::vector<Transaction
   block.transactions.resize(1);
   block.transactions[0].tx = blockData.baseTransaction;
   TransactionIndex transactionIndex = {newHeight, 0};
+  bool blockTxnActive = false;
+
+  auto trimBlobsToActiveChain = [&]() {
+    if (!m_no_blobs) {
+      const uint32_t chainHeight = m_db.getChainHeight();
+      if (m_blobs.size() > chainHeight) {
+        m_blobs.resize(chainHeight);
+      }
+    }
+  };
+
+  auto abortCurrentBlockTxn = [&]() {
+    if (blockTxnActive && m_db.hasNestedTxn()) {
+      m_db.abortNestedWriteTxn();
+      blockTxnActive = false;
+    } else if (m_db.hasActiveTxn() && m_batchCount == 0) {
+      m_db.abortTxn();
+    }
+    trimBlobsToActiveChain();
+  };
+
+  auto abortEntireBatchTxn = [&]() {
+    if (blockTxnActive && m_db.hasNestedTxn()) {
+      m_db.abortNestedWriteTxn();
+      blockTxnActive = false;
+    }
+    m_db.abortTxn();
+    m_batchCount = 0;
+    trimBlobsToActiveChain();
+  };
 
   try {
     beginBatchIfNeeded();
+    if (m_batchCount > 0) {
+      m_db.beginNestedWriteTxn();
+      blockTxnActive = true;
+    }
 
     if (!pushTransaction(block, minerTransactionHash, transactionIndex)) {
-      m_db.abortTxn();
-      m_batchCount = 0;
+      abortCurrentBlockTxn();
       bvc.m_verification_failed = true;
       return false;
     }
@@ -2425,15 +2473,13 @@ bool Blockchain::pushBlock(const Block& blockData, const std::vector<Transaction
         logger(INFO, BRIGHT_WHITE) << "Block " << blockHash
           << " has at least one transaction with wrong inputs: " << tx_id;
         bvc.m_verification_failed = true;
-        m_db.abortTxn();
-        m_batchCount = 0;
+        abortCurrentBlockTxn();
         return false;
       }
 
       ++transactionIndex.transaction;
       if (!pushTransaction(block, tx_id, transactionIndex)) {
-        m_db.abortTxn();
-        m_batchCount = 0;
+        abortCurrentBlockTxn();
         bvc.m_verification_failed = true;
         return false;
       }
@@ -2444,8 +2490,7 @@ bool Blockchain::pushBlock(const Block& blockData, const std::vector<Transaction
 
     if (!checkCumulativeBlockSize(blockHash, cumulative_block_size, newHeight)) {
       bvc.m_verification_failed = true;
-      m_db.abortTxn();
-      m_batchCount = 0;
+      abortCurrentBlockTxn();
       return false;
     }
 
@@ -2453,8 +2498,7 @@ bool Blockchain::pushBlock(const Block& blockData, const std::vector<Transaction
                                      already_generated_coins, fee_summary, reward, emissionChange)) {
       logger(INFO, BRIGHT_WHITE) << "Block " << blockHash << " has invalid miner transaction";
       bvc.m_verification_failed = true;
-      m_db.abortTxn();
-      m_batchCount = 0;
+      abortCurrentBlockTxn();
       return false;
     }
 
@@ -2463,14 +2507,17 @@ bool Blockchain::pushBlock(const Block& blockData, const std::vector<Transaction
     block.cumulative_difficulty   = currentDifficulty + prevCumulativeDifficulty;
 
     pushBlock(block, blockHash);  // writes block-level LMDB data
+    if (blockTxnActive) {
+      m_db.commitNestedWriteTxn();
+      blockTxnActive = false;
+    }
 
-    commitBatchOrBlock();  // commits now if live, defers if syncing
+    commitBatchOrBlock(newHeight == 0);  // commits now if live, defers if syncing
 
   } catch (const LMDBMapFullException&) {
     // Batch (possibly spanning many blocks) is aborted.  Chain reverts to the
     // last committed height; the protocol handler will re-sync from there.
-    m_db.abortTxn();
-    m_batchCount = 0;
+    abortEntireBatchTxn();
     if (m_batchFastMode) {
       m_db.setFastSyncMode(false);
       m_batchFastMode = false;
@@ -2482,8 +2529,7 @@ bool Blockchain::pushBlock(const Block& blockData, const std::vector<Transaction
     return false;
   } catch (const std::exception& e) {
     // Any other LMDB error (e.g. MDB_CORRUPTED): abort and clean up batch state.
-    m_db.abortTxn();
-    m_batchCount = 0;
+    abortEntireBatchTxn();
     if (m_batchFastMode) {
       m_db.setFastSyncMode(false);
       m_batchFastMode = false;

@@ -173,6 +173,11 @@ bool LMDBBlockchainDB::open(const std::string& path) {
 }
 
 void LMDBBlockchainDB::close() {
+  if (m_parentWriteTxn) {
+    mdb_txn_abort(m_writeTxn);
+    m_writeTxn = m_parentWriteTxn;
+    m_parentWriteTxn = nullptr;
+  }
   if (m_writeTxn) {
     mdb_txn_abort(m_writeTxn);
     m_writeTxn = nullptr;
@@ -196,7 +201,7 @@ void LMDBBlockchainDB::close() {
 }
 
 void LMDBBlockchainDB::clear() {
-  assert(!m_writeTxn && "clear() called with open write txn");
+  assert(!m_writeTxn && !m_parentWriteTxn && "clear() called with open write txn");
 
   MDB_txn* txn = nullptr;
   int rc = mdb_txn_begin(m_env, nullptr, 0, &txn);
@@ -258,19 +263,57 @@ bool LMDBBlockchainDB::isLocked(const std::string& path) {
 // ─── Transaction control ───────────────────────────────────────────────────
 
 void LMDBBlockchainDB::beginWriteTxn() {
-  assert(!m_writeTxn && "beginWriteTxn called with already-open txn");
+  assert(!m_writeTxn && !m_parentWriteTxn && "beginWriteTxn called with already-open txn");
   int rc = mdb_txn_begin(m_env, nullptr, 0, &m_writeTxn);
   checkRc(rc, "beginWriteTxn");
 }
 
+void LMDBBlockchainDB::beginNestedWriteTxn() {
+  assert(m_writeTxn && !m_parentWriteTxn && "beginNestedWriteTxn requires exactly one active parent txn");
+  MDB_txn* childTxn = nullptr;
+  int rc = mdb_txn_begin(m_env, m_writeTxn, 0, &childTxn);
+  checkRc(rc, "beginNestedWriteTxn");
+  m_parentWriteTxn = m_writeTxn;
+  m_writeTxn = childTxn;
+}
+
+void LMDBBlockchainDB::commitNestedWriteTxn() {
+  assert(m_writeTxn && m_parentWriteTxn && "commitNestedWriteTxn called without active nested txn");
+  MDB_txn* childTxn = m_writeTxn;
+  MDB_txn* parentTxn = m_parentWriteTxn;
+  int rc = mdb_txn_commit(childTxn);
+  // Restore the parent as the current write txn BEFORE checkRc may throw:
+  // mdb_txn_commit invalidates childTxn regardless of return code, so the
+  // child handle is gone either way. By swapping first we leave the object
+  // in a consistent "parent-only active" state on the throw path, where
+  // the caller's catch (e.g. abortEntireBatchTxn in pushBlock) can safely
+  // tear the parent down via abortTxn(). Reordering this would leak the
+  // child slot and confuse the next abort.
+  m_writeTxn = parentTxn;
+  m_parentWriteTxn = nullptr;
+  checkRc(rc, "commitNestedWriteTxn");
+}
+
+void LMDBBlockchainDB::abortNestedWriteTxn() {
+  assert(m_writeTxn && m_parentWriteTxn && "abortNestedWriteTxn called without active nested txn");
+  mdb_txn_abort(m_writeTxn);
+  m_writeTxn = m_parentWriteTxn;
+  m_parentWriteTxn = nullptr;
+}
+
 void LMDBBlockchainDB::commitTxn() {
-  assert(m_writeTxn && "commitTxn called without active txn");
+  assert(m_writeTxn && !m_parentWriteTxn && "commitTxn called without active top-level txn");
   int rc = mdb_txn_commit(m_writeTxn);
   m_writeTxn = nullptr;
   checkRc(rc, "commitTxn");
 }
 
 void LMDBBlockchainDB::abortTxn() {
+  if (m_parentWriteTxn) {
+    mdb_txn_abort(m_writeTxn);
+    m_writeTxn = m_parentWriteTxn;
+    m_parentWriteTxn = nullptr;
+  }
   if (m_writeTxn) {
     mdb_txn_abort(m_writeTxn);
     m_writeTxn = nullptr;
@@ -280,7 +323,7 @@ void LMDBBlockchainDB::abortTxn() {
 // ─── resizeMap ────────────────────────────────────────────────────────────
 
 void LMDBBlockchainDB::resizeMap() {
-  assert(!m_writeTxn && "resizeMap called with active write txn");
+  assert(!m_writeTxn && !m_parentWriteTxn && "resizeMap called with active write txn");
   MDB_envinfo info{};
   mdb_env_info(m_env, &info);
   size_t newSize = info.me_mapsize * 2;
@@ -289,7 +332,7 @@ void LMDBBlockchainDB::resizeMap() {
 }
 
 void LMDBBlockchainDB::growMapIfNeeded(double threshold) {
-  assert(!m_writeTxn && "growMapIfNeeded called with active write txn");
+  assert(!m_writeTxn && !m_parentWriteTxn && "growMapIfNeeded called with active write txn");
   MDB_envinfo info{};
   mdb_env_info(m_env, &info);
   MDB_stat stat{};
